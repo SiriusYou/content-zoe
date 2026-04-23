@@ -1,6 +1,10 @@
 # Operating Model — four-agent workflow for building content-zoe
 
-**Intent**: make the half-autonomous workflow in `~/Desktop/Screenshot 2026-04-17 at 2.53.34 AM.png` operationally executable so a fresh session can pick up mid-flow without re-discovering decisions. Derived from (a) user intent "Zoe of healthcare takes real tasks and evolves with building" (2026-04-23), (b) content-zoe Claude's critique of the prior compressed role-split doc, (c) the Path 1 architectural decision.
+**Intent**: make the half-autonomous workflow in `~/Desktop/Screenshot 2026-04-17 at 2.53.34 AM.png` operationally executable so a fresh session can pick up mid-flow without re-discovering decisions.
+
+**Nature of this doc**: a **preferred pattern with explicit exception lanes**, not a strict rule. The Zoe-orchestrated path is the default for meaningful work. Trivial fixes and runtime-unavailable situations route through named exception lanes (§1). Strict-rule framing was rejected because greenfield projects need the ability to ship a typo fix without spinning up a task-group.
+
+Derived from (a) user intent "Zoe of healthcare takes real tasks and evolves with building" (2026-04-23), (b) cz-Claude's structural critique of the compressed role-split doc, (c) cz-Codex's structural pushback on over-constraining to always-Zoe, (d) the Path 1 architectural decision.
 
 ## 1. Repos and mutation boundaries (Path 1)
 
@@ -13,8 +17,18 @@ Two repos, distinct ownership, asymmetric mutation rights:
 
 **Enforced invariants:**
 - Content-zoe → oh-healthcare writes are forbidden (per `~/.claude/projects/-Users-youjia-dev-content-zoe/memory/feedback_readonly_reference_repos.md`).
-- Oh-healthcare → content-zoe writes happen **only through the Zoe runtime** (worker worktrees), not via ad-hoc driver-agent Edit/Write. Exception: governance artifacts like this file are OK as direct driver writes.
+- Oh-healthcare → content-zoe writes happen **only through the Zoe runtime** (worker worktrees) for meaningful code work, not via ad-hoc driver-agent Edit/Write. See Direct + Fallback lanes below for the narrow exceptions.
 - Oh-healthcare → oh-healthcare engine-evolution changes are **scoped to cross-repo target support** under this process. Unrelated oh-healthcare changes use oh-healthcare's own ticket/SDD flow.
+
+### Three lanes for mutating content-zoe
+
+| Lane | When | Agent | Commit tag | Skip review rounds? |
+|---|---|---|---|---|
+| **Zoe-track (default)** | Any change touching `src/`, schema, tests, adapter interfaces, or any commit ≥ 20 lines | Zoe worker (via task-group) | (none) | no — full workflow |
+| **Direct lane (exception)** | Trivial: typo/grammar in docs, comment-only edits, `.gitignore` / license / metadata fixes, single-line config tweaks. < 20 lines total, no `src/` touches, no schema. | hc-Claude OR cz-Claude, direct Edit | `[direct]` in commit trailer | yes — self-review only |
+| **Fallback lane (exception)** | Zoe runtime unavailable: engine regression, mid-evolution of cross-repo feature (e.g., `source_repo_path` not yet propagated through all loops), explicit maintenance window | hc-Codex rooted at content-zoe | `[fallback]` in commit trailer + reason line | no — full review still required, just implementation didn't use Zoe |
+
+**Lane arbitration**: when the lane is unclear, route to Zoe-track (the strict side). The exception lanes exist to avoid friction death, not to shortcut review.
 
 ## 2. Four-agent grid — instantiation
 
@@ -28,6 +42,12 @@ Two repos, distinct ownership, asymmetric mutation rights:
 **Bridging**: hc-Claude and cz-Claude cannot see each other's memory or chat. The user is the bridge — paste-back is how review rounds move between lanes. This is the "half-autonomous" shape: engines and reviewers are automated; the bridging is manual.
 
 ## 3. Workflow walk — image boxes mapped to artifacts
+
+**Binding artifact chain** (the single chain a worker and reviewer must follow; anything outside this chain is context, not binding):
+
+    docs/specs/NNNN-*.md  →  docs/plans/NNNN-*.md  →  Zoe task-group (execution packet)  →  run/group manifest + SHAs (validation report)  →  Reviews page approve/reject (operator decision)
+
+Each arrow is a hand-off that captures prior decisions as immutable input to the next step. A worker in IMPLEMENT reads the execution packet, not the chat backlog. A reviewer at APPROVAL reads the validation report + current SHA, not the conversation. This keeps fresh sessions able to execute.
 
 | Image box | Lane | Artifact / action | Canonical location |
 |---|---|---|---|
@@ -76,9 +96,19 @@ When a decision spans both lanes: write the detail in the OWNING lane's memory, 
 
 Plan-time for content-zoe has already consumed 7 rounds; we are now on the implementation-slice budget for slice 0001 and subsequent slices unless a new spec is drafted.
 
+### Arbitration when reviewers disagree
+
+When hc-Claude and cz-Codex (or any pair) produce conflicting findings on the same diff, resolution order:
+
+1. **Severity + specificity filter** — blocker/high + concrete-with-file-line-evidence wins over lower severity or vibes. Most disagreements collapse here.
+2. **Domain authority** — for a remaining tie, the reviewer whose scope (per §2) the finding falls into wins: runtime/architecture ↔ hc-Claude; implementation-risk/race-condition ↔ cz-Codex; spec/product ↔ cz-Claude.
+3. **Operator tiebreak** — remaining conflicts escalate to the user with: both findings verbatim, drafter's preferred resolution, 1-line explanation.
+
+No "majority vote" across reviewers — domain authority always wins over headcount. This prevents hc-lane ganging up on a cz-scope finding or vice versa.
+
 ## 7. One-line summary
 
-**hc-lane** owns runtime orchestration + engine self-evolution (cross-repo feature only) + run-log memory. **cz-lane** owns spec authorship + product judgment + adversarial code review + product memory. The user bridges chat-isolated lanes manually via paste-back.
+**hc-lane** owns runtime orchestration + engine self-evolution (cross-repo feature only) + run-log memory. **cz-lane** owns spec authorship + product judgment + adversarial code review + product memory. Default to Zoe-track; use Direct or Fallback lanes only by explicit criteria in §1. The user bridges chat-isolated lanes manually via paste-back until Zoe's Reviews page absorbs that role.
 
 ## Out of scope for this doc (deferred elsewhere)
 
