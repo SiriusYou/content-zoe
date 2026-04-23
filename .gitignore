@@ -1,0 +1,25 @@
+# Runtime state (two-process SQLite + WAL sidecars)
+.data/
+.runs/
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Node/Bun
+node_modules/
+bun.lockb
+
+# Staged artifact dirs (promoted via atomic rename)
+reports/.tmp-*/
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
+
+# Per-session state dirs from Claude Code / OMC harnesses (not project-tracked)
+.omc/
+.omx/
+.remember/
