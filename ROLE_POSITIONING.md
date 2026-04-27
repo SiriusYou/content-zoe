@@ -120,6 +120,38 @@ openclaw-healthcare workers committing to content-zoe are the only currently per
 - Never edit `~/dev/content-zoe/ROLE_POSITIONING.md` through worker execution.
 - Never edit `~/dev/content-zoe/CLAUDE.md` through worker execution.
 
+## Slice Approval Evidence Requirement
+
+Every `[x] (cz-Claude approved YYYY-MM-DD) Slice N: ...` line committed to PLAN.md or TODOS.md MUST have a matching `.omx/artifacts/claude-slice-N-review-YYYY-MM-DD.md` artifact, authored in a cz-Claude session, recording the substance of the review (scope verification, intent alignment, findings, verdict). The PLAN.md/TODOS.md label is the *index*; the artifact is the *substance*.
+
+**Verdict vocabulary** — the artifact's final verdict line MUST use one of:
+
+- `VERDICT: APPROVE` — slice scope sound, no findings requiring amendment
+- `VERDICT: APPROVE-WITH-AMENDMENTS-PENDING` — findings raised, slice not yet ready for hc-worker action
+- `VERDICT: APPROVE-WITH-AMENDMENTS-MET` — findings were raised AND the amendments are now applied; slice is ready
+- `VERDICT: HOLD` — review incomplete or further investigation required
+- `VERDICT: REJECT` — slice scope or intent fundamentally misaligned
+
+**Approval gate** — a slice is "approved" for hc-worker action ONLY if the matching artifact's final verdict is `APPROVE` or `APPROVE-WITH-AMENDMENTS-MET`. A PLAN.md/TODOS.md label without a matching artifact, or with an artifact whose verdict is `APPROVE-WITH-AMENDMENTS-PENDING`, `HOLD`, or `REJECT`, is NOT a valid approval. hc-workers must not act on it.
+
+**Re-review on amendment** — if a slice is amended after initial review (e.g. operator or hc-codex addresses findings), the new review artifact uses an incremented suffix: `claude-slice-N-review-YYYY-MM-DD-r2.md`, `-r3.md`, etc. The `YYYY-MM-DD` in the filename is the **original review date** (not the re-review date); the suffix tracks the review iteration. Original artifacts are preserved in the working tree for audit; the **latest-suffix artifact's verdict is the operative one**.
+
+**PLAN.md/TODOS.md label stability on re-review** — when a slice is amended and re-reviewed, the original `[x] (cz-Claude approved YYYY-MM-DD) Slice N: ...` label STAYS UNCHANGED. The label is the index pointing at the slice approval cycle; the operative status comes from the latest-suffix artifact's verdict, not from label toggling. This avoids cascading PLAN.md commits and worker-races between label and artifact state.
+
+**cz-Codex involvement** — cz-Claude review alone is sufficient at the slice-approval gate. cz-Codex adversarial review is mandatory at implementation/merge gates (per Cross-repo authority model § Gate 2), not at slice-approval.
+
+**Cross-repo intake snapshot** — because `.omx/` is gitignored and hc-workers operate from a checked-out target worktree at `<task-root>/target/` (not the operator's original working tree), each cross-repo intake referencing a slice approval MUST include the following fields in the intake body:
+
+- `slice_artifact_path`: path to the cz-Claude review artifact. MUST match the pattern `.omx/artifacts/claude-slice-N-review-YYYY-MM-DD(-rN)?.md`. **For re-reviewed slices, the path MUST point to the latest-suffix artifact** (e.g. `-r3.md` if r3 is the latest). An intake referencing an older-suffix artifact for an amended slice is invalid, even if that older artifact has an approving verdict.
+- `slice_artifact_verdict`: the verbatim final verdict line (e.g. `VERDICT: APPROVE`)
+- `slice_artifact_sha256`: the artifact file's SHA-256 at intake-submission time
+
+If any of these fields is absent, the verdict is not in the approve set, the recorded SHA is missing from the submitted intake's approval snapshot, the path doesn't match the required pattern, or the path doesn't reference the latest-suffix artifact for the slice, the intake is invalid and the slice is not approved. Invalid intakes route through the **Gate 1 rejection flow** defined in the Cross-repo authority model — the worker is not started, the operator is notified of the specific invalidation reason, and the operator must resubmit with corrected snapshot fields.
+
+The snapshot is an operator attestation captured at submission time; workers validate the intake fields, while reviewers can audit the hash against the operator's original cz checkout when needed. This snapshot is what makes the slice-approval gate auditable downstream of the operator's submission, since workers cannot see `.omx/` artifacts directly.
+
+Slice approval artifacts remain gitignored (per cz `.gitignore` for `.omx/`) — they live alongside the repo state for permanence within the working tree. Long-term archival of artifacts is operator policy and out of charter scope.
+
 ## Multi-Repo Composition
 
 The full hc-driven content system involves three repos:
