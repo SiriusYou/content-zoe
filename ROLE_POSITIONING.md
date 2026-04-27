@@ -65,22 +65,28 @@ Cross-repo execution is now a proven and bounded mode. This contract defines wha
 
 ## Cross-Repo Authority Model
 
-A cross-repo task crosses two governance domains. Both must consent before commits land on the target base branch.
+A cross-repo task crosses two governance domains. Both must consent before commits land on the target base branch. Gates are sequenced, not parallel.
 
-### openclaw-healthcare-Side Review
+### Gate 1: openclaw-healthcare-Side Review
 
-- openclaw-healthcare Claude reviews process discipline, declared-scope adherence, charter alignment, and lane integrity.
+Gate 1 reviews engine correctness and always runs first. It proves the branch is mechanically safe, declared-scope clean, and free of harness artifacts before target-side product review begins.
+
+- openclaw-healthcare Claude reviews process discipline, declared-scope adherence, charter alignment, lane integrity, and harness phase completion.
 - openclaw-healthcare Codex adversarially reviews engine implementation correctness.
 - Operator approves engine-side completion.
+- On rejection at Gate 1, the task is routed back through harness re-execute so the worker iterates on the same `agent/*` branch with amended commits, or it is replaced by a fresh worker run with a revised spec. No commits flow to Gate 2 until Gate 1 approves.
 
-### Target-Side Review
+### Gate 2: Target-Side Review
+
+Gate 2 reviews product and content correctness. It runs only after Gate 1 approves.
 
 - For content-zoe, content-zoe Claude reviews against content-zoe spec and plan intent.
 - For content-zoe, content-zoe Codex adversarially reviews target output.
 - For future targets, charter extension is required before cross-repo execution is permitted.
 - Operator approves target-side merge.
+- On rejection at Gate 2, operator chooses one of two paths: amend commits on the same `agent/*` branch through a fresh worker iteration scoped to the rejection feedback, or drop the `agent/*` branch entirely and retask with a revised intake. Operator records the choice in the run log.
 
-Operator approval at both gates is required for cross-repo merge. Either side rejecting routes the task back to the worker through standard SDD flow.
+Cross-repo merge to the target base branch is gated on both Gate 1 and Gate 2 approval. Either gate rejecting halts merge and triggers the rejection flow above. The `agent/*` branch persists during rejection-and-retry cycles to preserve diff history. It is dropped only after successful merge or by explicit operator decision.
 
 ## content-zoe Actors: Dual State
 
@@ -88,7 +94,9 @@ content-zoe Claude and content-zoe Codex operate in two states based on repo mat
 
 ### Pre-Bootstrap
 
-Current state: content-zoe is a planning workspace and has no `package.json`.
+Current state: content-zoe is a planning workspace and has no `package.json`. The authoritative state marker is this file.
+
+Transition to post-bootstrap state requires an explicit operator declaration recorded as a commit to this file. The recommended predicate is: `package.json` exists, `bun run report:run` has produced at least one published weekly-report bundle under `reports/YYYY-Www-ai-trends/`, and the bundle was approved through content-zoe Telegram approval flow with `status=published` in the local DB. Operator owns the transition decision and may declare earlier or later based on observed reliability.
 
 - content-zoe Claude is spec and plan custodian for what content-zoe will become.
 - content-zoe Claude reviews planning docs (`PLAN.md`, `TODOS.md`, addenda) for coherence and design intent.
@@ -96,7 +104,7 @@ Current state: content-zoe is a planning workspace and has no `package.json`.
 
 ### Post-Bootstrap
 
-Post-bootstrap state begins when `~/dev/content-zoe/package.json` exists and `bun run report:run` produces a working artifact.
+Post-bootstrap state begins only after the explicit operator declaration described above. After that declaration:
 
 - content-zoe Claude is full product steward and reviews implementation against the `PLAN.md` contract.
 - content-zoe Codex is full adversarial reviewer of content-zoe code, acceptance criteria, and content-output quality.
@@ -105,7 +113,7 @@ Post-bootstrap state begins when `~/dev/content-zoe/package.json` exists and `bu
 
 openclaw-healthcare workers committing to content-zoe are the only currently permitted cross-repo direction.
 
-- Pre-bootstrap content-zoe target: only Markdown, planning, docs, or scaffolding files. No code commits to content-zoe unless content-zoe Claude has approved a scaffolding plan slice.
+- Pre-bootstrap content-zoe target: only Markdown, planning, docs, or scaffolding files. Code commits to content-zoe require an explicit approved scaffolding-plan slice in `PLAN.md` or `TODOS.md`. The slice must be checked or marked approved by content-zoe Claude with declared file scope listed inline, for example: `[x] (cz-Claude approved 2026-04-XX) Slice 1: bootstrap report runner — file scope: package.json, src/preflight.ts, scripts/report-run.ts`. Workers verify the approved slice exists before writing code; harness scope guard fires if the worker writes code outside the listed file scope.
 - Post-bootstrap content-zoe target: code commits are permitted, scoped per spec.
 - Always: only declared-file-scope changes, never harness artifacts.
 - Never edit `~/dev/content-zoe/AGENTS.md`; it is a thin pointer per `f2f8a6b`.
