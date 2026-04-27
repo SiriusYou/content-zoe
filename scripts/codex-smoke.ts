@@ -9,19 +9,40 @@
 // All runtime artifacts (transcript, stderr log, findings.md, summary.json)
 // land under .runs/<id>/ and MUST stay out of git — .runs/ is gitignored.
 //
-// Pass condition (Gate 1 hardened): the smoke counts only structured Codex
-// JSONL tool events whose nested `item.type === "web_search"` — substring
-// matching against serialized lines is explicitly rejected. The `codex exec`
-// child is bounded by a timeout (default 90s) and killed on expiry with a
-// clear failure summary.
+// Pass condition (Gate 2 hardened):
+//
+//  1. Substring matching against serialized JSONL is rejected. The smoke
+//     counts only structured Codex tool events whose nested
+//     `item.type === "web_search"` matches the canonical Codex shape.
+//  2. `codex exec` is bounded by a timeout (default 180s, override via
+//     `CZ_SMOKE_TIMEOUT_MS`). On expiry the runner kills the entire Codex
+//     *process group* — not only the immediate Bun child handle — using
+//     `process.kill(-pgid, "SIGKILL")` against the detached child's pid.
+//     This guarantees that any descendants Codex forked for tool execution
+//     (web_search, file_change, command_execution, …) are also terminated.
+//  3. After the parent exits we capture two filesystem snapshots of the
+//     attempt directory across a quiescence window (default 5s, override
+//     via `CZ_SMOKE_QUIESCE_MS`). If any file grows or a new file appears
+//     between the snapshots, a descendant survived the kill — the
+//     quiescence proof fails and the failure summary records it.
+//
+// Why a Node `child_process.spawn` instead of `Bun.spawn`? Bun.spawn has no
+// `detached: true` switch as of writing. `node:child_process.spawn` is
+// supported by Bun and exposes `detached: true`, which calls setsid() so
+// the child becomes its own process group leader (PGID === child.pid).
+// Killing `-child.pid` then targets the whole group, which is the bug
+// Gate 2 caught.
 
 import {
+  createWriteStream,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   statSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { spawn } from "node:child_process";
 
 import { assertCodexAvailable } from "../src/preflight.ts";
 
@@ -34,6 +55,14 @@ const TIMEOUT_MS = (() => {
   if (!raw) return DEFAULT_TIMEOUT_MS;
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_TIMEOUT_MS;
+})();
+
+const DEFAULT_QUIESCE_MS = 5_000;
+const POST_KILL_QUIESCE_MS = (() => {
+  const raw = process.env.CZ_SMOKE_QUIESCE_MS;
+  if (!raw) return DEFAULT_QUIESCE_MS;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_QUIESCE_MS;
 })();
 
 function repoRoot(): string {
@@ -190,10 +219,119 @@ function summarizeJsonl(text: string): JsonlSummary {
   };
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// Post-kill quiescence proof.
+//
+// After we kill the process group, we recursively snapshot the attempt
+// directory twice across a fixed window. If anything grows or appears
+// between the two snapshots, a descendant Codex process survived the
+// SIGKILL and is still mutating files — which is exactly the lifecycle
+// failure Gate 2 caught. If both snapshots match, the process group went
+// quiet and the bounded-timeout guarantee is honored.
+// ──────────────────────────────────────────────────────────────────────────
+
+interface SnapshotEntry {
+  relPath: string;
+  bytes: number;
+  mtimeMs: number;
+}
+
+interface DirSnapshot {
+  capturedAtMs: number;
+  capturedAtIso: string;
+  files: SnapshotEntry[];
+}
+
+function snapshotAttemptDir(dir: string): DirSnapshot {
+  const files: SnapshotEntry[] = [];
+  function walk(d: string, base = ""): void {
+    if (!existsSync(d)) return;
+    let entries;
+    try {
+      entries = readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = join(d, entry.name);
+      const rel = base ? `${base}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        walk(full, rel);
+      } else if (entry.isFile()) {
+        try {
+          const s = statSync(full);
+          files.push({ relPath: rel, bytes: s.size, mtimeMs: s.mtimeMs });
+        } catch {
+          /* ignore — file may have been removed mid-walk */
+        }
+      }
+    }
+  }
+  walk(dir);
+  files.sort((a, b) => a.relPath.localeCompare(b.relPath));
+  const now = Date.now();
+  return {
+    capturedAtMs: now,
+    capturedAtIso: new Date(now).toISOString(),
+    files,
+  };
+}
+
+interface QuiescenceProof {
+  quiesceWindowMs: number;
+  before: DirSnapshot;
+  after: DirSnapshot;
+  changedFiles: Array<{
+    relPath: string;
+    beforeBytes: number;
+    afterBytes: number;
+    beforeMtimeMs: number;
+    afterMtimeMs: number;
+  }>;
+  newFiles: SnapshotEntry[];
+  quiet: boolean;
+}
+
+function compareSnapshots(
+  before: DirSnapshot,
+  after: DirSnapshot,
+  quiesceWindowMs: number,
+): QuiescenceProof {
+  const beforeMap = new Map<string, { bytes: number; mtimeMs: number }>();
+  for (const f of before.files) {
+    beforeMap.set(f.relPath, { bytes: f.bytes, mtimeMs: f.mtimeMs });
+  }
+  const changedFiles: QuiescenceProof["changedFiles"] = [];
+  const newFiles: SnapshotEntry[] = [];
+  for (const f of after.files) {
+    const prior = beforeMap.get(f.relPath);
+    if (!prior) {
+      newFiles.push({ relPath: f.relPath, bytes: f.bytes, mtimeMs: f.mtimeMs });
+    } else if (prior.bytes !== f.bytes || prior.mtimeMs !== f.mtimeMs) {
+      changedFiles.push({
+        relPath: f.relPath,
+        beforeBytes: prior.bytes,
+        afterBytes: f.bytes,
+        beforeMtimeMs: prior.mtimeMs,
+        afterMtimeMs: f.mtimeMs,
+      });
+    }
+  }
+  return {
+    quiesceWindowMs,
+    before,
+    after,
+    changedFiles,
+    newFiles,
+    quiet: changedFiles.length === 0 && newFiles.length === 0,
+  };
+}
+
 async function main(): Promise<void> {
   const preflight = assertCodexAvailable();
   console.log(`[codex-smoke] codex preflight: ${preflight.raw}`);
   console.log(`[codex-smoke] timeout budget: ${TIMEOUT_MS}ms`);
+  console.log(`[codex-smoke] post-kill quiescence window: ${POST_KILL_QUIESCE_MS}ms`);
 
   const root = repoRoot();
   const attemptDir = makeAttemptDir(root);
@@ -222,39 +360,128 @@ async function main(): Promise<void> {
   ];
 
   console.log(`[codex-smoke] spawning: ${JSON.stringify(cmd)}`);
+  console.log(`[codex-smoke] spawn mode: detached (process group leader, setsid)`);
 
-  const proc = Bun.spawn({
-    cmd,
-    stdout: Bun.file(transcriptPath),
-    stderr: Bun.file(stderrPath),
+  // Pipe stdout/stderr to disk via Node streams. We do not use Bun.file()
+  // sinks here because we are using node:child_process.spawn for the
+  // `detached: true` flag (Bun.spawn lacks it as of writing).
+  const transcriptStream = createWriteStream(transcriptPath);
+  const stderrStream = createWriteStream(stderrPath);
+
+  // detached: true → child becomes leader of its own process group via
+  // setsid(); PGID === child.pid. Killing `-child.pid` then signals every
+  // descendant Codex forks for tool execution. This is the Gate 2 fix.
+  const proc = spawn(cmd[0], cmd.slice(1), {
+    detached: true,
+    stdio: ["ignore", "pipe", "pipe"],
   });
+  proc.stdout!.pipe(transcriptStream);
+  proc.stderr!.pipe(stderrStream);
+
+  const pid = typeof proc.pid === "number" ? proc.pid : null;
+  console.log(`[codex-smoke] codex pid (= pgid): ${pid ?? "<unknown>"}`);
 
   let timedOut = false;
+  let killSignal: string | null = null;
+  let killTargetPgid: number | null = null;
+  let killSentAtMs: number | null = null;
+  let killError: string | null = null;
   const startedAt = Date.now();
+
   const timeoutHandle = setTimeout(() => {
     timedOut = true;
+    killSentAtMs = Date.now();
     console.error(
-      `[codex-smoke] timeout after ${TIMEOUT_MS}ms — killing codex child (pid=${proc.pid ?? "?"})`,
+      `[codex-smoke] timeout after ${TIMEOUT_MS}ms — killing codex process group (pgid=${pid ?? "?"})`,
     );
-    try {
-      proc.kill("SIGKILL");
-    } catch (err) {
-      console.error(
-        `[codex-smoke] kill failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+    if (typeof pid === "number" && pid > 0) {
+      try {
+        // Negative pid → kill the whole process group. SIGKILL is
+        // unblockable; it will reap Codex and any descendants in one shot.
+        process.kill(-pid, "SIGKILL");
+        killSignal = "SIGKILL";
+        killTargetPgid = pid;
+        console.error(
+          `[codex-smoke] SIGKILL delivered to process group -${pid}`,
+        );
+      } catch (err) {
+        killError = err instanceof Error ? err.message : String(err);
+        console.error(
+          `[codex-smoke] process.kill(-${pid}, SIGKILL) failed: ${killError}; falling back to direct child kill`,
+        );
+        try {
+          proc.kill("SIGKILL");
+          killSignal = "SIGKILL (direct fallback)";
+        } catch (err2) {
+          const msg2 = err2 instanceof Error ? err2.message : String(err2);
+          killError = `pgid kill failed (${killError}); direct kill also failed: ${msg2}`;
+        }
+      }
+    } else {
+      killError = "no pid available to target process group";
     }
   }, TIMEOUT_MS);
 
-  let exitCode: number | null = null;
-  try {
-    exitCode = await proc.exited;
-  } finally {
-    clearTimeout(timeoutHandle);
-  }
+  const { exitCode, signal } = await new Promise<{
+    exitCode: number | null;
+    signal: NodeJS.Signals | null;
+  }>((resolveExit) => {
+    proc.on("exit", (code, sig) => resolveExit({ exitCode: code, signal: sig }));
+    proc.on("error", (err) => {
+      console.error(`[codex-smoke] child error: ${err.message}`);
+      resolveExit({ exitCode: null, signal: null });
+    });
+  });
+  clearTimeout(timeoutHandle);
+
+  // Flush both streams before we attempt to read the transcript.
+  await new Promise<void>((r) => transcriptStream.end(() => r()));
+  await new Promise<void>((r) => stderrStream.end(() => r()));
+
   const elapsedMs = Date.now() - startedAt;
+  // Conventional shell exit code for SIGKILL = 128 + 9 = 137.
+  const reportedExitCode =
+    exitCode !== null ? exitCode : signal === "SIGKILL" ? 137 : null;
   console.log(
-    `[codex-smoke] codex exit code: ${exitCode} (elapsed=${elapsedMs}ms, timedOut=${timedOut})`,
+    `[codex-smoke] codex exit: code=${exitCode} signal=${signal ?? "<none>"} reportedExitCode=${reportedExitCode} (elapsed=${elapsedMs}ms, timedOut=${timedOut})`,
   );
+
+  // Post-kill quiescence proof: only meaningful when we actually killed.
+  let quiescence: QuiescenceProof | null = null;
+  if (timedOut) {
+    const before = snapshotAttemptDir(attemptDir);
+    console.log(
+      `[codex-smoke] post-kill snapshot 1: ${before.files.length} files at ${before.capturedAtIso}`,
+    );
+    if (POST_KILL_QUIESCE_MS > 0) {
+      console.log(
+        `[codex-smoke] waiting ${POST_KILL_QUIESCE_MS}ms to detect surviving descendants…`,
+      );
+      await new Promise((r) => setTimeout(r, POST_KILL_QUIESCE_MS));
+    }
+    const after = snapshotAttemptDir(attemptDir);
+    console.log(
+      `[codex-smoke] post-kill snapshot 2: ${after.files.length} files at ${after.capturedAtIso}`,
+    );
+    quiescence = compareSnapshots(before, after, POST_KILL_QUIESCE_MS);
+    if (quiescence.quiet) {
+      console.log(
+        `[codex-smoke] quiescence: PASS — no file growth or new files in ${POST_KILL_QUIESCE_MS}ms after kill (process group fully terminated)`,
+      );
+    } else {
+      console.error(
+        `[codex-smoke] quiescence: FAIL — ${quiescence.changedFiles.length} files changed, ${quiescence.newFiles.length} new files appeared after kill (descendants survived)`,
+      );
+      for (const c of quiescence.changedFiles) {
+        console.error(
+          `  changed: ${c.relPath} ${c.beforeBytes}→${c.afterBytes} bytes`,
+        );
+      }
+      for (const n of quiescence.newFiles) {
+        console.error(`  new:     ${n.relPath} ${n.bytes} bytes`);
+      }
+    }
+  }
 
   const transcriptExists = existsSync(transcriptPath);
   const transcriptSize = transcriptExists ? statSync(transcriptPath).size : 0;
@@ -272,7 +499,7 @@ async function main(): Promise<void> {
 
   const pass =
     !timedOut &&
-    exitCode === 0 &&
+    reportedExitCode === 0 &&
     findingsExists &&
     findingsSize > 0 &&
     jsonl.parsedLines > 0 &&
@@ -291,10 +518,27 @@ async function main(): Promise<void> {
       preflight.major !== null && preflight.minor !== null
         ? `${preflight.major}.${preflight.minor}`
         : null,
+    spawn: {
+      runtime: "node:child_process",
+      detached: true,
+      pid,
+    },
     timeoutMs: TIMEOUT_MS,
+    quiesceWindowMs: POST_KILL_QUIESCE_MS,
     timedOut,
     elapsedMs,
-    exitCode,
+    exitCode: reportedExitCode,
+    rawExitCode: exitCode,
+    terminationSignal: signal,
+    kill: timedOut
+      ? {
+          targetPgid: killTargetPgid,
+          signal: killSignal,
+          sentAtMs: killSentAtMs,
+          error: killError,
+        }
+      : null,
+    postKillQuiescence: quiescence,
     transcript: {
       exists: transcriptExists,
       bytes: transcriptSize,
@@ -321,13 +565,18 @@ async function main(): Promise<void> {
 
   if (!pass) {
     if (timedOut) {
+      const quietNote = quiescence
+        ? quiescence.quiet
+          ? `process group quiet across ${POST_KILL_QUIESCE_MS}ms after kill`
+          : `process group NOT quiet (changed=${quiescence.changedFiles.length}, new=${quiescence.newFiles.length})`
+        : "no quiescence snapshot taken";
       console.error(
-        `[codex-smoke] FAIL — codex exec exceeded ${TIMEOUT_MS}ms; child was killed. ` +
+        `[codex-smoke] FAIL — codex exec exceeded ${TIMEOUT_MS}ms; process group SIGKILLed; ${quietNote}. ` +
           `transcriptBytes=${transcriptSize} structuredWebSearchEvents=${jsonl.webSearchEvents} findingsExists=${findingsExists}`,
       );
     } else {
       console.error(
-        `[codex-smoke] FAIL — exit=${exitCode} findings=${findingsExists} bytes=${findingsSize} structuredWebSearchEvents=${jsonl.webSearchEvents}`,
+        `[codex-smoke] FAIL — exit=${reportedExitCode} findings=${findingsExists} bytes=${findingsSize} structuredWebSearchEvents=${jsonl.webSearchEvents}`,
       );
     }
     process.exit(1);
