@@ -1,0 +1,1 @@
+content-zoe is eligible to receive automated commits from openclaw-healthcare workers via sourceRepoPath; those commits arrive on agent/* branches, receive cz-Claude or operator review before merge, and follow the runbook at openclaw-healthcare:docs/runbooks/compounding-loop-workflow-repair.md.
