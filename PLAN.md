@@ -36,6 +36,14 @@ Four pivots and six review rounds produced this plan. Key flips to acknowledge:
 
 **Smoke-test codex CLI web-search** before writing `src/llm/codex-cli.ts`:
 
+### Approved scaffolding slice
+
+[x] (cz-Claude approved 2026-04-27) Slice 1: preflight and Codex CLI smoke-test scaffold — file scope: package.json, src/preflight.ts, scripts/codex-smoke.ts, docs/preflight/codex-smoke.md
+
+- `AGENTS.md` is explicitly out of worker scope for Slice 1. The worker records the observed Codex version, recommended `<major.minor>` pin, JSONL evidence, and pass/fail decision in `docs/preflight/codex-smoke.md`; the operator records any `AGENTS.md` pin in a separate governance edit after reviewing that evidence.
+- Acceptance: `package.json` exposes a Bun smoke command that runs `scripts/codex-smoke.ts`; the smoke exits 0, JSONL contains web_search events, and `findings.md` contains live-web content. `src/preflight.ts` provides the memoized `codex --version` assertion used later by `report-run.ts`.
+- Blocks Slice 2 (LLM provider scaffold) until `docs/preflight/codex-smoke.md` records the smoke result and the operator has made the `AGENTS.md` pin decision.
+
 ```bash
 codex --version                                                  # record; pin in AGENTS.md
 mkdir -p /tmp/codex-smoke && cd /tmp/codex-smoke
