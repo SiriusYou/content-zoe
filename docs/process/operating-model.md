@@ -39,6 +39,7 @@ Each arrow captures prior decisions as immutable input to the next step. A worke
 |---|---|---|---|
 | SPEC (artifact) | cz-Claude drafts (seeded by operator request through SDD), cz-Codex + hc-Claude review | Markdown spec | `content-zoe/docs/specs/NNNN-*.md` |
 | PLAN (artifact) | cz-Claude drafts, cz-Codex + hc-Claude + hc-Codex review | Markdown plan w/ build sequence, acceptance criteria, Mode line | `content-zoe/docs/plans/NNNN-*.md` |
+| SLICE DRAFT (artifact) | hc-Claude drafts; cz-Claude reviews (mandatory, all slices); cz-Codex reviews (mandatory for framework slices per charter v3.3, advisory for handler) | Markdown slice draft + matching `.omx/artifacts/claude-slice-N-review-*.md` + (framework only) `.omx/artifacts/codex-slice-N-review-*.md` | `content-zoe/.omx/drafts/slice-N-*.md` (gitignored) |
 | ADVERSARIAL REVIEW of plan | cz-Codex primary; hc-Claude + hc-Codex secondary | findings list with severity grades | inline in plan doc revision history |
 | PICK SMALLEST MODE | cz-Claude proposes, hc-Claude ratifies, operator approves | explicit "Mode: DIRECT / A / B / C / D / E / R" header in plan | (in plan doc) |
 | WORKER IMPLEMENTS | Zoe worker via claim-loop | code changes in worktree off content-zoe branch | oh-healthcare dashboard `/dashboard/runs` |
@@ -82,6 +83,7 @@ When a decision spans both lanes: write the detail in the OWNING lane's memory, 
 |---|---|---|
 | Plan-time (new SPEC or PLAN) | 3 adversarial rounds max (cz-Codex + hc-Claude + hc-Codex) | engine-evolution slices (oh-healthcare internal) get full extended review — load-bearing infrastructure |
 | Per-implementation-slice | 1 adversarial pass (cz-Codex) + 1 plan-compliance pass (hc-Claude) | if review findings ≥ 2 high-severity OR any spec-violation → re-enter plan-time review |
+| Slice-approval gate | Handler slices: 1 cz-Claude review (sufficient). Framework slices: 1 cz-Claude review + 1 cz-Codex slice-approval review (per charter v3.3, both must be in approve set) | If r1→r4 does not converge to the approve set → re-enter plan-time review for SPEC/PLAN amendment |
 
 Plan-time for content-zoe has already consumed 7 rounds; we are now on the implementation-slice budget for slice 0001 and subsequent slices unless a new spec is drafted.
 
@@ -95,6 +97,14 @@ Resolution order:
 4. **Operator tiebreak** — remaining conflicts escalate to the operator with both findings verbatim, drafter's preferred resolution, 1-line explanation.
 
 No "majority vote" across reviewers — domain authority always wins over headcount.
+
+### Reviewer brief discipline
+
+For adversarial review cycles (slice-approval, plan review, charter amendment), reviewer briefs SHOULD include explicit out-of-scope clauses delineating each reviewer's domain. This prevents review-budget bleed and surfaces early when a reviewer is encroaching on another reviewer's lane.
+
+**Brief shape**: each reviewer brief MUST contain (a) a "Focus" clause naming what to check, (b) a "Specifically check" clause naming concrete items, and (c) an "Out of scope" clause naming what other reviewers' lanes are. Round-N briefs should narrow further: they verify only that round-(N-1) findings folded cleanly, plus surface any new contradictions introduced by the fold itself.
+
+**Origin**: charter v3.3 cycle (2026-04-28). The cycle's r1 + r2 + r3 reviewer briefs explicitly demonstrated this discipline; cz-Claude r2 forward observation #4 codified it as a future operating-model addition.
 
 ## 8. One-line summary
 
@@ -128,6 +138,14 @@ Patterns surfaced across Slice 1 + Slice 2 + Slice 3 cycles (cz-Claude r1→rN +
 
 **How to apply**: when a slice draft introduces a generalized invariant (e.g. "no env reads under X", "all paths inside Y"), explicitly audit upstream surfaces for contradictions. Don't assume prior approvals carry forward — codifying a stricter rule re-litigates earlier acceptances. Reviewers should grep for the new invariant's keywords across PLAN.md + prior slice drafts + charter to catch latent contradictions before implementation.
 
+**Audit checklist** (added 2026-04-28 from charter v3.3 cycle, where v1.0's audit missed a singular-grammar surface that v1.1's re-audit caught):
+
+1. When the amendment introduces a NEW invariant (e.g., "no env reads under X", "all paths inside Y"), grep for the invariant's keywords across all upstream surfaces (PLAN.md, prior slice drafts, charter sections).
+2. When the amendment introduces MULTIPLICITY where there was singularity (e.g., dual artifacts where there was one, multiple reviewer streams where there was one), grep the entire charter for singular grammar ("the matching artifact", "the verdict") that needs updating to plural or conditional grammar.
+3. Don't assume prior approvals carry forward — codifying a stricter rule re-litigates earlier acceptances. Surface those re-litigations explicitly in the latent-contradiction audit table.
+
+This converts § 9.3 from a post-hoc explanation pattern into a checkable verification step at draft time.
+
 ### 9.4 Forward observations as inheritance contracts
 
 **Rule**: each slice's "Forward observations" section becomes the next slice's structural constraints. Forward observations are NOT speculative wishes — they are binding inheritance contracts that the next slice's ACs MUST honor.
@@ -144,6 +162,16 @@ Patterns surfaced across Slice 1 + Slice 2 + Slice 3 cycles (cz-Claude r1→rN +
 
 **How to apply**: smoke runners should either (a) implement append-only mode for the outcome matrix, OR (b) the operator manually preserves prior rows when regenerating. When a worker-context FAIL is followed by an operator-context PASS, the matrix should show BOTH rows with distinct scenario names + execution-context lines. When a parser fold regenerates evidence, prior rows from earlier folds STAY in the matrix as audit history. Reviewers checking a smoke regeneration MUST verify that prior FAIL rows weren't silently overwritten.
 
+### 9.6 Self-applying amendment cycle pattern
+
+**Rule**: when a charter or operating-model amendment introduces a new review structure, governance gate, or classification, the amendment cycle itself should run the amendment's draft under the proposed rules. This validates that the new structure is operationally workable, catches gaps that the abstract proposal cannot surface, and provides one documented data point of the new structure's effectiveness on a real (and structurally relevant) artifact.
+
+**Data points**: charter v3.3 cycle (2026-04-28) — amendment promoted cz-Codex slice-approval review to mandatory for framework slices. The amendment cycle itself ran the v3.3 amendment draft through cz-Codex slice-approval review (advisory under v3.2 at draft-time, treated as if mandatory). cz-Codex caught two structural classifier gaps that cz-Claude's process-coherence review structurally couldn't: (r1) classifier needed non-TS contract classes (DB schema, event vocab, command grammar, prompts/delimiters, fs layout); (r2) classifier needed behavioral-invariant contract classes (workflow, state machine, retry, recovery, approval, promotion, authorization). Validates evidence base #2 of v3.3 by self-application.
+
+**How to apply**: when drafting an amendment that introduces a new review structure, identify whether the amendment itself qualifies under that structure (e.g., a charter amendment introducing framework-slice mandatory review applies to itself if the amendment introduces new cross-slice contract surfaces). If yes, run the amendment through the proposed structure as part of the cycle. The first cycle's outcome is a category-defining data point even though it's a single instance — it is not a recurrence-threshold candidate but a structure-defining instance.
+
+**Sub-pattern: Path B charter-vs-engine decoupling** (deferred for now; first observed in v3.3 cycle hc-codex r1 H1 fold). When an amendment introduces fields that the existing engine cannot mechanically enforce, two paths: (A) block amendment merge on engine slice landing; (B) soften charter to operator-attestation-and-audit, defer mechanical enforcement to follow-on engine slice. Path B is preferable when charter is policy and engine is enforcement, because coupling them creates an ordering loop. Track for promotion to its own § 9.7 once a second amendment cycle exercises the same pattern.
+
 ## Out of scope for this doc
 
 - 6-actor charter → `ROLE_POSITIONING.md`.
@@ -151,4 +179,6 @@ Patterns surfaced across Slice 1 + Slice 2 + Slice 3 cycles (cz-Claude r1→rN +
 - Per-slice acceptance-criterion conventions → each spec in `docs/specs/` is self-contained.
 - Brand voice rules → `content-zoe/docs/SOUL.md` (not yet written).
 - Bot allowlist + preflight policy → `content-zoe/AGENTS.md` (stubbed, filled at scaffolding commit per PLAN.md).
-- Patterns at threshold but deferred from § 9 (held back per hc-codex's "only patterns Slice 3 implementation will actually use" filter): #4 Optional consistency strengthening, #9 Constrained-alternative-due-to-prior-slice-freeze, #10 Cross-lane finding amplification (emerging). Will fold once a Slice 4+ cycle exercises them.
+- Patterns at threshold but deferred from § 9 (will fold once a future cycle exercises each):
+  - From Slice 3 cycle: #4 Optional consistency strengthening, #9 Constrained-alternative-due-to-prior-slice-freeze, #10 Cross-lane finding amplification (emerging) — held back per hc-codex's "only patterns Slice 3 implementation will actually use" filter.
+  - From charter v3.3 cycle (2026-04-28): Path B charter-vs-engine decoupling (registered as sub-pattern in § 9.6 above); bonus strengthening clauses as fold-quality signal; verbiage-drift-on-binding-force-flip (cz-Claude r1 M-r1-1 origin); lifecycle-clause-for-slice-draft-top-declarations (cz-Claude r1 M-r1-3 origin). Each held below recurrence threshold (N=1) until a second cycle exercises it.
