@@ -132,23 +132,64 @@ Every `[x] (cz-Claude approved YYYY-MM-DD) Slice N: ...` line committed to PLAN.
 - `VERDICT: HOLD` — review incomplete or further investigation required
 - `VERDICT: REJECT` — slice scope or intent fundamentally misaligned
 
-**Approval gate** — a slice is "approved" for hc-worker action ONLY if the matching artifact's final verdict is `APPROVE` or `APPROVE-WITH-AMENDMENTS-MET`. A PLAN.md/TODOS.md label without a matching artifact, or with an artifact whose verdict is `APPROVE-WITH-AMENDMENTS-PENDING`, `HOLD`, or `REJECT`, is NOT a valid approval. hc-workers must not act on it.
+**Approval gate** — a slice is "approved" for hc-worker action ONLY if (a) for **handler slices**, the cz-Claude review artifact's latest-suffix final verdict is `VERDICT: APPROVE` or `VERDICT: APPROVE-WITH-AMENDMENTS-MET`; (b) for **framework slices**, BOTH the cz-Claude review artifact's latest-suffix verdict AND the cz-Codex slice-approval review artifact's latest-suffix verdict are in the approve set (`VERDICT: APPROVE` or `VERDICT: APPROVE-WITH-AMENDMENTS-MET`). A PLAN.md/TODOS.md label without all required artifacts present, or with any required artifact whose latest-suffix verdict is `VERDICT: APPROVE-WITH-AMENDMENTS-PENDING`, `VERDICT: HOLD`, or `VERDICT: REJECT`, is NOT a valid approval. hc-workers must not act on it.
 
-**Re-review on amendment** — if a slice is amended after initial review (e.g. operator or hc-codex addresses findings), the new review artifact uses an incremented suffix: `claude-slice-N-review-YYYY-MM-DD-r2.md`, `-r3.md`, etc. The `YYYY-MM-DD` in the filename is the **original review date** (not the re-review date); the suffix tracks the review iteration. Original artifacts are preserved in the working tree for audit; the **latest-suffix artifact's verdict is the operative one**.
+**Re-review on amendment** — if a slice is amended after initial review (e.g. operator, hc-codex, cz-Codex slice-approval review, or cz-Claude review addresses findings), the new review artifact uses an incremented suffix: `claude-slice-N-review-YYYY-MM-DD-r2.md`, `-r3.md`, etc. The `YYYY-MM-DD` in the filename is the **original review date** (not the re-review date); the suffix tracks the review iteration. Original artifacts are preserved in the working tree for audit; the **latest-suffix artifact's verdict is the operative one**.
 
 **PLAN.md/TODOS.md label stability on re-review** — when a slice is amended and re-reviewed, the original `[x] (cz-Claude approved YYYY-MM-DD) Slice N: ...` label STAYS UNCHANGED. The label is the index pointing at the slice approval cycle; the operative status comes from the latest-suffix artifact's verdict, not from label toggling. This avoids cascading PLAN.md commits and worker-races between label and artifact state.
 
-**cz-Codex involvement** — cz-Claude review alone is sufficient at the slice-approval gate. cz-Codex adversarial review is mandatory at implementation/merge gates (per Cross-repo authority model § Gate 2), not at slice-approval.
+**cz-Codex involvement** — cz-Codex involvement at the slice-approval gate is governed by slice classification:
+
+- **Handler slices**: cz-Claude review alone is sufficient at the slice-approval gate. cz-Codex slice-approval review (advisory) is permitted but not required. cz-Codex Gate 2 adversarial review remains mandatory at implementation/merge per Cross-repo authority model § Gate 2.
+- **Framework slices**: BOTH cz-Claude review AND cz-Codex slice-approval review are mandatory at the slice-approval gate. Both reviewers' latest-suffix final verdicts MUST be in the approve set (`VERDICT: APPROVE` or `VERDICT: APPROVE-WITH-AMENDMENTS-MET`) before the slice is approved for hc-worker action. cz-Codex Gate 2 adversarial review remains mandatory at implementation/merge per Cross-repo authority model § Gate 2.
+
+**Slice classification** — a slice is a **framework slice** if it introduces or modifies any of the following classes of cross-slice consumed contracts:
+
+- (a) TypeScript interfaces, type aliases, exported classes, or functions whose signature is consumed across slice boundaries;
+- (b) database schema (tables, columns, indexes, migrations) consumed by other slices;
+- (c) event or status vocabularies (enum values, event-type strings, status-token strings) emitted by one slice and consumed by another;
+- (d) command grammar — CLI argument structures, subcommand layouts, environment-variable names — consumed by other slices;
+- (e) prompt templates, security delimiters, or escaping conventions that downstream slices interpolate into;
+- (f) filesystem layout conventions, report directory structures, or artifact-path patterns consumed by other slices;
+- (g) workflow, state-machine, lifecycle, retry, recovery, approval, promotion, or authorization semantics — behavioral invariants that downstream slices must honor or remain compatible with (e.g., state transition rules, retry-limit policies, crash-recovery sequencing, atomic-promote requirements, notifier compare-and-set rules, stage-loop behavior, authorization-token rotation policies).
+
+A slice is a **handler slice** if it consumes existing frameworks/contracts without introducing or modifying any of (a)-(g).
+
+The slice draft MUST declare classification at the top of the document on a line of the form `**Slice classification**: framework | handler`. The PLAN.md/TODOS.md approved-slice line MUST also carry the classification, in the form: `[x] (cz-Claude approved YYYY-MM-DD; classification=framework|handler) Slice N: <title> — file scope: <list>`. The PLAN.md/TODOS.md label is the **committed surface** that hc-workers can verify; the slice draft is the operator-internal artifact.
+
+Where classification is ambiguous (e.g., a composition root that wires existing framework without defining new cross-slice contracts), the operator records the classification decision on the approved-slice line at **slice-approval label commit time** (i.e., when the operator commits the cz-Claude-approved label to PLAN.md/TODOS.md). The recorded decision MAY be supplemented by a one-line rationale note immediately below the approved-slice line.
+
+**Classification lifecycle** — once recorded on the approved-slice line in PLAN.md/TODOS.md, the slice classification is sticky for the duration of the slice approval cycle (v1.0 → v1.N folds). If a draft revision introduces or removes a cross-slice contract that would change classification:
+
+- **handler→framework upgrade**: operator MUST update the approved-slice line, MUST open a cz-Codex slice-approval review on the current draft revision before any further hc-worker action, and outstanding cz-Claude findings remain operative.
+- **framework→handler downgrade**: operator MUST update the approved-slice line; any outstanding cz-Codex slice-approval findings on the now-handler slice may be retired with operator note recording the rationale, OR honored at operator discretion (downgrade does not invalidate prior findings, only their binding force).
+
+**cz-Codex slice-approval artifact format** — cz-Codex review at the slice-approval gate produces an artifact at `.omx/artifacts/codex-slice-N-review-YYYY-MM-DD.md`, with the same suffix convention as cz-Claude artifacts: `-r2`, `-r3`, ... for re-reviews; the original review date stays in the filename, the suffix tracks iteration; the latest-suffix verdict is operative for that reviewer's lane. cz-Claude and cz-Codex artifact suffix counters are **independent** — cz-Claude r1→rM and cz-Codex r1→rN do not need to lockstep. Each reviewer's latest-suffix verdict applies to that reviewer's lane only.
+
+The artifact's final verdict line MUST use one of: `VERDICT: APPROVE`, `VERDICT: APPROVE-WITH-AMENDMENTS-PENDING`, `VERDICT: APPROVE-WITH-AMENDMENTS-MET`, `VERDICT: HOLD`, `VERDICT: REJECT`. Bare verdict tokens without the `VERDICT:` prefix are not conformant. Findings raised by cz-Codex follow the same fold-and-re-review cycle as cz-Claude findings (per § "Re-review on amendment").
+
+**Reviewer arbitration at slice-approval** — when cz-Claude and cz-Codex disagree on a finding at the slice-approval gate, resolution follows operating-model § 7 ("Arbitration when reviewers disagree"). Concretely: severity + specificity filter → domain authority (product-fit ↔ cz-Claude; implementation-risk and cross-slice-contract correctness ↔ cz-Codex) → first-filer for same-domain same-severity → operator tiebreak.
 
 **Cross-repo intake snapshot** — because `.omx/` is gitignored and hc-workers operate from a checked-out target worktree at `<task-root>/target/` (not the operator's original working tree), each cross-repo intake referencing a slice approval MUST include the following fields in the intake body:
 
+For ALL slices (framework or handler):
+
+- `slice_classification`: `framework` or `handler`. MUST match the classification declared on the PLAN.md/TODOS.md approved-slice line at the operator's cz checkout HEAD at intake-submission time. Workers MAY verify by `grep`-style match against PLAN.md/TODOS.md at HEAD.
 - `slice_artifact_path`: path to the cz-Claude review artifact. MUST match the pattern `.omx/artifacts/claude-slice-N-review-YYYY-MM-DD(-rN)?.md`. **For re-reviewed slices, the path MUST point to the latest-suffix artifact** (e.g. `-r3.md` if r3 is the latest). An intake referencing an older-suffix artifact for an amended slice is invalid, even if that older artifact has an approving verdict.
-- `slice_artifact_verdict`: the verbatim final verdict line (e.g. `VERDICT: APPROVE`)
-- `slice_artifact_sha256`: the artifact file's SHA-256 at intake-submission time
+- `slice_artifact_verdict`: the verbatim final verdict line from the cz-Claude artifact (e.g. `VERDICT: APPROVE-WITH-AMENDMENTS-MET`). MUST be in the approve set.
+- `slice_artifact_sha256`: the cz-Claude artifact file's SHA-256 at intake-submission time.
 
-If any of these fields is absent, the verdict is not in the approve set, the recorded SHA is missing from the submitted intake's approval snapshot, the path doesn't match the required pattern, or the path doesn't reference the latest-suffix artifact for the slice, the intake is invalid and the slice is not approved. Invalid intakes route through the **Gate 1 rejection flow** defined in the Cross-repo authority model — the worker is not started, the operator is notified of the specific invalidation reason, and the operator must resubmit with corrected snapshot fields.
+For framework slices ONLY (additional required fields):
 
-The snapshot is an operator attestation captured at submission time; workers validate the intake fields, while reviewers can audit the hash against the operator's original cz checkout when needed. This snapshot is what makes the slice-approval gate auditable downstream of the operator's submission, since workers cannot see `.omx/` artifacts directly.
+- `codex_review_path`: path to the cz-Codex slice-approval artifact. MUST match the pattern `.omx/artifacts/codex-slice-N-review-YYYY-MM-DD(-rN)?.md`. For re-reviewed slices, MUST point to the latest-suffix artifact.
+- `codex_review_verdict`: the verbatim final verdict line from the cz-Codex artifact. MUST be in the approve set.
+- `codex_review_sha256`: the cz-Codex artifact file's SHA-256 at intake-submission time.
+
+**Enforcement** — these intake-snapshot fields are **operator attestations** captured at submission time. The operator MUST not submit an intake unless all required fields are present, all verdicts are in the approve set, all SHAs are accurate as of submission, all paths reference latest-suffix artifacts, and `slice_classification` matches the PLAN.md/TODOS.md approved-slice line. A submission that violates any of these constraints is invalid as a matter of charter; the slice is not approved.
+
+**Mechanical enforcement** of these constraints — i.e., automated rejection of malformed intakes by the openclaw-healthcare intake-submit pipeline — is **deferred to a follow-on hc engine slice**. Until that engine slice lands, validation is operator-attestation-and-audit only: reviewers and the operator can audit intake snapshots against the corresponding cz checkout post-submission, and any violation surfaces in the run log for retroactive correction. Once the engine slice ships, malformed intakes route through the **Gate 1 rejection flow** defined in the Cross-repo authority model — the worker is not started, the operator is notified of the specific invalidation reason, and the operator must resubmit with corrected snapshot fields.
+
+For framework slices, both reviewer artifacts are operator attestations captured at submission time; reviewers can audit either hash against the operator's original cz checkout when needed.
 
 Slice approval artifacts remain gitignored (per cz `.gitignore` for `.omx/`) — they live alongside the repo state for permanence within the working tree. Long-term archival of artifacts is operator policy and out of charter scope.
 
