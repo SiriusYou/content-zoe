@@ -1,7 +1,7 @@
 # Run Stage Smoke - Evidence Report
 
 **Slice:** cz Slice 3 (Phase 4.2) pipeline framework
-**Generated:** 2026-04-28T08:36:19.267Z
+**Generated:** 2026-04-28T08:44:35.312Z
 **Provider scope:** FakeProvider-only; no real Codex execution performed.
 **Evidence ceiling:** FakeProvider-only framework smoke approval.
 
@@ -24,8 +24,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:36:19.257Z
-- Finished: 2026-04-28T08:36:19.257Z
+- Started: 2026-04-28T08:44:35.302Z
+- Finished: 2026-04-28T08:44:35.303Z
 - Evidence: Pre-staged non-empty file satisfied the manifest.
 - Evidence: FakeProvider returned canned text and no transcriptPath was present on success.
 
@@ -33,8 +33,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:36:19.257Z
-- Finished: 2026-04-28T08:36:19.257Z
+- Started: 2026-04-28T08:44:35.303Z
+- Finished: 2026-04-28T08:44:35.303Z
 - Evidence: Pre-staged empty file failed a file_non_empty rule.
 - Evidence: The first manifest error was MANIFEST_FILE_EMPTY.
 
@@ -42,8 +42,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:36:19.257Z
-- Finished: 2026-04-28T08:36:19.258Z
+- Started: 2026-04-28T08:44:35.303Z
+- Finished: 2026-04-28T08:44:35.303Z
 - Evidence: Missing canned response surfaced FakeProvider's LLMProviderError(kind=parse).
 - Evidence: A non-LLMProviderError throw normalized to LLMProviderError(kind=spawn) with runStage internal prefix.
 
@@ -51,8 +51,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:36:19.258Z
-- Finished: 2026-04-28T08:36:19.265Z
+- Started: 2026-04-28T08:44:35.303Z
+- Finished: 2026-04-28T08:44:35.310Z
 - Evidence: DelayedFakeProvider used constructor-injected delay greater than the stage timeout.
 - Evidence: runStage returned the provider's LLMProviderError(kind=timeout).
 
@@ -60,8 +60,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:36:19.265Z
-- Finished: 2026-04-28T08:36:19.266Z
+- Started: 2026-04-28T08:44:35.310Z
+- Finished: 2026-04-28T08:44:35.311Z
 - Evidence: Covered research -> draft_en -> edit_en -> translate_zh -> awaiting_approval.
 - Evidence: Covered locales=['en'] translation skip and invalid-current-stage error.
 
@@ -69,8 +69,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:36:19.266Z
-- Finished: 2026-04-28T08:36:19.266Z
+- Started: 2026-04-28T08:44:35.311Z
+- Finished: 2026-04-28T08:44:35.311Z
 - Evidence: Path rules rejected both ../outside.md and an absolute outside path.
 - Evidence: Missing runDir, runDir-as-file, and runDir symlink escaping cwd all failed pre-provider.
 
@@ -78,8 +78,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:36:19.266Z
-- Finished: 2026-04-28T08:36:19.267Z
+- Started: 2026-04-28T08:44:35.311Z
+- Finished: 2026-04-28T08:44:35.312Z
 - Evidence: Path rule realpath checked runDir/sneaky.md.
 - Evidence: Symlink target outside runDir produced MANIFEST_PATH_OUTSIDE_RUNDIR.
 
@@ -87,8 +87,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:36:19.267Z
-- Finished: 2026-04-28T08:36:19.267Z
+- Started: 2026-04-28T08:44:35.312Z
+- Finished: 2026-04-28T08:44:35.312Z
 - Evidence: Glob rules rejected absolute and parent-segment patterns before matching.
 - Evidence: A glob match whose symlink target escaped runDir produced MANIFEST_PATH_OUTSIDE_RUNDIR.
 
