@@ -9,6 +9,7 @@
 | Scenario | Status | Lifecycle | Quiet |
 |---|---:|---|---:|
 | `fake` | PASS | - | - |
+| `codex-cli` (worker-context, original) | FAIL | - | - |
 | `codex-cli` | PASS | - | - |
 | `codex-cli` (operator rerun) | PASS | - | - |
 | `codex-cli-force-timeout` | PASS | `soft-only` | `true` |
@@ -26,6 +27,16 @@
 - Finished: 2026-04-28T05:01:33.392Z
 - Evidence: One FakeProvider handled two canned prompts.
 - Evidence: No subprocess, filesystem write, or network path is used by FakeProvider.
+### codex-cli (worker-context, original)
+
+- Command: `bun run llm-smoke --provider codex-cli`
+- Status: FAIL
+- Started: 2026-04-28T04:05:52.310Z
+- Finished: 2026-04-28T04:05:52.987Z
+- Error kind: `exit`
+- Execution context: worker context before the operator rerun; retained as audit evidence for the known worker-context Codex session-permission constraint.
+- Transcript directory: `/Users/youjia/.openclaw-worktrees/BY63DMkLHmKYZwLjfCzWo/target/.runs/2026-04-28T04-05-52-377Z`
+- Evidence: LLMProviderError(kind=exit, transcriptDir=/Users/youjia/.openclaw-worktrees/BY63DMkLHmKYZwLjfCzWo/target/.runs/2026-04-28T04-05-52-377Z): codex exited with code 1 stderrTail="b84a8c784.1777298441017658000.sh: Custom { kind: Other, error: \"background task failed\" }\n2026-04-28T04:05:52.983270Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-04-28T04:05:52.983287Z  WARN codex_core::shell_snapshot: Failed to check rollout age for snapshot /Users/youjia/.codex/shell_snapshots/019dc502-65ea-73c0-bffa-238ec99ff8df.1777342295291870000.sh: Custom { kind: Other, error: \"background task failed\" }\nError: thread/start: thread/start failed: error creating thread: Fatal error: Codex cannot access session files at /Users/youjia/.codex/sessions (permission denied). If sessions were created using sudo, fix ownership: sudo chown -R $(whoami) /Users/youjia/.codex (underlying error: Operation not permitted (os error 1))"
 ### codex-cli
 
 - Command: `bun run llm-smoke --provider codex-cli`
