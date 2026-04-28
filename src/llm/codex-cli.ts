@@ -41,6 +41,11 @@ interface RunTelemetry {
 
 let codexAvailabilityChecked = false;
 
+// Single-spawn invariant: src/preflight.ts:assertCodexAvailable performs
+// the Codex CLI version probe and memoizes it for the process. This provider
+// must route all availability checks through that function so two runPrompt()
+// calls on one CodexCliProvider instance observe exactly one codex --version
+// spawn.
 function ensureCodexAvailableOnce(): void {
   if (codexAvailabilityChecked) return;
   assertCodexAvailable();
@@ -232,21 +237,45 @@ function extractTextFromAgentMessage(item: Record<string, unknown>): string | nu
 function unwrapEvent(parsed: unknown): Record<string, unknown> | null {
   if (!parsed || typeof parsed !== "object") return null;
   const direct = parsed as Record<string, unknown>;
-  if (direct.type === "item.completed") return direct;
+  if (typeof direct.type === "string") return direct;
 
   const msg = direct.msg;
   if (msg && typeof msg === "object") {
     const wrapped = msg as Record<string, unknown>;
-    if (wrapped.type === "item.completed") return wrapped;
+    if (typeof wrapped.type === "string") return wrapped;
   }
 
   return null;
+}
+
+function extractCodexError(event: Record<string, unknown>): string | null {
+  if (event.type !== "error") return null;
+  const direct =
+    coerceString(event.message) ??
+    coerceString(event.error) ??
+    coerceString(event.reason);
+  if (direct) return direct;
+
+  const error = event.error;
+  if (error && typeof error === "object") {
+    const obj = error as Record<string, unknown>;
+    return (
+      coerceString(obj.message) ??
+      coerceString(obj.type) ??
+      coerceString(obj.code) ??
+      JSON.stringify(obj)
+    );
+  }
+
+  return "unknown Codex error event";
 }
 
 export function parseAssistantFinalText(jsonl: string): string {
   const messages: string[] = [];
   const lines = jsonl.split("\n");
   let parseErrors = 0;
+  let sawTurnCompleted = false;
+  const codexErrors: string[] = [];
 
   for (const raw of lines) {
     if (!raw.trim()) continue;
@@ -261,6 +290,19 @@ export function parseAssistantFinalText(jsonl: string): string {
 
     const event = unwrapEvent(parsed);
     if (!event) continue;
+    if (event.type === "turn.completed") {
+      sawTurnCompleted = true;
+      continue;
+    }
+
+    const codexError = extractCodexError(event);
+    if (codexError) {
+      codexErrors.push(codexError);
+      continue;
+    }
+
+    if (event.type !== "item.completed") continue;
+
     const item = event.item;
     if (!item || typeof item !== "object") continue;
     const itemObj = item as Record<string, unknown>;
@@ -271,6 +313,18 @@ export function parseAssistantFinalText(jsonl: string): string {
   }
 
   const finalText = messages.at(-1);
+  if (codexErrors.length > 0) {
+    throw new LLMProviderError({
+      kind: "parse",
+      message: `codex JSONL contained error event: ${codexErrors.at(-1)}`,
+    });
+  }
+  if (!sawTurnCompleted) {
+    throw new LLMProviderError({
+      kind: "parse",
+      message: "codex JSONL did not contain a turn.completed event",
+    });
+  }
   if (!finalText) {
     throw new LLMProviderError({
       kind: "parse",

@@ -5,7 +5,10 @@ import {
   _getSpawnCount,
   assertCodexAvailable,
 } from "../src/preflight.ts";
-import { CodexCliProvider } from "../src/llm/codex-cli.ts";
+import {
+  CodexCliProvider,
+  parseAssistantFinalText,
+} from "../src/llm/codex-cli.ts";
 import { FakeProvider } from "../src/llm/fake.ts";
 import { LLMProviderError } from "../src/llm/provider.ts";
 
@@ -13,7 +16,9 @@ type ScenarioName =
   | "fake"
   | "codex-cli"
   | "codex-cli-force-timeout"
-  | "codex-cli-force-hard-kill";
+  | "codex-cli-force-hard-kill"
+  | "synthetic-no-turn-completed"
+  | "synthetic-error-event";
 
 interface ScenarioOutcome {
   name: ScenarioName;
@@ -73,7 +78,10 @@ function commandFor(name: ScenarioName): string {
   if (name === "codex-cli-force-timeout") {
     return "bun run llm-smoke --provider codex-cli --force-timeout";
   }
-  return "bun run llm-smoke --provider codex-cli --force-hard-kill";
+  if (name === "codex-cli-force-hard-kill") {
+    return "bun run llm-smoke --provider codex-cli --force-hard-kill";
+  }
+  return "bun run llm-smoke";
 }
 
 function notRun(name: ScenarioName): ScenarioOutcome {
@@ -343,6 +351,92 @@ async function runForceHardKillSmoke(): Promise<ScenarioOutcome> {
   }
 }
 
+async function runSyntheticNoTurnCompleted(): Promise<ScenarioOutcome> {
+  const startedAtIso = new Date().toISOString();
+  const jsonl = [
+    JSON.stringify({
+      type: "item.completed",
+      item: {
+        type: "agent_message",
+        text: "this text must not be accepted without turn.completed",
+      },
+    }),
+    "",
+  ].join("\n");
+
+  try {
+    parseAssistantFinalText(jsonl);
+    return fail(
+      "synthetic-no-turn-completed",
+      ["Parser returned text even though turn.completed was absent."],
+      { startedAtIso },
+    );
+  } catch (err) {
+    if (
+      err instanceof LLMProviderError &&
+      err.kind === "parse" &&
+      err.message.includes("turn.completed")
+    ) {
+      return pass(
+        "synthetic-no-turn-completed",
+        [
+          "Parser rejected agent_message text when the stream lacked turn.completed.",
+          "Failure kind was LLMProviderError(kind=parse).",
+        ],
+        { startedAtIso, errorKind: err.kind },
+      );
+    }
+    return fail("synthetic-no-turn-completed", [formatError(err)], {
+      startedAtIso,
+      errorKind: err instanceof LLMProviderError ? err.kind : undefined,
+    });
+  }
+}
+
+async function runSyntheticErrorEvent(): Promise<ScenarioOutcome> {
+  const startedAtIso = new Date().toISOString();
+  const jsonl = [
+    JSON.stringify({ type: "error", message: "synthetic codex failure" }),
+    JSON.stringify({
+      type: "item.completed",
+      item: {
+        type: "agent_message",
+        text: "this text must not mask the error event",
+      },
+    }),
+    JSON.stringify({ type: "turn.completed" }),
+    "",
+  ].join("\n");
+
+  try {
+    parseAssistantFinalText(jsonl);
+    return fail(
+      "synthetic-error-event",
+      ["Parser returned text even though an error event was present."],
+      { startedAtIso },
+    );
+  } catch (err) {
+    if (
+      err instanceof LLMProviderError &&
+      err.kind === "parse" &&
+      err.message.includes("synthetic codex failure")
+    ) {
+      return pass(
+        "synthetic-error-event",
+        [
+          "Parser rejected a stream containing an error event before returning any agent_message text.",
+          "Failure kind was LLMProviderError(kind=parse), and the error message preserved the Codex error text.",
+        ],
+        { startedAtIso, errorKind: err.kind },
+      );
+    }
+    return fail("synthetic-error-event", [formatError(err)], {
+      startedAtIso,
+      errorKind: err instanceof LLMProviderError ? err.kind : undefined,
+    });
+  }
+}
+
 function formatError(err: unknown): string {
   if (err instanceof LLMProviderError) {
     const stderrNote =
@@ -365,6 +459,8 @@ function selectedScenarios(options: CliOptions): ScenarioName[] {
       "codex-cli",
       "codex-cli-force-timeout",
       "codex-cli-force-hard-kill",
+      "synthetic-no-turn-completed",
+      "synthetic-error-event",
     ];
   }
   if (options.provider === "fake") return ["fake"];
@@ -377,7 +473,11 @@ async function runScenario(name: ScenarioName): Promise<ScenarioOutcome> {
   if (name === "fake") return runFakeSmoke();
   if (name === "codex-cli") return runCodexCliSmoke();
   if (name === "codex-cli-force-timeout") return runForceTimeoutSmoke();
-  return runForceHardKillSmoke();
+  if (name === "codex-cli-force-hard-kill") return runForceHardKillSmoke();
+  if (name === "synthetic-no-turn-completed") {
+    return runSyntheticNoTurnCompleted();
+  }
+  return runSyntheticErrorEvent();
 }
 
 function renderOutcome(outcome: ScenarioOutcome): string {
@@ -419,6 +519,8 @@ async function writeReport(outcomes: ScenarioOutcome[]): Promise<void> {
     "codex-cli",
     "codex-cli-force-timeout",
     "codex-cli-force-hard-kill",
+    "synthetic-no-turn-completed",
+    "synthetic-error-event",
   ];
   const complete = allNames.map((name) => byName.get(name) ?? notRun(name));
   const shouldCheckCodexVersion = outcomes.some((outcome) =>
