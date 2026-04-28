@@ -98,4 +98,3 @@
 - The smoke runner removes its temporary invocation root in a `finally` cleanup.
 - Manifest policy is the contract: empty provider output is not implicitly rejected unless a manifest rule fails.
 - `runStage internal:` is an operational classifier prefix only; downstream code must inspect `LLMProviderError` object properties.
-
