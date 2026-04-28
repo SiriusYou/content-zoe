@@ -57,6 +57,12 @@ codex exec --full-auto --json --skip-git-repo-check \
 - **Doesn't:** wire Tavily / Exa / Firecrawl in research-stage prompt tools.
 - **Record codex version** in `AGENTS.md`. `src/preflight.ts` runs `codex --version` + asserts the pinned `<major.minor>`. Called by `report-run.ts` only — the one process that spawns Codex. `bot.ts` and `report-remind.ts` do NOT invoke preflight: they handle DB/Telegram work that must remain usable even if Codex breaks (e.g., you can still `/approve` an already-ready report after a botched `brew upgrade codex`). D-9 + round-4 #2 + round-5 #2. Called AT MOST once per process via a memoized guard.
 
+[x] (cz-Claude approved 2026-04-27) Slice 2: LLM provider scaffold — file scope: src/llm/provider.ts, src/llm/codex-cli.ts, src/llm/fake.ts, scripts/llm-smoke.ts, package.json (scripts only)
+
+- Slice 1 file scope is FROZEN — no edits to `scripts/codex-smoke.ts`; `src/preflight.ts` is read-only beyond importing `assertCodexAvailable` and `_getSpawnCount`. Operator-tunable parameters are constructor inputs, not module-level env reads — nothing under `src/llm/` reads `process.env`. `LLM_PROVIDER` and `CZ_LLM_QUIESCE_MS` are read by the caller (Slice 3+ `src/bin/report-run.ts`) and passed in via constructor injection per PLAN.md line 30. Helper extraction (e.g. `src/llm/process-group.ts`) deferred to a future Slice 2.5 if a third caller emerges.
+- Acceptance: `scripts/llm-smoke.ts` asserts (a) FakeProvider two-call roundtrip, (b) CodexCliProvider two-call success path with `_getSpawnCount() === 1` proving `assertCodexAvailable` memoization survives cross-call, (c) `--force-timeout` path (SIGTERM → 10 s grace → SIGKILL → post-kill quiescence `quiet: true`). `docs/preflight/llm-smoke.md` records all three outcomes mirroring the Slice 1 evidence-report shape. Approval evidence: `.omx/artifacts/claude-slice-2-review-2026-04-27-r3.md` (latest-suffix per charter v3.2 § stale-approval-replay; cycle convergence r1=12 → r2=2 → r3=0; r1+r2 preserved alongside for audit).
+- Blocks Slice 3 (pipeline stages + `run-stage` helper) until `LLMProvider` interface lands, both providers pass through `scripts/llm-smoke.ts`, and `docs/preflight/llm-smoke.md` records the smoke evidence.
+
 ## Project structure
 
 ```
