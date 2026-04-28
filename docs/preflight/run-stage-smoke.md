@@ -1,7 +1,7 @@
 # Run Stage Smoke - Evidence Report
 
 **Slice:** cz Slice 3 (Phase 4.2) pipeline framework
-**Generated:** 2026-04-28T08:44:35.312Z
+**Generated:** 2026-04-28T09:45:43.230Z
 **Provider scope:** FakeProvider-only; no real Codex execution performed.
 **Evidence ceiling:** FakeProvider-only framework smoke approval.
 
@@ -17,6 +17,9 @@
 | `manifest-path-outside-rundir` | PASS |
 | `manifest-symlink-escape` | PASS |
 | `manifest-glob-escape` | PASS |
+| `manifest-glob-mixed-safe-and-escape` | PASS |
+| `manifest-glob-min-count-zero` | PASS |
+| `manifest-glob-broken-symlink` | PASS |
 
 ## Scenario Evidence
 
@@ -24,8 +27,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:44:35.302Z
-- Finished: 2026-04-28T08:44:35.303Z
+- Started: 2026-04-28T09:45:43.220Z
+- Finished: 2026-04-28T09:45:43.221Z
 - Evidence: Pre-staged non-empty file satisfied the manifest.
 - Evidence: FakeProvider returned canned text and no transcriptPath was present on success.
 
@@ -33,8 +36,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:44:35.303Z
-- Finished: 2026-04-28T08:44:35.303Z
+- Started: 2026-04-28T09:45:43.221Z
+- Finished: 2026-04-28T09:45:43.221Z
 - Evidence: Pre-staged empty file failed a file_non_empty rule.
 - Evidence: The first manifest error was MANIFEST_FILE_EMPTY.
 
@@ -42,8 +45,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:44:35.303Z
-- Finished: 2026-04-28T08:44:35.303Z
+- Started: 2026-04-28T09:45:43.221Z
+- Finished: 2026-04-28T09:45:43.221Z
 - Evidence: Missing canned response surfaced FakeProvider's LLMProviderError(kind=parse).
 - Evidence: A non-LLMProviderError throw normalized to LLMProviderError(kind=spawn) with runStage internal prefix.
 
@@ -51,8 +54,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:44:35.303Z
-- Finished: 2026-04-28T08:44:35.310Z
+- Started: 2026-04-28T09:45:43.221Z
+- Finished: 2026-04-28T09:45:43.228Z
 - Evidence: DelayedFakeProvider used constructor-injected delay greater than the stage timeout.
 - Evidence: runStage returned the provider's LLMProviderError(kind=timeout).
 
@@ -60,8 +63,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:44:35.310Z
-- Finished: 2026-04-28T08:44:35.311Z
+- Started: 2026-04-28T09:45:43.228Z
+- Finished: 2026-04-28T09:45:43.228Z
 - Evidence: Covered research -> draft_en -> edit_en -> translate_zh -> awaiting_approval.
 - Evidence: Covered locales=['en'] translation skip and invalid-current-stage error.
 
@@ -69,8 +72,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:44:35.311Z
-- Finished: 2026-04-28T08:44:35.311Z
+- Started: 2026-04-28T09:45:43.228Z
+- Finished: 2026-04-28T09:45:43.228Z
 - Evidence: Path rules rejected both ../outside.md and an absolute outside path.
 - Evidence: Missing runDir, runDir-as-file, and runDir symlink escaping cwd all failed pre-provider.
 
@@ -78,8 +81,8 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:44:35.311Z
-- Finished: 2026-04-28T08:44:35.312Z
+- Started: 2026-04-28T09:45:43.228Z
+- Finished: 2026-04-28T09:45:43.229Z
 - Evidence: Path rule realpath checked runDir/sneaky.md.
 - Evidence: Symlink target outside runDir produced MANIFEST_PATH_OUTSIDE_RUNDIR.
 
@@ -87,10 +90,37 @@
 
 - Command: `bun run run-stage-smoke`
 - Status: PASS
-- Started: 2026-04-28T08:44:35.312Z
-- Finished: 2026-04-28T08:44:35.312Z
+- Started: 2026-04-28T09:45:43.229Z
+- Finished: 2026-04-28T09:45:43.229Z
 - Evidence: Glob rules rejected absolute and parent-segment patterns before matching.
 - Evidence: A glob match whose symlink target escaped runDir produced MANIFEST_PATH_OUTSIDE_RUNDIR.
+
+### manifest-glob-mixed-safe-and-escape
+
+- Command: `bun run run-stage-smoke`
+- Status: PASS
+- Started: 2026-04-28T09:45:43.229Z
+- Finished: 2026-04-28T09:45:43.229Z
+- Evidence: Glob had two safe matches plus one symlink escape.
+- Evidence: Boundary validation examined all matches before count success and rejected the escape.
+
+### manifest-glob-min-count-zero
+
+- Command: `bun run run-stage-smoke`
+- Status: PASS
+- Started: 2026-04-28T09:45:43.229Z
+- Finished: 2026-04-28T09:45:43.230Z
+- Evidence: Explicit minCount=0 with zero matches succeeded.
+- Evidence: Default minCount remains 1 when minCount is omitted.
+
+### manifest-glob-broken-symlink
+
+- Command: `bun run run-stage-smoke`
+- Status: PASS
+- Started: 2026-04-28T09:45:43.230Z
+- Finished: 2026-04-28T09:45:43.230Z
+- Evidence: Glob matched a broken symlink whose target did not exist.
+- Evidence: ENOENT from realpath resolution was classified as MANIFEST_FILE_MISSING.
 
 ## Scope Notes
 

@@ -38,7 +38,7 @@ export type ManifestRule =
     }
   | {
       kind: "files_match_glob";
-      pattern: string;
+      glob: string;
       minCount?: number;
     };
 

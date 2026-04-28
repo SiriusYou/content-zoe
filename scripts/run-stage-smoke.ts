@@ -29,7 +29,10 @@ type ScenarioName =
   | "transition-coverage"
   | "manifest-path-outside-rundir"
   | "manifest-symlink-escape"
-  | "manifest-glob-escape";
+  | "manifest-glob-escape"
+  | "manifest-glob-mixed-safe-and-escape"
+  | "manifest-glob-min-count-zero"
+  | "manifest-glob-broken-symlink";
 
 interface ScenarioOutcome {
   name: ScenarioName;
@@ -48,6 +51,9 @@ const SCENARIOS: ScenarioName[] = [
   "manifest-path-outside-rundir",
   "manifest-symlink-escape",
   "manifest-glob-escape",
+  "manifest-glob-mixed-safe-and-escape",
+  "manifest-glob-min-count-zero",
+  "manifest-glob-broken-symlink",
 ];
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -301,7 +307,7 @@ async function runManifestGlobEscape(base: string): Promise<string[]> {
 
   const absoluteResult = await runStage(
     stageDef("absolute glob prompt", [
-      { kind: "files_match_glob", pattern: "/tmp/*.md" },
+      { kind: "files_match_glob", glob: "/tmp/*.md" },
     ]),
     new FakeProvider(new Map([["absolute glob prompt", "ok"]])),
     { runDir },
@@ -310,7 +316,7 @@ async function runManifestGlobEscape(base: string): Promise<string[]> {
 
   const dotDotResult = await runStage(
     stageDef("dotdot glob prompt", [
-      { kind: "files_match_glob", pattern: "../*.md" },
+      { kind: "files_match_glob", glob: "../*.md" },
     ]),
     new FakeProvider(new Map([["dotdot glob prompt", "ok"]])),
     { runDir },
@@ -320,7 +326,7 @@ async function runManifestGlobEscape(base: string): Promise<string[]> {
   symlinkSync("/etc/passwd", resolve(runDir, "leak.md"));
   const symlinkResult = await runStage(
     stageDef("glob symlink prompt", [
-      { kind: "files_match_glob", pattern: "*.md" },
+      { kind: "files_match_glob", glob: "*.md" },
     ]),
     new FakeProvider(new Map([["glob symlink prompt", "ok"]])),
     { runDir },
@@ -330,6 +336,62 @@ async function runManifestGlobEscape(base: string): Promise<string[]> {
   return [
     "Glob rules rejected absolute and parent-segment patterns before matching.",
     "A glob match whose symlink target escaped runDir produced MANIFEST_PATH_OUTSIDE_RUNDIR.",
+  ];
+}
+
+async function runManifestGlobMixedSafeAndEscape(base: string): Promise<string[]> {
+  const runDir = makeRunDir(base);
+  writeFileSync(resolve(runDir, "a-safe.md"), "safe\n");
+  writeFileSync(resolve(runDir, "b-safe.md"), "safe\n");
+  symlinkSync("/etc/passwd", resolve(runDir, "z-escape.md"));
+
+  const result = await runStage(
+    stageDef("glob mixed prompt", [
+      { kind: "files_match_glob", glob: "*.md", minCount: 2 },
+    ]),
+    new FakeProvider(new Map([["glob mixed prompt", "ok"]])),
+    { runDir },
+  );
+
+  assertManifestCode(result, "MANIFEST_PATH_OUTSIDE_RUNDIR");
+  return [
+    "Glob had two safe matches plus one symlink escape.",
+    "Boundary validation examined all matches before count success and rejected the escape.",
+  ];
+}
+
+async function runManifestGlobMinCountZero(base: string): Promise<string[]> {
+  const runDir = makeRunDir(base);
+  const result = await runStage(
+    stageDef("glob min zero prompt", [
+      { kind: "files_match_glob", glob: "*.missing", minCount: 0 },
+    ]),
+    new FakeProvider(new Map([["glob min zero prompt", "ok"]])),
+    { runDir },
+  );
+
+  assert(result.status === "ok", `expected ok, got ${result.status}`);
+  return [
+    "Explicit minCount=0 with zero matches succeeded.",
+    "Default minCount remains 1 when minCount is omitted.",
+  ];
+}
+
+async function runManifestGlobBrokenSymlink(base: string): Promise<string[]> {
+  const runDir = makeRunDir(base);
+  symlinkSync(resolve(runDir, "missing-target.md"), resolve(runDir, "broken.md"));
+  const result = await runStage(
+    stageDef("glob broken symlink prompt", [
+      { kind: "files_match_glob", glob: "*.md" },
+    ]),
+    new FakeProvider(new Map([["glob broken symlink prompt", "ok"]])),
+    { runDir },
+  );
+
+  assertManifestCode(result, "MANIFEST_FILE_MISSING");
+  return [
+    "Glob matched a broken symlink whose target did not exist.",
+    "ENOENT from realpath resolution was classified as MANIFEST_FILE_MISSING.",
   ];
 }
 
@@ -378,6 +440,12 @@ function scenarioRunner(
       return runManifestSymlinkEscape;
     case "manifest-glob-escape":
       return runManifestGlobEscape;
+    case "manifest-glob-mixed-safe-and-escape":
+      return runManifestGlobMixedSafeAndEscape;
+    case "manifest-glob-min-count-zero":
+      return runManifestGlobMinCountZero;
+    case "manifest-glob-broken-symlink":
+      return runManifestGlobBrokenSymlink;
   }
 }
 
@@ -486,7 +554,6 @@ function renderReport(outcomes: ScenarioOutcome[]): string {
     "- The smoke runner removes its temporary invocation root in a `finally` cleanup.",
     "- Manifest policy is the contract: empty provider output is not implicitly rejected unless a manifest rule fails.",
     "- `runStage internal:` is an operational classifier prefix only; downstream code must inspect `LLMProviderError` object properties.",
-    "",
   );
 
   return `${lines.join("\n")}\n`;

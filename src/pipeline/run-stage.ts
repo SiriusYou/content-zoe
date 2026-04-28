@@ -242,41 +242,56 @@ function validateGlobRule(
   rule: Extract<ManifestRule, { kind: "files_match_glob" }>,
   canonicalRunDir: string,
 ): ManifestError | undefined {
-  if (path.isAbsolute(rule.pattern) || hasParentSegment(rule.pattern)) {
+  if (path.isAbsolute(rule.glob) || hasParentSegment(rule.glob)) {
     return manifestError(
       "MANIFEST_PATH_OUTSIDE_RUNDIR",
-      `manifest glob is outside runDir: ${rule.pattern}`,
+      `manifest glob is outside runDir: ${rule.glob}`,
       rule,
-      { pattern: rule.pattern },
+      { pattern: rule.glob },
     );
   }
 
-  const matcher = globMatcher(rule.pattern);
+  const matcher = globMatcher(rule.glob);
   const minCount = rule.minCount ?? 1;
-  let matchCount = 0;
+  let safeCount = 0;
 
   for (const candidate of listFileCandidates(canonicalRunDir)) {
     if (!matcher(candidate.relPath)) continue;
 
-    const realPath = realpathSync(candidate.absPath);
+    let realPath: string;
+    try {
+      realPath = realpathSync(candidate.absPath);
+    } catch (err) {
+      if (isNotFoundError(err)) {
+        return manifestError(
+          "MANIFEST_FILE_MISSING",
+          `manifest glob match is missing: ${candidate.relPath}`,
+          rule,
+          { path: candidate.absPath, pattern: rule.glob, cause: err },
+        );
+      }
+      throw err;
+    }
+
     if (!isInside(realPath, canonicalRunDir)) {
       return manifestError(
         "MANIFEST_PATH_OUTSIDE_RUNDIR",
         `manifest glob match is outside runDir: ${candidate.relPath}`,
         rule,
-        { path: realPath, pattern: rule.pattern },
+        { path: realPath, pattern: rule.glob },
       );
     }
 
-    matchCount++;
-    if (matchCount >= minCount) return undefined;
+    safeCount++;
   }
+
+  if (safeCount >= minCount) return undefined;
 
   return manifestError(
     "MANIFEST_GLOB_NO_MATCH",
-    `manifest glob matched ${matchCount} files, expected at least ${minCount}: ${rule.pattern}`,
+    `manifest glob matched ${safeCount} files, expected at least ${minCount}: ${rule.glob}`,
     rule,
-    { pattern: rule.pattern },
+    { pattern: rule.glob },
   );
 }
 
@@ -339,6 +354,10 @@ function toPosixRelative(input: string): string {
 function isInside(candidate: string, root: string): boolean {
   const relative = path.relative(root, candidate);
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function isNotFoundError(err: unknown): boolean {
+  return err instanceof Error && "code" in err && err.code === "ENOENT";
 }
 
 function manifestError(
