@@ -11,7 +11,8 @@
   "scripts": {
     "preflight": "bun src/preflight.ts",
     "codex-smoke": "bun scripts/codex-smoke.ts",
-    "llm-smoke": "bun scripts/llm-smoke.ts"
+    "llm-smoke": "bun scripts/llm-smoke.ts",
+    "run-stage-smoke": "bun scripts/run-stage-smoke.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.1.13",
