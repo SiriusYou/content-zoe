@@ -24,6 +24,7 @@ import { Stage } from "../src/pipeline/types.ts";
 
 type ScenarioName =
   | "happy-path"
+  | "default-llm-provider-when-unset"
   | "en-only-skip"
   | "stage-failure-mid-run"
   | "resume-after-failure"
@@ -43,6 +44,7 @@ interface ScenarioOutcome {
 
 const SCENARIOS: ScenarioName[] = [
   "happy-path",
+  "default-llm-provider-when-unset",
   "en-only-skip",
   "stage-failure-mid-run",
   "resume-after-failure",
@@ -115,6 +117,8 @@ async function scenarioImpl(
   switch (name) {
     case "happy-path":
       return runHappyPath(dir);
+    case "default-llm-provider-when-unset":
+      return runDefaultLlmProviderWhenUnset(dir);
     case "en-only-skip":
       return runEnOnlySkip(dir);
     case "stage-failure-mid-run":
@@ -148,6 +152,26 @@ async function runHappyPath(dir: string): Promise<string[]> {
   return [
     "CLI path exited 0 with the fake-provider visibility log.",
     "run-state.json reached awaiting_approval at translate_zh in attempt-1.",
+  ];
+}
+
+async function runDefaultLlmProviderWhenUnset(dir: string): Promise<string[]> {
+  const result = runReportRunCli(
+    dir,
+    ["default-provider", "--locales=en"],
+    { llmProvider: "unset" },
+  );
+  assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
+  assert(
+    result.stderr.includes("[report-run] LLM_PROVIDER=fake"),
+    `expected unset LLM_PROVIDER to default to fake, got ${result.stderr}`,
+  );
+  const state = readState(dir, "default-provider", 1);
+  assert(state.status === "awaiting_approval", `expected awaiting_approval, got ${state.status}`);
+  assert(state.lastStage === Stage.EDIT_EN, `expected en-only terminal edit_en, got ${state.lastStage}`);
+  return [
+    "CLI path ran with LLM_PROVIDER absent from the child environment.",
+    "runtime-config defaulted to FakeProvider and emitted the fake-provider visibility log.",
   ];
 }
 
@@ -461,11 +485,19 @@ function providerOmitting(omitted: readonly Stage[]): FakeProvider {
 function runReportRunCli(
   cwd: string,
   args: string[],
+  options: { llmProvider?: "fake" | "unset" } = {},
 ): { exitCode: number | null; stdout: string; stderr: string } {
+  const env = { ...process.env };
+  if (options.llmProvider === "unset") {
+    delete env.LLM_PROVIDER;
+  } else {
+    env.LLM_PROVIDER = "fake";
+  }
+
   const proc = Bun.spawnSync({
     cmd: ["bun", resolve(repoRoot, "src", "bin", "report-run.ts"), ...args],
     cwd,
-    env: { ...process.env, LLM_PROVIDER: "fake" },
+    env,
     stdout: "pipe",
     stderr: "pipe",
   });

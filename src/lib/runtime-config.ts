@@ -34,6 +34,7 @@ export function loadRuntimeConfig(): RuntimeConfig {
 }
 
 function parseProvider(value: string | undefined): LLMProviderName {
+  value ??= "fake";
   if (value === "fake" || value === "codex") return value;
   throw new Error(
     `invalid LLM_PROVIDER: expected "fake" or "codex", got ${JSON.stringify(value)}`,

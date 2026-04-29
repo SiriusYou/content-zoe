@@ -1,13 +1,14 @@
 # report-run smoke evidence
 
 - Command: `bun run report-run-smoke`
-- Started: 2026-04-29T13:30:08.407Z
-- Finished: 2026-04-29T13:30:08.538Z
-- Scenario root: /Users/youjia/.openclaw-worktrees/ddNjGVtI1-Dq4shohdGKo/target/.runs/report-run-smoke/2026-04-29T13-30-08.406Z (removed by finally-cleanup)
+- Started: 2026-04-29T14:20:10.178Z
+- Finished: 2026-04-29T14:20:10.316Z
+- Scenario root: /Users/youjia/.openclaw-worktrees/ddNjGVtI1-Dq4shohdGKo/target/.runs/report-run-smoke/2026-04-29T14-20-10.177Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
 | happy-path | PASS | CLI path exited 0 with the fake-provider visibility log.<br>run-state.json reached awaiting_approval at translate_zh in attempt-1. |
+| default-llm-provider-when-unset | PASS | CLI path ran with LLM_PROVIDER absent from the child environment.<br>runtime-config defaulted to FakeProvider and emitted the fake-provider visibility log. |
 | en-only-skip | PASS | FakeProvider omitted translate_zh, so an incorrect translation call would have failed.<br>locales=['en'] terminated after edit_en. |
 | stage-failure-mid-run | PASS | Missing edit_en canned prompt produced the same non-ok loop result the CLI maps to failure.<br>The composition-root exit-code branch maps that non-ok stage result to exit 2.<br>run-state.json recorded status=error and lastStage=edit_en. |
 | resume-after-failure | PASS | Resume from failed edit_en started at edit_en; missing research/draft prompts were never called.<br>Atomic attempt-2 includes carry-forward files and recoveryCleanup audit data. |
