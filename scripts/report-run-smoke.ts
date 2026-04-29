@@ -12,9 +12,11 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { FakeProvider } from "../src/llm/fake.ts";
+import { prepareReportRunAttempt } from "../src/bin/report-run.ts";
 import {
   type Locale,
   runReportLoop,
+  type ReportLoopResult,
   type RunState,
 } from "../src/lib/report-loop.ts";
 import { STAGES } from "../src/pipeline/stages.ts";
@@ -150,7 +152,7 @@ async function runHappyPath(dir: string): Promise<string[]> {
 }
 
 async function runEnOnlySkip(dir: string): Promise<string[]> {
-  const result = await runReportLoop({
+  const result = await runPreparedReportLoop({
     jobId: "en-only",
     locales: ["en"],
     provider: providerOmitting([Stage.TRANSLATE_ZH]),
@@ -166,7 +168,7 @@ async function runEnOnlySkip(dir: string): Promise<string[]> {
 }
 
 async function runStageFailureMidRun(dir: string): Promise<string[]> {
-  const result = await runReportLoop({
+  const result = await runPreparedReportLoop({
     jobId: "fail-mid",
     locales: ["en", "zh"],
     provider: providerOmitting([Stage.EDIT_EN]),
@@ -179,8 +181,8 @@ async function runStageFailureMidRun(dir: string): Promise<string[]> {
   assert(state.status === "error", `expected run-state error, got ${state.status}`);
   assert(state.lastStage === Stage.EDIT_EN, `expected lastStage edit_en, got ${state.lastStage}`);
   return [
-    "Missing edit_en canned prompt produced a non-ok stage result.",
-    "The composition-root exit-code mapping produced exit 2 for the non-ok stage.",
+    "Missing edit_en canned prompt produced the same non-ok loop result the CLI maps to failure.",
+    "The composition-root exit-code branch maps that non-ok stage result to exit 2.",
     "run-state.json recorded status=error and lastStage=edit_en.",
   ];
 }
@@ -200,7 +202,7 @@ async function runResumeAfterFailure(dir: string): Promise<string[]> {
     finishedAt: new Date().toISOString(),
   });
 
-  const result = await runReportLoop({
+  const result = await runPreparedReportLoop({
     jobId: "resume-failure",
     locales: ["en", "zh"],
     provider: providerOmitting([Stage.RESEARCH, Stage.DRAFT_EN]),
@@ -210,7 +212,12 @@ async function runResumeAfterFailure(dir: string): Promise<string[]> {
   assert(result.status === "awaiting_approval", `expected awaiting_approval, got ${result.status}`);
   assert(result.attemptNumber === 2, `expected attempt-2, got ${result.attemptNumber}`);
   const state = readState(dir, "resume-failure", 2);
-  assert(state.recoveryCleanup?.restartStage === Stage.EDIT_EN, "expected restartStage edit_en");
+  const cleanup = state.recoveryCleanup;
+  assert(cleanup !== undefined, "expected recoveryCleanup");
+  assert(cleanup.restartStage === Stage.EDIT_EN, "expected restartStage edit_en");
+  assert(cleanup.fromAttempt === 1, "expected fromAttempt 1");
+  assert(cleanup.copiedFromAttempt === 1, "expected copiedFromAttempt 1");
+  assert(Array.isArray(cleanup.deletedFiles), "expected deletedFiles audit list");
   assert(state.lastStage === Stage.TRANSLATE_ZH, `expected final translate_zh, got ${state.lastStage}`);
   assert(existsSync(resolve(dir, ".runs", "resume-failure", "attempt-2", "report.en.md")), "report.en.md was not carried forward");
   return [
@@ -272,7 +279,7 @@ async function runResumeCarryForward(dir: string): Promise<string[]> {
     startedAt: new Date().toISOString(),
   });
 
-  const result = await runReportLoop({
+  const result = await runPreparedReportLoop({
     jobId: "carry-forward",
     locales: ["en", "zh"],
     provider: providerOmitting([Stage.RESEARCH]),
@@ -281,17 +288,54 @@ async function runResumeCarryForward(dir: string): Promise<string[]> {
   });
   assert(result.status === "awaiting_approval", `expected awaiting_approval, got ${result.status}`);
   const state = readState(dir, "carry-forward", 2);
-  assert(state.recoveryCleanup?.sourceAttemptNumber === 1, "expected source attempt 1");
-  assert(state.recoveryCleanup?.restartStage === Stage.DRAFT_EN, "expected restartStage draft_en");
+  const cleanup = state.recoveryCleanup;
+  assert(cleanup !== undefined, "expected recoveryCleanup");
+  assert(cleanup.fromAttempt === 1, "expected fromAttempt 1");
+  assert(cleanup.copiedFromAttempt === 1, "expected copiedFromAttempt 1");
+  assert(cleanup.restartStage === Stage.DRAFT_EN, "expected restartStage draft_en");
   assert(
-    state.recoveryCleanup?.carryForward.join(",") === "research,sources.json",
-    `unexpected carryForward ${state.recoveryCleanup?.carryForward.join(",")}`,
+    cleanup.carryForward.join(",") === "research,sources.json",
+    `unexpected carryForward ${cleanup.carryForward.join(",")}`,
+  );
+  assert(
+    cleanup.deletedFiles.join(",") === "",
+    `unexpected deletedFiles ${cleanup.deletedFiles.join(",")}`,
   );
   assert(existsSync(resolve(dir, ".runs", "carry-forward", "attempt-2", "research", "notes.md")), "research/ was not carried forward");
   assert(existsSync(resolve(dir, ".runs", "carry-forward", "attempt-2", "sources.json")), "sources.json was not carried forward");
+  const recoveryBeforeIdempotentResume = JSON.stringify(cleanup);
+
+  const second = await runPreparedReportLoop({
+    jobId: "carry-forward",
+    locales: ["en", "zh"],
+    provider: providerOmitting([
+      Stage.RESEARCH,
+      Stage.DRAFT_EN,
+      Stage.EDIT_EN,
+      Stage.TRANSLATE_ZH,
+    ]),
+    cwd: dir,
+    resume: true,
+  });
+  assert(second.status === "awaiting_approval", `expected idempotent awaiting_approval, got ${second.status}`);
+  assert(second.attemptNumber === 2, `expected idempotent attempt-2, got ${second.attemptNumber}`);
+  assert(second.alreadyComplete, "expected second resume to be alreadyComplete");
+  assert(!existsSync(resolve(dir, ".runs", "carry-forward", "attempt-3")), "attempt-3 must not be created");
+  assert(
+    readdirSync(resolve(dir, ".runs", "carry-forward")).every(
+      (entry) => !entry.includes(".bootstrap-"),
+    ),
+    "idempotent resume left a bootstrap directory",
+  );
+  const stateAfterIdempotentResume = readState(dir, "carry-forward", 2);
+  assert(
+    JSON.stringify(stateAfterIdempotentResume.recoveryCleanup) === recoveryBeforeIdempotentResume,
+    "recoveryCleanup drifted after idempotent resume",
+  );
   return [
     "Resume from ok research advanced to draft_en; missing research prompt was never called.",
-    "research/ and sources.json were copied into attempt-2 with recoveryCleanup recorded.",
+    "research/ and sources.json were copied into attempt-2 with fromAttempt/copiedFromAttempt/deletedFiles recorded.",
+    "A second resume was an already-complete no-op: no attempt-3, no bootstrap residue, no recoveryCleanup drift.",
   ];
 }
 
@@ -360,7 +404,7 @@ async function runCarryForwardPartialFailure(dir: string): Promise<string[]> {
   let copyCalls = 0;
   let failed = false;
   try {
-    await runReportLoop({
+    await runPreparedReportLoop({
       jobId: "partial-failure",
       locales: ["en", "zh"],
       provider: providerOmitting([Stage.RESEARCH]),
@@ -388,7 +432,7 @@ async function runCarryForwardPartialFailure(dir: string): Promise<string[]> {
     "bootstrap temp directory was not cleaned up",
   );
 
-  const result = await runReportLoop({
+  const result = await runPreparedReportLoop({
     jobId: "partial-failure",
     locales: ["en", "zh"],
     provider: providerOmitting([Stage.RESEARCH]),
@@ -432,6 +476,43 @@ function runReportRunCli(
   };
 }
 
+async function runPreparedReportLoop(opts: {
+  jobId: string;
+  locales: readonly Locale[];
+  provider: FakeProvider;
+  cwd: string;
+  resume?: boolean;
+  fsOps?: Parameters<typeof prepareReportRunAttempt>[0]["fsOps"];
+}): Promise<ReportLoopResult> {
+  const attempt = prepareReportRunAttempt({
+    jobId: opts.jobId,
+    locales: opts.locales,
+    cwd: opts.cwd,
+    resume: opts.resume,
+    fsOps: opts.fsOps,
+  });
+  if (attempt.alreadyComplete) {
+    return {
+      status: "awaiting_approval",
+      runDir: attempt.runDir,
+      attemptNumber: attempt.attemptNumber,
+      alreadyComplete: true,
+    };
+  }
+
+  return runReportLoop({
+    jobId: opts.jobId,
+    locales: opts.locales,
+    provider: opts.provider,
+    cwd: opts.cwd,
+    runDir: attempt.runDir,
+    attemptNumber: attempt.attemptNumber,
+    startStage: attempt.startStage,
+    startedAt: attempt.startedAt,
+    recoveryCleanup: attempt.recoveryCleanup,
+  });
+}
+
 function readState(cwd: string, jobId: string, attemptNumber: number): RunState {
   return JSON.parse(
     readFileSync(
@@ -459,6 +540,13 @@ async function expectResumeError(
 ): Promise<void> {
   const result = runReportRunCli(cwd, [jobId, "--resume"]);
   assert(result.exitCode === 1, `expected exit 1, got ${result.exitCode}`);
+  const logIndex = result.stderr.indexOf("[report-run] LLM_PROVIDER=fake");
+  const errorIndex = result.stderr.indexOf(expected);
+  assert(logIndex !== -1, `expected LLM_PROVIDER visibility log, got ${result.stderr}`);
+  assert(
+    logIndex < errorIndex,
+    `expected visibility log before resume precondition error, got ${result.stderr}`,
+  );
   assert(
     result.stderr.includes(expected),
     `expected stderr ${JSON.stringify(expected)}, got ${result.stderr}`,
