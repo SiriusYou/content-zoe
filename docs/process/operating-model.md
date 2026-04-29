@@ -170,7 +170,23 @@ This converts § 9.3 from a post-hoc explanation pattern into a checkable verifi
 
 **How to apply**: when drafting an amendment that introduces a new review structure, identify whether the amendment itself qualifies under that structure (e.g., a charter amendment introducing framework-slice mandatory review applies to itself if the amendment introduces new cross-slice contract surfaces). If yes, run the amendment through the proposed structure as part of the cycle. The first cycle's outcome is a category-defining data point even though it's a single instance — it is not a recurrence-threshold candidate but a structure-defining instance.
 
-**Sub-pattern: Path B charter-vs-engine decoupling** (deferred for now; first observed in v3.3 cycle hc-codex r1 H1 fold). When an amendment introduces fields that the existing engine cannot mechanically enforce, two paths: (A) block amendment merge on engine slice landing; (B) soften charter to operator-attestation-and-audit, defer mechanical enforcement to follow-on engine slice. Path B is preferable when charter is policy and engine is enforcement, because coupling them creates an ordering loop. Track for promotion to its own § 9.7 once a second amendment cycle exercises the same pattern.
+**Sub-pattern: Path B charter-vs-engine decoupling** (deferred for now; first observed in v3.3 cycle hc-codex r1 H1 fold). When an amendment introduces fields that the existing engine cannot mechanically enforce, two paths: (A) block amendment merge on engine slice landing; (B) soften charter to operator-attestation-and-audit, defer mechanical enforcement to follow-on engine slice. Path B is preferable when charter is policy and engine is enforcement, because coupling them creates an ordering loop. Track for promotion to its own subsection once a second amendment cycle exercises the same pattern.
+
+### 9.7 Methodology divergence between review lanes
+
+**Rule**: review lanes employing different methodologies — **textual conformance review** (read AC text against impl text) vs **behavioral verification** (smoke + CLI permutations + execution probes) — catch different finding classes. The dual-lane protocol's catch coverage depends on methodological diversity, not just reviewer count. Same-methodology lane pairs would miss the same finding class.
+
+**Data points**: Slice 3.5 cycle (2026-04-29) showed the pattern across three rounds (slice-approval, Gate 1, Gate 2). Each round had zero finding overlap between Claude (textual) and Codex (behavioral) lanes. Concrete catches: cz-Codex Gate 2 r1 caught `LLM_PROVIDER` unset → throws (v1.2 line 98 `Defaults: LLM_PROVIDER=fake` violation) by running `bun src/bin/report-run.ts <jobId>` with the env var unset; cz-Claude (textual) read the same spec but didn't probe the env-unset path. cz-Claude Gate 2 r1 + hc-Claude Gate 1 r1 both independently caught visibility-log textual-spec ordering inversion (`AFTER argv parsing`); Codex lanes (behavioral) didn't flag because impl behavior is correct in the observed paths. Pattern observed N=3 within Slice 3.5; not yet validated across distinct slices.
+
+**How to apply**: each review artifact MUST tag its findings with the methodology that surfaced them — `[method: behavioral]` (smoke / CLI permutation / execution probe), `[method: textual]` (AC text vs impl text reading), or `[method: hybrid]` (both methods independently confirmed). Tagging is data-collection discipline; reviewer behavior need not change. Reviewer artifacts SHOULD include a "Methodology summary" section listing methodologies applied per round (e.g., "Smoke executed: yes; CLI permutations: 7; AC text vs impl text reading: yes"). After **N=5+ instances across distinct slices** (not rounds within one slice), the diagnostic base supports a follow-on charter amendment decision.
+
+Until then, do NOT homogenize methodology across lanes (i.e., do NOT require each lane to do both methods). Homogenization dissolves the divergence signal that the dual-lane protocol depends on.
+
+**Tagging format**: each finding heading includes `[method: behavioral|textual|hybrid]` suffix. Example:
+- `### M-r1-1: opts.startStage parameter unused on resume path [method: textual]`
+- `### M-r1-1: LLM_PROVIDER does not default to fake [method: behavioral]`
+
+**Promotion path**: at N=5+ distinct slices, evaluate **gate-level methodology-completeness** as the v3.4 amendment shape (each gate must include at least one behavioral stream + at least one textual stream — preserves lane specialization), NOT lane-level homogenization (each lane does both methods — dissolves divergence signal).
 
 ## Out of scope for this doc
 
