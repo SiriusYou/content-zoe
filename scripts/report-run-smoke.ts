@@ -11,10 +11,21 @@ import {
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  findEventsByJob,
+  findJobById,
+  insertJob,
+  openDb,
+  recordRecoveryCleanup,
+} from "../src/db.ts";
 import { FakeProvider } from "../src/llm/fake.ts";
-import { prepareReportRunAttempt } from "../src/bin/report-run.ts";
+import {
+  prepareReportRunAttempt,
+  recordRecoveryCleanupAudit,
+} from "../src/bin/report-run.ts";
 import {
   type Locale,
+  type RecoveryCleanup,
   runReportLoop,
   type ReportLoopResult,
   type RunState,
@@ -32,7 +43,8 @@ type ScenarioName =
   | "resume-carry-forward"
   | "resume-after-success-idempotent"
   | "resume-edge-cases"
-  | "carry-forward-partial-failure";
+  | "carry-forward-partial-failure"
+  | "recovery-cleanup-db-audit";
 
 interface ScenarioOutcome {
   name: ScenarioName;
@@ -53,6 +65,7 @@ const SCENARIOS: ScenarioName[] = [
   "resume-after-success-idempotent",
   "resume-edge-cases",
   "carry-forward-partial-failure",
+  "recovery-cleanup-db-audit",
 ];
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -135,6 +148,8 @@ async function scenarioImpl(
       return runResumeEdgeCases(dir);
     case "carry-forward-partial-failure":
       return runCarryForwardPartialFailure(dir);
+    case "recovery-cleanup-db-audit":
+      return runRecoveryCleanupDbAudit(dir);
   }
 }
 
@@ -212,6 +227,7 @@ async function runStageFailureMidRun(dir: string): Promise<string[]> {
 }
 
 async function runResumeAfterFailure(dir: string): Promise<string[]> {
+  seedJobRow(dir, "resume-failure");
   const attempt1 = resolve(dir, ".runs", "resume-failure", "attempt-1");
   mkdirSync(attempt1, { recursive: true });
   writeCarryForwardFiles(attempt1);
@@ -289,6 +305,7 @@ async function runEnvPurityStaticCheck(): Promise<string[]> {
 }
 
 async function runResumeCarryForward(dir: string): Promise<string[]> {
+  seedJobRow(dir, "carry-forward");
   const attempt1 = resolve(dir, ".runs", "carry-forward", "attempt-1");
   mkdirSync(attempt1, { recursive: true });
   mkdirSync(resolve(attempt1, "research"), { recursive: true });
@@ -411,6 +428,7 @@ async function runResumeEdgeCases(dir: string): Promise<string[]> {
 }
 
 async function runCarryForwardPartialFailure(dir: string): Promise<string[]> {
+  seedJobRow(dir, "partial-failure");
   const attempt1 = resolve(dir, ".runs", "partial-failure", "attempt-1");
   mkdirSync(attempt1, { recursive: true });
   mkdirSync(resolve(attempt1, "research"), { recursive: true });
@@ -468,6 +486,65 @@ async function runCarryForwardPartialFailure(dir: string): Promise<string[]> {
   return [
     "Injected copy failure removed the bootstrap directory and left attempt-2 absent.",
     "A subsequent resume still selected attempt-1 as highest and published attempt-2 successfully.",
+  ];
+}
+
+async function runRecoveryCleanupDbAudit(dir: string): Promise<string[]> {
+  const jobId = "recovery-audit";
+  seedJobRow(dir, jobId);
+  writeFailedAttemptForRecovery(dir, jobId);
+
+  const result = runReportRunCli(dir, [jobId, "--locales=en,zh", "--resume"]);
+  assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
+
+  const state = readState(dir, jobId, 2);
+  const cleanup = state.recoveryCleanup;
+  assert(cleanup !== undefined, "expected recoveryCleanup in run-state.json");
+
+  const db = openDb(resolve(dir, ".data", "content.db"));
+  try {
+    const events = findEventsByJob(db, jobId, "recovery_cleanup").filter(
+      (event) => event.attempt_number === state.attemptNumber,
+    );
+    assert(events.length === 1, `expected one recovery_cleanup event, got ${events.length}`);
+    assertRecoveryCleanupPayloadMatches(events[0].payload, cleanup);
+
+    recordRecoveryCleanup(db, {
+      jobId,
+      attemptNumber: state.attemptNumber,
+      recoveryCleanup: cleanup,
+    });
+    const afterDuplicate = findEventsByJob(db, jobId, "recovery_cleanup").filter(
+      (event) => event.attempt_number === state.attemptNumber,
+    );
+    assert(
+      afterDuplicate.length === 1,
+      `expected duplicate recordRecoveryCleanup to leave one row, got ${afterDuplicate.length}`,
+    );
+  } finally {
+    db.close();
+  }
+
+  const missingJobId = "recovery-audit-missing-job";
+  writeFailedAttemptForRecovery(dir, missingJobId);
+  const missing = runReportRunCli(dir, [missingJobId, "--locales=en,zh", "--resume"]);
+  assert(missing.exitCode === 1, `expected missing job exit 1, got ${missing.exitCode}`);
+  assert(
+    missing.stderr.includes("recovery audit requires a DB jobs row") &&
+      missing.stderr.includes(missingJobId),
+    `expected missing DB jobs row recovery audit error, got ${missing.stderr}`,
+  );
+  const missingState = readState(dir, missingJobId, 2);
+  assert(
+    missingState.status === "running" && missingState.lastStage === Stage.EDIT_EN,
+    `missing-job recovery audit failure must happen before stage execution, got ${missingState.status}/${missingState.lastStage}`,
+  );
+
+  return [
+    "CLI resume with LLM_PROVIDER=fake wrote one recovery_cleanup event for attempt-2.",
+    "The event payload matched run-state.json recoveryCleanup fields.",
+    "A duplicate recordRecoveryCleanup call with the same job/attempt/payload left exactly one event row.",
+    "A cleanup resume without a DB jobs row failed before stage execution with an operator-readable recovery audit error.",
   ];
 }
 
@@ -531,6 +608,12 @@ async function runPreparedReportLoop(opts: {
       alreadyComplete: true,
     };
   }
+  recordRecoveryCleanupAudit({
+    cwd: opts.cwd,
+    jobId: opts.jobId,
+    attemptNumber: attempt.attemptNumber,
+    recoveryCleanup: attempt.recoveryCleanup,
+  });
 
   return runReportLoop({
     jobId: opts.jobId,
@@ -563,6 +646,63 @@ function writeCarryForwardFiles(attemptDir: string): void {
   writeFileSync(resolve(attemptDir, "research", "notes.md"), "notes\n");
   writeFileSync(resolve(attemptDir, "sources.json"), "[]\n");
   writeFileSync(resolve(attemptDir, "report.en.md"), "English report\n");
+}
+
+function seedJobRow(cwd: string, jobId: string): void {
+  const db = openDb(resolve(cwd, ".data", "content.db"));
+  try {
+    if (findJobById(db, jobId)) return;
+    const now = unixNow();
+    insertJob(db, {
+      id: jobId,
+      week_key: `smoke-${jobId}`,
+      topic: `Smoke ${jobId}`,
+      status: "queued",
+      current_stage: Stage.RESEARCH,
+      created_at: now,
+      updated_at: now,
+    });
+  } finally {
+    db.close();
+  }
+}
+
+function writeFailedAttemptForRecovery(cwd: string, jobId: string): void {
+  const attempt1 = resolve(cwd, ".runs", jobId, "attempt-1");
+  mkdirSync(attempt1, { recursive: true });
+  writeCarryForwardFiles(attempt1);
+  writeState(attempt1, {
+    schemaVersion: 1,
+    jobId,
+    attemptNumber: 1,
+    lastStage: Stage.EDIT_EN,
+    status: "error",
+    error: "synthetic edit failure",
+    startedAt: new Date().toISOString(),
+    finishedAt: new Date().toISOString(),
+  });
+}
+
+function assertRecoveryCleanupPayloadMatches(
+  payload: string | null,
+  cleanup: RecoveryCleanup,
+): void {
+  assert(payload !== null, "expected recovery_cleanup payload");
+  const parsed = JSON.parse(payload) as RecoveryCleanup;
+  assert(parsed.fromAttempt === cleanup.fromAttempt, "payload fromAttempt mismatch");
+  assert(
+    parsed.copiedFromAttempt === cleanup.copiedFromAttempt,
+    "payload copiedFromAttempt mismatch",
+  );
+  assert(
+    JSON.stringify(parsed.deletedFiles) === JSON.stringify(cleanup.deletedFiles),
+    "payload deletedFiles mismatch",
+  );
+  assert(parsed.restartStage === cleanup.restartStage, "payload restartStage mismatch");
+  assert(
+    JSON.stringify(parsed.carryForward) === JSON.stringify(cleanup.carryForward),
+    "payload carryForward mismatch",
+  );
 }
 
 async function expectResumeError(
@@ -654,6 +794,10 @@ function removeEmptyDir(dir: string): void {
     rmdirSync(dir);
   } catch {
   }
+}
+
+function unixNow(): number {
+  return Math.floor(Date.now() / 1000);
 }
 
 if (import.meta.main) {

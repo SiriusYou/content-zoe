@@ -15,6 +15,7 @@ import path from "node:path";
 import { CodexCliProvider } from "../llm/codex-cli.ts";
 import { FakeProvider } from "../llm/fake.ts";
 import type { LLMProvider } from "../llm/provider.ts";
+import { findJobById, openDb, recordRecoveryCleanup } from "../db.ts";
 import { loadRuntimeConfig } from "../lib/runtime-config.ts";
 import {
   type Locale,
@@ -56,6 +57,13 @@ interface FileSystemOps {
   renameSync: typeof renameSync;
   rmSync: typeof rmSync;
   writeFileSync: typeof writeFileSync;
+}
+
+export interface RecordRecoveryCleanupAuditOptions {
+  cwd: string;
+  jobId: string;
+  attemptNumber: number;
+  recoveryCleanup?: RecoveryCleanup;
 }
 
 interface AttemptEntry {
@@ -153,6 +161,12 @@ async function main(): Promise<number> {
       cwd: config.cwd,
       resume: args.resume,
     });
+    recordRecoveryCleanupAudit({
+      cwd: config.cwd,
+      jobId: args.jobId,
+      attemptNumber: attempt.attemptNumber,
+      recoveryCleanup: attempt.recoveryCleanup,
+    });
   } catch (err) {
     console.error(formatError(err));
     return 1;
@@ -242,6 +256,31 @@ function prepareFreshAttempt(
     startedAt,
     alreadyComplete: false,
   };
+}
+
+export function recordRecoveryCleanupAudit(
+  opts: RecordRecoveryCleanupAuditOptions,
+): void {
+  if (!opts.recoveryCleanup) return;
+
+  const db = openDb(path.resolve(opts.cwd, ".data", "content.db"));
+  try {
+    const job = findJobById(db, opts.jobId);
+    if (!job) {
+      throw new Error(
+        `recovery audit requires a DB jobs row for job id ${JSON.stringify(
+          opts.jobId,
+        )} before recovery cleanup can be recorded`,
+      );
+    }
+    recordRecoveryCleanup(db, {
+      jobId: opts.jobId,
+      attemptNumber: opts.attemptNumber,
+      recoveryCleanup: opts.recoveryCleanup,
+    });
+  } finally {
+    db.close();
+  }
 }
 
 function prepareResumeAttempt(

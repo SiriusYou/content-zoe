@@ -1,9 +1,9 @@
 # report-run smoke evidence
 
 - Command: `bun run report-run-smoke`
-- Started: 2026-04-29T14:20:10.178Z
-- Finished: 2026-04-29T14:20:10.316Z
-- Scenario root: /Users/youjia/.openclaw-worktrees/ddNjGVtI1-Dq4shohdGKo/target/.runs/report-run-smoke/2026-04-29T14-20-10.177Z (removed by finally-cleanup)
+- Started: 2026-04-30T08:56:36.039Z
+- Finished: 2026-04-30T08:56:36.264Z
+- Scenario root: /Users/youjia/.openclaw-worktrees/4YjnSufWTfcfpXek8gHqc/target/.runs/report-run-smoke/2026-04-30T08-56-36.039Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
@@ -17,4 +17,5 @@
 | resume-after-success-idempotent | PASS | A completed job resumed as an idempotent no-op.<br>The resume path emitted already complete and did not create attempt-2. |
 | resume-edge-cases | PASS | Missing job directory, empty job directory, missing run-state, corrupted JSON, and schema mismatch all failed with exit-class precondition errors. |
 | carry-forward-partial-failure | PASS | Injected copy failure removed the bootstrap directory and left attempt-2 absent.<br>A subsequent resume still selected attempt-1 as highest and published attempt-2 successfully. |
+| recovery-cleanup-db-audit | PASS | CLI resume with LLM_PROVIDER=fake wrote one recovery_cleanup event for attempt-2.<br>The event payload matched run-state.json recoveryCleanup fields.<br>A duplicate recordRecoveryCleanup call with the same job/attempt/payload left exactly one event row.<br>A cleanup resume without a DB jobs row failed before stage execution with an operator-readable recovery audit error. |
 
