@@ -13,9 +13,9 @@ import {
 import path from "node:path";
 
 import { CodexCliProvider } from "../llm/codex-cli.ts";
-import { FakeProvider } from "../llm/fake.ts";
 import type { LLMProvider } from "../llm/provider.ts";
 import { findJobById, openDb, recordRecoveryCleanup } from "../db.ts";
+import { createReportRunFakeProvider } from "../lib/report-run-fake-provider.ts";
 import { loadRuntimeConfig } from "../lib/runtime-config.ts";
 import {
   type Locale,
@@ -179,14 +179,7 @@ async function main(): Promise<number> {
 
   const provider: LLMProvider =
     config.llmProvider === "fake"
-      ? new FakeProvider(
-          new Map(
-            Object.values(STAGES).map((stageDef) => [
-              stageDef.prompt,
-              `fake output for ${stageDef.stage}`,
-            ]),
-          ),
-        )
+      ? createReportRunFakeProvider()
       : new CodexCliProvider({ quiesceWindowMs: config.quiesceWindowMs });
 
   try {

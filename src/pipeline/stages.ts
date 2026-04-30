@@ -1,12 +1,8 @@
+import { RESEARCH_STAGE } from "./research.ts";
 import { Stage, type StageDef } from "./types.ts";
 
 export const STAGES: Record<Stage, StageDef> = {
-  [Stage.RESEARCH]: {
-    stage: Stage.RESEARCH,
-    prompt: "Run the research stage.",
-    timeoutMs: 1_200_000,
-    manifest: { rules: [] },
-  },
+  [Stage.RESEARCH]: RESEARCH_STAGE,
   [Stage.DRAFT_EN]: {
     stage: Stage.DRAFT_EN,
     prompt: "Run the English draft stage.",

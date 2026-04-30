@@ -23,6 +23,7 @@ import {
   prepareReportRunAttempt,
   recordRecoveryCleanupAudit,
 } from "../src/bin/report-run.ts";
+import { createReportRunFakeProvider } from "../src/lib/report-run-fake-provider.ts";
 import {
   type Locale,
   type RecoveryCleanup,
@@ -30,7 +31,6 @@ import {
   type ReportLoopResult,
   type RunState,
 } from "../src/lib/report-loop.ts";
-import { STAGES } from "../src/pipeline/stages.ts";
 import { Stage } from "../src/pipeline/types.ts";
 
 type ScenarioName =
@@ -549,14 +549,7 @@ async function runRecoveryCleanupDbAudit(dir: string): Promise<string[]> {
 }
 
 function providerOmitting(omitted: readonly Stage[]): FakeProvider {
-  const omittedSet = new Set(omitted);
-  return new FakeProvider(
-    new Map(
-      Object.values(STAGES)
-        .filter((stageDef) => !omittedSet.has(stageDef.stage))
-        .map((stageDef) => [stageDef.prompt, `fake output for ${stageDef.stage}`]),
-    ),
-  );
+  return createReportRunFakeProvider({ omitStages: omitted });
 }
 
 function runReportRunCli(

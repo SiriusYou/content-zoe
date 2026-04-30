@@ -1,9 +1,9 @@
 # report-run smoke evidence
 
 - Command: `bun run report-run-smoke`
-- Started: 2026-04-30T09:09:48.853Z
-- Finished: 2026-04-30T09:09:49.123Z
-- Scenario root: /Users/youjia/.openclaw-worktrees/4YjnSufWTfcfpXek8gHqc/target/.runs/report-run-smoke/2026-04-30T09-09-48.853Z (removed by finally-cleanup)
+- Started: 2026-04-30T13:42:29.237Z
+- Finished: 2026-04-30T13:42:29.480Z
+- Scenario root: /Users/youjia/.openclaw-worktrees/4x3AUVbi-E64e7wNEnmzk/target/.runs/report-run-smoke/2026-04-30T13-42-29.237Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
