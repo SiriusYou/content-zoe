@@ -14,7 +14,8 @@
     "llm-smoke": "bun scripts/llm-smoke.ts",
     "run-stage-smoke": "bun scripts/run-stage-smoke.ts",
     "report:run": "bun src/bin/report-run.ts",
-    "report-run-smoke": "bun scripts/report-run-smoke.ts"
+    "report-run-smoke": "bun scripts/report-run-smoke.ts",
+    "db:smoke": "bun scripts/db-smoke.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.1.13",
