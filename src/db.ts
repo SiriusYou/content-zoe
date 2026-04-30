@@ -5,6 +5,11 @@ import { fileURLToPath } from "node:url";
 
 import { Database } from "bun:sqlite";
 
+import type { RecoveryCleanup as Slice35RecoveryCleanup } from "./lib/report-loop.ts";
+
+export type DbClient = Database;
+export type RecoveryCleanup = Slice35RecoveryCleanup;
+
 export type DbInitErrorCode =
   | "DB_OPEN_FAILED"
   | "DB_PRAGMA_FAILED"
@@ -17,14 +22,13 @@ export type DbMigrationErrorCode =
   | "MIGRATION_APPLY_FAILED";
 
 export type DbConstraintSubcode =
-  | "DUPLICATE_JOB_ID"
-  | "DUPLICATE_WEEK_KEY"
-  | "DUPLICATE_RECOVERY_CLEANUP"
-  | "FK_JOB_NOT_FOUND"
-  | "INVALID_LOCALES"
-  | "CHECK_FAILED"
-  | "UNIQUE_FAILED"
-  | "CONSTRAINT_FAILED";
+  | "SQLITE_CONSTRAINT_UNIQUE"
+  | "SQLITE_CONSTRAINT_FOREIGNKEY"
+  | "SQLITE_CONSTRAINT_NOTNULL"
+  | "SQLITE_CONSTRAINT_CHECK"
+  | "SQLITE_CONSTRAINT_PRIMARYKEY"
+  | "SQLITE_CONSTRAINT_TRIGGER"
+  | "SQLITE_CONSTRAINT_OTHER";
 
 export class DbInitError extends Error {
   readonly name = "DbInitError";
@@ -42,17 +46,23 @@ export class DbMigrationError extends Error {
   readonly name = "DbMigrationError";
   readonly errorCode: DbMigrationErrorCode;
   readonly migration?: string;
+  readonly expectedSha?: string;
+  readonly actualSha?: string;
   override readonly cause?: unknown;
 
   constructor(args: {
     errorCode: DbMigrationErrorCode;
     message: string;
     migration?: string;
+    expectedSha?: string;
+    actualSha?: string;
     cause?: unknown;
   }) {
     super(args.message);
     this.errorCode = args.errorCode;
     this.migration = args.migration;
+    this.expectedSha = args.expectedSha;
+    this.actualSha = args.actualSha;
     this.cause = args.cause;
   }
 }
@@ -61,12 +71,24 @@ export class DbConstraintError extends Error {
   readonly name = "DbConstraintError";
   readonly errorCode = "DB_CONSTRAINT";
   readonly subcode: DbConstraintSubcode;
-  override readonly cause?: unknown;
+  readonly originalError: Error;
+  readonly tableName?: string;
+  readonly columnHint?: string;
+  override readonly cause?: Error;
 
-  constructor(subcode: DbConstraintSubcode, message: string, cause?: unknown) {
-    super(message);
-    this.subcode = subcode;
-    this.cause = cause;
+  constructor(args: {
+    subcode: DbConstraintSubcode;
+    message: string;
+    originalError: Error;
+    tableName?: string;
+    columnHint?: string;
+  }) {
+    super(args.message);
+    this.subcode = args.subcode;
+    this.originalError = args.originalError;
+    this.tableName = args.tableName;
+    this.columnHint = args.columnHint;
+    this.cause = args.originalError;
   }
 }
 
@@ -163,16 +185,33 @@ export interface NewEvent {
   created_at: number;
 }
 
-export interface RecoveryCleanupAudit {
-  job_id: string;
-  attempt_number: number;
-  payload: string;
-  created_at: number;
+export interface RecoveryCleanupParams {
+  jobId: string;
+  attemptNumber: number;
+  recoveryCleanup: RecoveryCleanup;
 }
 
 export interface OpenDbOptions {
   migrationsDir?: string;
   migrate?: boolean;
+}
+
+export interface MigrationResult {
+  applied: string[];
+  skipped: string[];
+}
+
+export interface RowsAffectedResult {
+  rowsAffected: number;
+}
+
+export interface CasExpected {
+  status: string;
+  attemptNumber: number;
+}
+
+export interface CasRowsAffectedResult {
+  rowsAffected: 0 | 1;
 }
 
 const migrationsDir = resolve(dirname(fileURLToPath(import.meta.url)), "migrations");
@@ -233,13 +272,15 @@ export function openDb(dbPath: string, options: OpenDbOptions = {}): Database {
   }
 }
 
-export function runMigrations(db: Database, dir = migrationsDir): void {
+export function runMigrations(db: DbClient, dir = migrationsDir): MigrationResult {
   if (!existsSync(dir)) {
     throw new DbMigrationError({
       errorCode: "MIGRATION_DIR_MISSING",
       message: `migration directory does not exist: ${dir}`,
     });
   }
+
+  const result: MigrationResult = { applied: [], skipped: [] };
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
@@ -280,9 +321,12 @@ export function runMigrations(db: Database, dir = migrationsDir): void {
             errorCode: "MIGRATION_SHA_MISMATCH",
             message: `migration SHA mismatch for ${filename}`,
             migration: filename,
+            expectedSha: existing.sha256,
+            actualSha: sha256,
           });
         }
         db.exec("COMMIT");
+        result.skipped.push(filename);
         continue;
       }
 
@@ -291,6 +335,7 @@ export function runMigrations(db: Database, dir = migrationsDir): void {
         "INSERT INTO _migrations (filename, sha256, applied_at) VALUES (?, ?, ?)",
       ).run(filename, sha256, Math.floor(Date.now() / 1000));
       db.exec("COMMIT");
+      result.applied.push(filename);
     } catch (err) {
       try {
         db.exec("ROLLBACK");
@@ -308,9 +353,11 @@ export function runMigrations(db: Database, dir = migrationsDir): void {
       });
     }
   }
+
+  return result;
 }
 
-export function createJob(db: Database, input: NewJob): Job {
+export function insertJob(db: DbClient, input: NewJob): Job {
   try {
     db.query(`
       INSERT INTO jobs (
@@ -354,30 +401,42 @@ export function createJob(db: Database, input: NewJob): Job {
   }
 }
 
-export function getJob(db: Database, id: string): Job | null {
+export function findJobById(db: DbClient, id: string): Job | null {
   return db.query<Job, [string]>("SELECT * FROM jobs WHERE id = ?").get(id) ?? null;
 }
 
-export function getJobByWeekKey(db: Database, weekKey: string): Job | null {
+export function findJobsByStatus(db: DbClient, status: string): Job[] {
   return db
-    .query<Job, [string]>("SELECT * FROM jobs WHERE week_key = ?")
-    .get(weekKey) ?? null;
+    .query<Job, [string]>(
+      "SELECT * FROM jobs WHERE status = ? ORDER BY attempt_number ASC, updated_at ASC, id ASC",
+    )
+    .all(status);
 }
 
-export function updateJob(db: Database, id: string, patch: JobPatch): number {
+export function updateJob(
+  db: DbClient,
+  id: string,
+  patch: JobPatch,
+): RowsAffectedResult {
   return updateJobWhere(db, "id = ?", [id], patch);
 }
 
 export function casUpdateJob(
-  db: Database,
+  db: DbClient,
   id: string,
-  expectedUpdatedAt: number,
+  expected: CasExpected,
   patch: JobPatch,
-): number {
-  return updateJobWhere(db, "id = ? AND updated_at = ?", [id, expectedUpdatedAt], patch);
+): CasRowsAffectedResult {
+  const result = updateJobWhere(
+    db,
+    "id = ? AND status = ? AND attempt_number = ?",
+    [id, expected.status, expected.attemptNumber],
+    patch,
+  );
+  return { rowsAffected: result.rowsAffected === 0 ? 0 : 1 };
 }
 
-export function appendEvent(db: Database, input: NewEvent): Event {
+export function insertEvent(db: DbClient, input: NewEvent): Event {
   try {
     const result = db
       .query(
@@ -392,44 +451,57 @@ export function appendEvent(db: Database, input: NewEvent): Event {
       );
     return getEventOrThrow(db, Number(result.lastInsertRowid));
   } catch (err) {
-    throw mapConstraintError(err, input.type);
+    throw mapConstraintError(err);
   }
 }
 
-export function getEvent(db: Database, id: number): Event | null {
+function getEvent(db: DbClient, id: number): Event | null {
   return db.query<Event, [number]>("SELECT * FROM events WHERE id = ?").get(id) ?? null;
 }
 
-export function listEventsForJob(db: Database, jobId: string): Event[] {
+export function findEventsByJob(
+  db: DbClient,
+  jobId: string,
+  type?: string,
+): Event[] {
+  if (type === undefined) {
+    return db
+      .query<Event, [string]>(
+        "SELECT * FROM events WHERE job_id = ? ORDER BY id ASC",
+      )
+      .all(jobId);
+  }
+
   return db
-    .query<Event, [string]>(
-      "SELECT * FROM events WHERE job_id = ? ORDER BY id ASC",
+    .query<Event, [string, string]>(
+      "SELECT * FROM events WHERE job_id = ? AND type = ? ORDER BY id ASC",
     )
-    .all(jobId);
+    .all(jobId, type);
 }
 
 export function recordRecoveryCleanup(
-  db: Database,
-  audit: RecoveryCleanupAudit,
+  db: DbClient,
+  params: RecoveryCleanupParams,
 ): Event {
+  const payload = JSON.stringify(params.recoveryCleanup);
   try {
-    return appendEvent(db, {
-      job_id: audit.job_id,
-      attempt_number: audit.attempt_number,
+    return insertEvent(db, {
+      job_id: params.jobId,
+      attempt_number: params.attemptNumber,
       type: "recovery_cleanup",
-      payload: audit.payload,
-      created_at: audit.created_at,
+      payload,
+      created_at: Math.floor(Date.now() / 1000),
     });
   } catch (err) {
     if (
       err instanceof DbConstraintError &&
-      err.subcode === "DUPLICATE_RECOVERY_CLEANUP"
+      err.subcode === "SQLITE_CONSTRAINT_UNIQUE"
     ) {
       const existing = db
         .query<Event, [string, number]>(
           "SELECT * FROM events WHERE job_id = ? AND attempt_number = ? AND type = 'recovery_cleanup'",
         )
-        .get(audit.job_id, audit.attempt_number);
+        .get(params.jobId, params.attemptNumber);
       if (existing) {
         return existing;
       }
@@ -439,16 +511,16 @@ export function recordRecoveryCleanup(
 }
 
 function updateJobWhere(
-  db: Database,
+  db: DbClient,
   whereSql: string,
   whereValues: (string | number)[],
   patch: JobPatch,
-): number {
+): RowsAffectedResult {
   const entries = Object.entries(patch).filter(([key]) =>
     jobPatchColumns.includes(key as (typeof jobPatchColumns)[number]),
   );
   if (entries.length === 0) {
-    return 0;
+    return { rowsAffected: 0 };
   }
 
   const setSql = entries.map(([key]) => `${key} = ?`).join(", ");
@@ -459,21 +531,21 @@ function updateJobWhere(
       ...values,
       ...whereValues,
     );
-    return result.changes;
+    return { rowsAffected: result.changes };
   } catch (err) {
     throw mapConstraintError(err);
   }
 }
 
-function getJobOrThrow(db: Database, id: string): Job {
-  const job = getJob(db, id);
+function getJobOrThrow(db: DbClient, id: string): Job {
+  const job = findJobById(db, id);
   if (!job) {
     throw new Error(`job not found after write: ${id}`);
   }
   return job;
 }
 
-function getEventOrThrow(db: Database, id: number): Event {
+function getEventOrThrow(db: DbClient, id: number): Event {
   const event = getEvent(db, id);
   if (!event) {
     throw new Error(`event not found after write: ${id}`);
@@ -481,7 +553,7 @@ function getEventOrThrow(db: Database, id: number): Event {
   return event;
 }
 
-function pragmaScalar<T>(db: Database, sql: string): T {
+function pragmaScalar<T>(db: DbClient, sql: string): T {
   const row = db.query<Record<string, T>, []>(sql).get();
   if (!row) {
     throw new DbInitError("DB_PRAGMA_FAILED", `pragma returned no rows: ${sql}`);
@@ -489,31 +561,21 @@ function pragmaScalar<T>(db: Database, sql: string): T {
   return Object.values(row)[0] as T;
 }
 
-function mapConstraintError(err: unknown, eventType?: string): never {
+function mapConstraintError(err: unknown): never {
   if (!isSqliteConstraint(err)) {
     throw err;
   }
 
-  const message = err instanceof Error ? err.message : String(err);
-  if (message.includes("FOREIGN KEY")) {
-    throw new DbConstraintError("FK_JOB_NOT_FOUND", message, err);
-  }
-  if (message.includes("jobs.id")) {
-    throw new DbConstraintError("DUPLICATE_JOB_ID", message, err);
-  }
-  if (message.includes("jobs.week_key")) {
-    throw new DbConstraintError("DUPLICATE_WEEK_KEY", message, err);
-  }
-  if (eventType === "recovery_cleanup" && message.includes("UNIQUE")) {
-    throw new DbConstraintError("DUPLICATE_RECOVERY_CLEANUP", message, err);
-  }
-  if (message.includes("jobs.locales") || message.includes("CHECK")) {
-    throw new DbConstraintError("INVALID_LOCALES", message, err);
-  }
-  if (message.includes("UNIQUE")) {
-    throw new DbConstraintError("UNIQUE_FAILED", message, err);
-  }
-  throw new DbConstraintError("CONSTRAINT_FAILED", message, err);
+  const originalError = err instanceof Error ? err : new Error(String(err));
+  const message = originalError.message;
+  const { tableName, columnHint } = inferConstraintTarget(message);
+  throw new DbConstraintError({
+    subcode: sqliteConstraintSubcode(originalError),
+    message,
+    originalError,
+    tableName,
+    columnHint,
+  });
 }
 
 function isSqliteConstraint(err: unknown): boolean {
@@ -521,5 +583,34 @@ function isSqliteConstraint(err: unknown): boolean {
     return false;
   }
   const code = (err as Error & { code?: string }).code;
-  return code === "SQLITE_CONSTRAINT" || err.message.includes("constraint");
+  return code?.startsWith("SQLITE_CONSTRAINT") === true || err.message.includes("constraint");
+}
+
+function sqliteConstraintSubcode(err: Error): DbConstraintSubcode {
+  const code = (err as Error & { code?: string }).code;
+  switch (code) {
+    case "SQLITE_CONSTRAINT_UNIQUE":
+    case "SQLITE_CONSTRAINT_FOREIGNKEY":
+    case "SQLITE_CONSTRAINT_NOTNULL":
+    case "SQLITE_CONSTRAINT_CHECK":
+    case "SQLITE_CONSTRAINT_PRIMARYKEY":
+    case "SQLITE_CONSTRAINT_TRIGGER":
+      return code;
+    default:
+      return "SQLITE_CONSTRAINT_OTHER";
+  }
+}
+
+function inferConstraintTarget(message: string): {
+  tableName?: string;
+  columnHint?: string;
+} {
+  const tableColumn = message.match(/constraint failed: ([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)/);
+  if (tableColumn) {
+    return { tableName: tableColumn[1], columnHint: tableColumn[2] };
+  }
+  if (message.includes("locales")) {
+    return { tableName: "jobs", columnHint: "locales" };
+  }
+  return {};
 }

@@ -4,20 +4,21 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  appendEvent,
   casUpdateJob,
-  createJob,
   DbConstraintError,
   DbInitError,
   DbMigrationError,
-  getJob,
-  getJobByWeekKey,
-  listEventsForJob,
+  findEventsByJob,
+  findJobById,
+  findJobsByStatus,
+  insertEvent,
+  insertJob,
   openDb,
   recordRecoveryCleanup,
   runMigrations,
   updateJob,
 } from "../src/db.ts";
+import { Stage } from "../src/pipeline/types.ts";
 
 type ScenarioName =
   | "open-pragmas"
@@ -35,6 +36,12 @@ interface ScenarioOutcome {
   details: string[];
   startedAtIso: string;
   finishedAtIso: string;
+}
+
+interface RecoveryCleanupRaceResult {
+  eventId: number;
+  observedExisting: boolean;
+  payload: string | null;
 }
 
 const SCENARIOS: ScenarioName[] = [
@@ -145,7 +152,12 @@ function runOpenPragmas(dir: string): string[] {
 function runMigrationIdempotenceStaticBegin(dir: string): string[] {
   const db = openDb(resolve(dir, "content.db"));
   try {
-    runMigrations(db);
+    const rerun = runMigrations(db);
+    assert(rerun.applied.length === 0, "expected rerun to apply no migrations");
+    assert(
+      rerun.skipped.includes("0001_initial.sql"),
+      "expected rerun to skip already-applied 0001_initial.sql",
+    );
     const rows = scalar<number>(
       db,
       "SELECT COUNT(*) AS value FROM _migrations WHERE filename = '0001_initial.sql'",
@@ -163,7 +175,7 @@ function runMigrationIdempotenceStaticBegin(dir: string): string[] {
 
   return [
     "runMigrations was idempotent and stored one SHA-256 row for 0001_initial.sql.",
-    "F3 static check found explicit BEGIN IMMEDIATE/COMMIT/ROLLBACK and no Database.transaction use.",
+    "F3 static check found explicit BEGIN IMMEDIATE/COMMIT/ROLLBACK and no Database.transaction use. [BEGIN IMMEDIATE confirmed in source]",
   ];
 }
 
@@ -193,10 +205,22 @@ function runMigrationShaMismatch(dir: string): string[] {
       mismatch.errorCode === "MIGRATION_SHA_MISMATCH",
       `expected MIGRATION_SHA_MISMATCH, got ${mismatch.errorCode}`,
     );
+    assert(
+      typeof mismatch.expectedSha === "string" && mismatch.expectedSha.length === 64,
+      "expected mismatch.expectedSha to expose stored SHA-256",
+    );
+    assert(
+      typeof mismatch.actualSha === "string" && mismatch.actualSha.length === 64,
+      "expected mismatch.actualSha to expose current SHA-256",
+    );
+    assert(
+      mismatch.expectedSha !== mismatch.actualSha,
+      "expected SHA mismatch payload values to differ",
+    );
 
     return [
       "A modified applied migration was refused.",
-      "DbMigrationError.errorCode was MIGRATION_SHA_MISMATCH.",
+      "DbMigrationError.errorCode was MIGRATION_SHA_MISMATCH with expectedSha and actualSha evidence.",
     ];
   } finally {
     db.close();
@@ -207,7 +231,7 @@ function runJobsCrud(dir: string): string[] {
   const db = openDb(resolve(dir, "content.db"));
   try {
     const now = unixNow();
-    const job = createJob(db, {
+    const job = insertJob(db, {
       id: "job-crud",
       week_key: "2026-W17",
       topic: "AI trends",
@@ -218,10 +242,10 @@ function runJobsCrud(dir: string): string[] {
     });
 
     assert(job.locales === "en,zh", `expected default locales, got ${job.locales}`);
-    assert(getJob(db, "job-crud")?.topic === "AI trends", "getJob failed");
+    assert(findJobById(db, "job-crud")?.topic === "AI trends", "findJobById failed");
     assert(
-      getJobByWeekKey(db, "2026-W17")?.id === "job-crud",
-      "getJobByWeekKey failed",
+      findJobsByStatus(db, "queued").some((queuedJob) => queuedJob.id === "job-crud"),
+      "findJobsByStatus failed",
     );
 
     const changed = updateJob(db, "job-crud", {
@@ -230,14 +254,14 @@ function runJobsCrud(dir: string): string[] {
       primary_report_path: ".runs/job-crud/attempt-1/report.en.md",
       updated_at: now + 1,
     });
-    assert(changed === 1, `expected one changed row, got ${changed}`);
-    const updated = getJob(db, "job-crud");
+    assert(changed.rowsAffected === 1, `expected one changed row, got ${changed.rowsAffected}`);
+    const updated = findJobById(db, "job-crud");
     assert(updated?.status === "running", "updateJob did not update status");
     assert(updated.primary_report_path?.endsWith("report.en.md"), "path patch missing");
 
     let duplicate: unknown;
     try {
-      createJob(db, {
+      insertJob(db, {
         id: "job-crud-2",
         week_key: "2026-W17",
         topic: "duplicate",
@@ -251,13 +275,18 @@ function runJobsCrud(dir: string): string[] {
     }
     assert(duplicate instanceof DbConstraintError, "expected duplicate week constraint");
     assert(
-      duplicate.subcode === "DUPLICATE_WEEK_KEY",
-      `expected DUPLICATE_WEEK_KEY, got ${duplicate.subcode}`,
+      duplicate.subcode === "SQLITE_CONSTRAINT_UNIQUE",
+      `expected SQLITE_CONSTRAINT_UNIQUE, got ${duplicate.subcode}`,
+    );
+    assert(duplicate.tableName === "jobs", `expected tableName jobs, got ${duplicate.tableName}`);
+    assert(
+      duplicate.columnHint === "week_key",
+      `expected columnHint week_key, got ${duplicate.columnHint}`,
     );
 
     return [
-      "createJob/getJob/getJobByWeekKey/updateJob preserved typed job fields.",
-      "Duplicate week_key surfaced DbConstraintError.subcode=DUPLICATE_WEEK_KEY.",
+      "insertJob/findJobById/findJobsByStatus/updateJob preserved typed job fields.",
+      "Duplicate week_key surfaced DbConstraintError.subcode=SQLITE_CONSTRAINT_UNIQUE with table/column hints.",
     ];
   } finally {
     db.close();
@@ -268,7 +297,7 @@ function runEventsAppendFk(dir: string): string[] {
   const db = openDb(resolve(dir, "content.db"));
   try {
     const now = unixNow();
-    createJob(db, {
+    insertJob(db, {
       id: "job-events",
       week_key: "2026-W18",
       topic: "Events",
@@ -279,7 +308,7 @@ function runEventsAppendFk(dir: string): string[] {
     });
 
     const payload = '{"nested":{"kept":"as string"}}';
-    const event = appendEvent(db, {
+    const event = insertEvent(db, {
       job_id: "job-events",
       attempt_number: 1,
       type: "stage_enter",
@@ -287,12 +316,14 @@ function runEventsAppendFk(dir: string): string[] {
       created_at: now + 1,
     });
     assert(event.payload === payload, "payload string was not preserved exactly");
-    const events = listEventsForJob(db, "job-events");
+    const events = findEventsByJob(db, "job-events");
     assert(events.length === 1, `expected one event, got ${events.length}`);
+    const typedEvents = findEventsByJob(db, "job-events", "stage_enter");
+    assert(typedEvents.length === 1, `expected one typed event, got ${typedEvents.length}`);
 
     let fk: unknown;
     try {
-      appendEvent(db, {
+      insertEvent(db, {
         job_id: "missing-job",
         attempt_number: 1,
         type: "stage_enter",
@@ -303,11 +334,15 @@ function runEventsAppendFk(dir: string): string[] {
       fk = err;
     }
     assert(fk instanceof DbConstraintError, "expected FK DbConstraintError");
-    assert(fk.subcode === "FK_JOB_NOT_FOUND", `expected F6 FK_JOB_NOT_FOUND, got ${fk.subcode}`);
+    assert(
+      fk.subcode === "SQLITE_CONSTRAINT_FOREIGNKEY",
+      `expected F6 SQLITE_CONSTRAINT_FOREIGNKEY, got ${fk.subcode}`,
+    );
+    assert(fk.originalError instanceof Error, "expected originalError to be exposed");
 
     return [
-      "appendEvent/listEventsForJob preserved payload as a string.",
-      "F6 foreign-key violation surfaced DbConstraintError.subcode=FK_JOB_NOT_FOUND.",
+      "insertEvent/findEventsByJob preserved payload as a string and supported type filtering.",
+      "F6 foreign-key violation surfaced DbConstraintError.subcode=SQLITE_CONSTRAINT_FOREIGNKEY.",
     ];
   } finally {
     db.close();
@@ -318,43 +353,63 @@ function runCasSemantics(dir: string): string[] {
   const db = openDb(resolve(dir, "content.db"));
   try {
     const now = unixNow();
-    createJob(db, {
+    insertJob(db, {
       id: "job-cas",
       week_key: "2026-W19",
       topic: "CAS",
-      status: "queued",
-      current_stage: "research",
+      status: "awaiting_approval",
+      current_stage: "translate_zh",
       created_at: now,
       updated_at: now,
     });
 
-    const ok = casUpdateJob(db, "job-cas", now, {
-      status: "running",
+    const ok = casUpdateJob(db, "job-cas", {
+      status: "awaiting_approval",
+      attemptNumber: 1,
+    }, {
+      notified_at: now + 1,
       updated_at: now + 1,
     });
-    const stale = casUpdateJob(db, "job-cas", now, {
-      status: "failed",
+
+    const attemptChanged = updateJob(db, "job-cas", {
+      attempt_number: 2,
+      status: "queued",
+      current_stage: "draft_en",
       updated_at: now + 2,
     });
+    const stale = casUpdateJob(db, "job-cas", {
+      status: "awaiting_approval",
+      attemptNumber: 1,
+    }, {
+      notified_at: now + 3,
+      updated_at: now + 3,
+    });
 
-    assert(ok === 1, `expected successful CAS rowsAffected=1, got ${ok}`);
-    assert(stale === 0, `expected stale CAS rowsAffected=0, got ${stale}`);
-    assert(getJob(db, "job-cas")?.status === "running", "stale CAS changed row");
+    assert(ok.rowsAffected === 1, `expected successful CAS rowsAffected=1, got ${ok.rowsAffected}`);
+    assert(
+      attemptChanged.rowsAffected === 1,
+      `expected one attempt change, got ${attemptChanged.rowsAffected}`,
+    );
+    assert(stale.rowsAffected === 0, `expected stale CAS rowsAffected=0, got ${stale.rowsAffected}`);
+    const afterStale = findJobById(db, "job-cas");
+    assert(afterStale?.status === "queued", "stale CAS changed status");
+    assert(afterStale.notified_at === now + 1, "stale CAS changed notified_at");
 
     return [
-      "casUpdateJob returned rowsAffected=1 for a matching updated_at guard.",
-      "casUpdateJob returned rowsAffected=0 and did not mutate on a stale guard.",
+      "casUpdateJob returned rowsAffected=1 for a matching status plus attempt_number guard.",
+      "casUpdateJob returned rowsAffected=0 and did not mutate after status/attempt_number drift.",
     ];
   } finally {
     db.close();
   }
 }
 
-function runRecoveryCleanup(dir: string): string[] {
-  const db = openDb(resolve(dir, "content.db"));
+async function runRecoveryCleanup(dir: string): Promise<string[]> {
+  const dbPath = resolve(dir, "content.db");
+  const db = openDb(dbPath);
   try {
     const now = unixNow();
-    createJob(db, {
+    insertJob(db, {
       id: "job-recovery",
       week_key: "2026-W20",
       topic: "Recovery",
@@ -364,18 +419,26 @@ function runRecoveryCleanup(dir: string): string[] {
       updated_at: now,
     });
 
-    const payload = '{"deletedFiles":["stale.md"],"restartStage":"edit_en"}';
+    const recoveryCleanup = {
+      fromAttempt: 1,
+      copiedFromAttempt: 1,
+      deletedFiles: ["stale.md"],
+      restartStage: Stage.EDIT_EN,
+      carryForward: ["research/", "sources.json"],
+    } as const;
+    const payload = JSON.stringify(recoveryCleanup);
     const first = recordRecoveryCleanup(db, {
-      job_id: "job-recovery",
-      attempt_number: 2,
-      payload,
-      created_at: now + 1,
+      jobId: "job-recovery",
+      attemptNumber: 2,
+      recoveryCleanup,
     });
     const duplicate = recordRecoveryCleanup(db, {
-      job_id: "job-recovery",
-      attempt_number: 2,
-      payload: '{"deletedFiles":["other.md"]}',
-      created_at: now + 2,
+      jobId: "job-recovery",
+      attemptNumber: 2,
+      recoveryCleanup: {
+        ...recoveryCleanup,
+        deletedFiles: ["other.md"],
+      },
     });
 
     assert(first.id === duplicate.id, "F4 duplicate did not return existing event");
@@ -388,12 +451,38 @@ function runRecoveryCleanup(dir: string): string[] {
       "expected one recovery_cleanup row",
     );
 
+    insertJob(db, {
+      id: "job-recovery-race",
+      week_key: "2026-W22",
+      topic: "Recovery race",
+      status: "queued",
+      current_stage: "research",
+      created_at: now,
+      updated_at: now,
+    });
+
+    const raceResults = await runRecoveryCleanupRace(dbPath);
+    const raceRowCount = scalar<number>(
+      db,
+      "SELECT COUNT(*) AS value FROM events WHERE job_id = 'job-recovery-race' AND attempt_number = 3 AND type = 'recovery_cleanup'",
+    );
+    assert(raceRowCount === 1, `expected one race recovery_cleanup row, got ${raceRowCount}`);
+    assert(
+      new Set(raceResults.map((result) => result.eventId)).size === 1,
+      "expected concurrent duplicate callers to return the same event id",
+    );
+    assert(
+      raceResults.some((result) => result.observedExisting),
+      "expected one concurrent caller to report handled UNIQUE duplicate path",
+    );
+
     const source = readFileSync(resolve(repoRoot, "src", "db.ts"), "utf8");
     assert(!source.includes("run-state.json"), "recordRecoveryCleanup must not reference run-state.json");
 
     return [
-      "recordRecoveryCleanup wrote the audit payload only to events.",
-      "F4 duplicate recovery_cleanup returned the existing row and did not change the payload.",
+      "recordRecoveryCleanup serialized the Slice 3.5 recoveryCleanup object into events only.",
+      "F4 sequential duplicate recovery_cleanup returned the existing row and did not change the payload.",
+      "F6 Test #7(b) launched two separate connections/processes; partial UNIQUE enforcement left exactly one row and the duplicate path returned the existing row.",
     ];
   } finally {
     db.close();
@@ -406,7 +495,7 @@ async function runWalConcurrentReader(dir: string): Promise<string[]> {
   const reader = openDb(dbPath);
   try {
     const now = unixNow();
-    createJob(writer, {
+    insertJob(writer, {
       id: "job-wal",
       week_key: "2026-W21",
       topic: "WAL",
@@ -418,11 +507,11 @@ async function runWalConcurrentReader(dir: string): Promise<string[]> {
 
     writer.exec("BEGIN IMMEDIATE");
     updateJob(writer, "job-wal", { status: "running", updated_at: now + 1 });
-    const visibleToReader = getJob(reader, "job-wal");
+    const visibleToReader = findJobById(reader, "job-wal");
     assert(visibleToReader?.status === "queued", "reader should see pre-commit snapshot");
     writer.exec("COMMIT");
 
-    const afterCommit = getJob(reader, "job-wal");
+    const afterCommit = findJobById(reader, "job-wal");
     assert(afterCommit?.status === "running", "reader did not see committed WAL update");
 
     return [
@@ -440,6 +529,74 @@ async function runWalConcurrentReader(dir: string): Promise<string[]> {
     reader.close();
     writer.close();
   }
+}
+
+async function runRecoveryCleanupRace(
+  dbPath: string,
+): Promise<RecoveryCleanupRaceResult[]> {
+  const childCode = `
+    import { openDb, recordRecoveryCleanup } from "./src/db.ts";
+
+    const label = process.env.RACE_LABEL;
+    if (!label || !process.env.DB_PATH) {
+      throw new Error("missing race child environment");
+    }
+
+    const recoveryCleanup = {
+      fromAttempt: 2,
+      copiedFromAttempt: 2,
+      deletedFiles: [\`\${label}.md\`],
+      restartStage: "draft_en",
+      carryForward: ["research/"],
+    };
+    const expectedPayload = JSON.stringify(recoveryCleanup);
+    const db = openDb(process.env.DB_PATH);
+
+    try {
+      const event = recordRecoveryCleanup(db, {
+        jobId: "job-recovery-race",
+        attemptNumber: 3,
+        recoveryCleanup,
+      });
+      console.log(JSON.stringify({
+        eventId: event.id,
+        observedExisting: event.payload !== expectedPayload,
+        payload: event.payload,
+      }));
+    } finally {
+      db.close();
+    }
+  `;
+
+  const children = ["left", "right"].map((label) =>
+    Bun.spawn({
+      cmd: [process.execPath, "--eval", childCode],
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        DB_PATH: dbPath,
+        RACE_LABEL: label,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    }),
+  );
+
+  const outputs = await Promise.all(
+    children.map(async (child) => {
+      const [exitCode, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      assert(exitCode === 0, `race child failed with ${exitCode}: ${stderr}`);
+      const line = stdout.trim().split("\n").filter(Boolean).at(-1);
+      assert(line !== undefined, "race child produced no JSON output");
+      return JSON.parse(line) as RecoveryCleanupRaceResult;
+    }),
+  );
+
+  return outputs;
 }
 
 function scalar<T>(db: { query: (sql: string) => { get: () => Record<string, T> | null } }, sql: string): T {

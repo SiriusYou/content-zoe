@@ -24,6 +24,8 @@ CREATE TABLE jobs (
   CHECK (locales IN ('en', 'en,zh'))
 );
 
+-- statement-breakpoint
+
 CREATE TABLE events (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   job_id         TEXT NOT NULL,
@@ -34,10 +36,20 @@ CREATE TABLE events (
   FOREIGN KEY(job_id) REFERENCES jobs(id)
 );
 
-CREATE INDEX idx_jobs_status_updated_at ON jobs(status, updated_at);
-CREATE INDEX idx_jobs_current_stage ON jobs(current_stage);
-CREATE INDEX idx_events_job_id_id ON events(job_id, id);
-CREATE INDEX idx_events_type_created_at ON events(type, created_at);
+-- statement-breakpoint
+
+CREATE INDEX idx_jobs_status_attempt ON jobs(status, attempt_number);
+
+-- statement-breakpoint
+
+CREATE INDEX idx_jobs_week_key ON jobs(week_key);
+
+-- statement-breakpoint
+
+CREATE INDEX idx_events_job_attempt ON events(job_id, attempt_number);
+
+-- statement-breakpoint
+
 CREATE UNIQUE INDEX idx_events_recovery_cleanup_unique
-  ON events(job_id, attempt_number, type)
-  WHERE type='recovery_cleanup';
+  ON events(job_id, attempt_number)
+  WHERE type = 'recovery_cleanup';
