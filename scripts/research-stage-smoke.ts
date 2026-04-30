@@ -243,7 +243,6 @@ function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {
           .map((detail) => detail.replaceAll("|", "\\|"))
           .join("<br>")} |`,
     ),
-    "",
   ];
   writeFileSync(docPath, `${lines.join("\n")}\n`);
 }
