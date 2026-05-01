@@ -10,8 +10,15 @@ export enum Stage {
 export interface StageDef {
   stage: Stage;
   prompt: string;
+  buildPrompt?: (context: StagePromptContext) => string;
   timeoutMs: number;
   manifest: ManifestSchema;
+}
+
+export interface StagePromptContext {
+  stage: Stage;
+  runDir: string;
+  cwd?: string;
 }
 
 export interface JobContext {

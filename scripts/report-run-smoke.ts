@@ -309,6 +309,7 @@ async function runResumeCarryForward(dir: string): Promise<string[]> {
   const attempt1 = resolve(dir, ".runs", "carry-forward", "attempt-1");
   mkdirSync(attempt1, { recursive: true });
   mkdirSync(resolve(attempt1, "research"), { recursive: true });
+  writeFileSync(resolve(attempt1, "research", "brief.md"), "brief\n");
   writeFileSync(resolve(attempt1, "research", "notes.md"), "notes\n");
   writeFileSync(resolve(attempt1, "sources.json"), "[]\n");
   writeState(attempt1, {
@@ -432,6 +433,7 @@ async function runCarryForwardPartialFailure(dir: string): Promise<string[]> {
   const attempt1 = resolve(dir, ".runs", "partial-failure", "attempt-1");
   mkdirSync(attempt1, { recursive: true });
   mkdirSync(resolve(attempt1, "research"), { recursive: true });
+  writeFileSync(resolve(attempt1, "research", "brief.md"), "brief\n");
   writeFileSync(resolve(attempt1, "research", "notes.md"), "notes\n");
   writeFileSync(resolve(attempt1, "sources.json"), "[]\n");
   writeState(attempt1, {
@@ -636,6 +638,7 @@ function writeState(attemptDir: string, state: RunState): void {
 
 function writeCarryForwardFiles(attemptDir: string): void {
   mkdirSync(resolve(attemptDir, "research"), { recursive: true });
+  writeFileSync(resolve(attemptDir, "research", "brief.md"), "brief\n");
   writeFileSync(resolve(attemptDir, "research", "notes.md"), "notes\n");
   writeFileSync(resolve(attemptDir, "sources.json"), "[]\n");
   writeFileSync(resolve(attemptDir, "report.en.md"), "English report\n");

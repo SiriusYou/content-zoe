@@ -13,20 +13,23 @@ export function createReportRunFakeProvider(
   options: ReportRunFakeProviderOptions = {},
 ): FakeProvider {
   const omitted = new Set(options.omitStages ?? []);
+  const enabledStages = new Set(
+    Object.values(Stage).filter((stage) => !omitted.has(stage)),
+  );
   return new ReportRunFakeProvider(
     new Map(
       Object.values(STAGES)
-        .filter((stageDef) => !omitted.has(stageDef.stage))
+        .filter((stageDef) => enabledStages.has(stageDef.stage))
         .map((stageDef) => [stageDef.prompt, `fake output for ${stageDef.stage}`]),
     ),
-    !omitted.has(Stage.RESEARCH),
+    enabledStages,
   );
 }
 
 class ReportRunFakeProvider extends FakeProvider {
   constructor(
     responses: Map<string, string>,
-    private readonly researchArtifactsEnabled: boolean,
+    private readonly enabledStages: ReadonlySet<Stage>,
   ) {
     super(responses);
   }
@@ -36,8 +39,19 @@ class ReportRunFakeProvider extends FakeProvider {
     cwd: string,
     timeoutMs: number,
   ): Promise<string> {
-    if (this.researchArtifactsEnabled && prompt === STAGES[Stage.RESEARCH].prompt) {
+    if (
+      this.enabledStages.has(Stage.RESEARCH) &&
+      prompt === STAGES[Stage.RESEARCH].prompt
+    ) {
       writeResearchArtifacts(cwd);
+    }
+
+    if (
+      this.enabledStages.has(Stage.DRAFT_EN) &&
+      prompt.startsWith(STAGES[Stage.DRAFT_EN].prompt)
+    ) {
+      writeDraftArtifacts(cwd);
+      return `fake output for ${Stage.DRAFT_EN}`;
     }
 
     return super.runPrompt(prompt, cwd, timeoutMs);
@@ -58,5 +72,12 @@ function writeResearchArtifacts(runDir: string): void {
         type: "synthetic",
       },
     ])}\n`,
+  );
+}
+
+function writeDraftArtifacts(runDir: string): void {
+  writeFileSync(
+    path.resolve(runDir, "report.en.md"),
+    "# English Report\n\nSynthetic fake-provider English draft for report-run smoke coverage.\n",
   );
 }

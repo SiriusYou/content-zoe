@@ -14,6 +14,7 @@
     "llm-smoke": "bun scripts/llm-smoke.ts",
     "run-stage-smoke": "bun scripts/run-stage-smoke.ts",
     "research-stage-smoke": "bun scripts/research-stage-smoke.ts",
+    "draft-en-stage-smoke": "bun scripts/draft-en-stage-smoke.ts",
     "report:run": "bun src/bin/report-run.ts",
     "report-run-smoke": "bun scripts/report-run-smoke.ts",
     "db:smoke": "bun scripts/db-smoke.ts"

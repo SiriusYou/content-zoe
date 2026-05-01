@@ -50,9 +50,36 @@ export async function runStage(
 
   const { canonicalRunDir } = preflight;
 
+  let providerPrompt: string;
+  try {
+    providerPrompt = stageDef.buildPrompt
+      ? stageDef.buildPrompt({
+          stage: stageDef.stage,
+          runDir: canonicalRunDir,
+          cwd: jobContext.cwd,
+        })
+      : stageDef.prompt;
+  } catch (err) {
+    const error =
+      err instanceof LLMProviderError
+        ? err
+        : new LLMProviderError({
+            kind: "spawn",
+            message: `runStage internal: prompt construction failed: ${formatThrown(err)}`,
+            cause: err,
+          });
+    return {
+      status: "error",
+      stage: stageDef.stage,
+      runDir: canonicalRunDir,
+      elapsedMs: elapsedSince(startedAt),
+      error,
+    };
+  }
+
   try {
     const output = await provider.runPrompt(
-      stageDef.prompt,
+      providerPrompt,
       canonicalRunDir,
       stageDef.timeoutMs,
     );
