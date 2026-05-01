@@ -106,13 +106,38 @@ For adversarial review cycles (slice-approval, plan review, charter amendment), 
 
 **Origin**: charter v3.3 cycle (2026-04-28). The cycle's r1 + r2 + r3 reviewer briefs explicitly demonstrated this discipline; cz-Claude r2 forward observation #4 codified it as a future operating-model addition.
 
+### Implementation review source-read discipline
+
+For Gate 1 and Gate 2 implementation reviews, reviewers SHOULD read source from immutable full commit SHAs, not from mutable worktrees or mutable branch refs. Preferred forms:
+
+- `git show <full-commit-sha>:<path>` for source inspection.
+- `git diff <base-full-sha>..<target-full-sha> -- <path>` for scoped drift checks.
+
+Branch refs such as `agent/<id>` may be used only to resolve the target commit (`git rev-parse agent/<id>`). Review artifacts must record the resolved SHA, and source citations should use that SHA rather than the branch name.
+
+Working-tree reads are acceptable only for generated evidence files that exist solely in the review checkout, or when the artifact explicitly records why an immutable full-SHA read was not possible.
+
+**Origin**: Slice 3.7 and Slice 4.1/4.2 implementation reviews. Immutable full-SHA reads prevented review drift when worker cleanup, branch advancement, or operator-side worktree state changed after implementation.
+
+### Review artifact baseline metric
+
+The current v3.3 steady-state baseline for a completed implementation slice is 8 review artifacts:
+
+- 4 slice-approval artifacts: cz-Claude r1/r2 + cz-Codex r1/r2.
+- 2 Gate 1 artifacts: hc-Codex + hc-Claude.
+- 2 Gate 2 artifacts: cz-Codex + cz-Claude.
+
+This is a planning metric, not a pass/fail rule. Handler slices may use fewer slice-approval artifacts when charter permits. Extra artifacts are expected when findings require additional folds. Close-out should record deviations from the baseline so future campaign planning uses observed cycle cost rather than intuition.
+
+**Origin**: Slice 4.1 and Slice 4.2 both closed at the 8-artifact baseline despite different classification pressure.
+
 ## 8. One-line summary
 
 See `ROLE_POSITIONING.md` § "One-Line Summary". Reproduced here as a guard against drift: oh-healthcare thinks, organizes, dispatches, and validates. oh-healthcare workers code. content-zoe judges whether the result is the right product.
 
 ## 9. Compounding-forward patterns
 
-Patterns surfaced across Slice 1 + Slice 2 + Slice 3 cycles (cz-Claude r1→rN + hc-codex Gate 1 + cz-Codex Gate 2 + cz-Codex advisory). Each reached the operator's "3+ exercised → fold to operating-model" threshold during Slice 3's r3 + r4 reviews. Memorialized here so Slice 3.5+ and Slice 4+ cycles inherit canonical references instead of re-deriving from slice-history archaeology.
+Patterns surfaced across Slice 1 + Slice 2 + Slice 3 cycles (cz-Claude r1→rN + hc-codex Gate 1 + cz-Codex Gate 2 + cz-Codex advisory) and later Slice 3.5-4.2 governance cycles. Each promoted pattern reached its stated threshold or was self-applying in a charter cycle. Memorialized here so later slice cycles inherit canonical references instead of re-deriving from slice-history archaeology.
 
 ### 9.1 Function-name citation pattern
 
@@ -146,13 +171,22 @@ Patterns surfaced across Slice 1 + Slice 2 + Slice 3 cycles (cz-Claude r1→rN +
 
 This converts § 9.3 from a post-hoc explanation pattern into a checkable verification step at draft time.
 
-### 9.4 Forward observations as inheritance contracts
+### 9.4 Forward observations as revalidated inheritance inputs
 
-**Rule**: each slice's "Forward observations" section becomes the next slice's structural constraints. Forward observations are NOT speculative wishes — they are binding inheritance contracts that the next slice's ACs MUST honor.
+**Rule**: each slice's "Forward observations" section is a structured inheritance input to later slices, not a binding contract by itself. The next slice touching the same surface MUST revalidate each relevant forward observation against canonical sources before acting on it.
 
-**Data points**: Slice 2 r2 L-r2-1 origin (operator-tunable params via constructor) → Slice 3 v1.0 inherited (OUT scope #1+#2+#3) → Slice 3 v1.1 expanded (Forward observations #1-#4) → Slice 3 v1.3 (Forward observations #5-#7 from cz-Claude r2/r3 + cz-Codex advisory) → Slice 3.5+ inheritance pending.
+Forward observations have four valid dispositions:
 
-**How to apply**: every slice draft's "Forward observations" section is a structured handoff. When drafting slice N+1, read slice N's forward observations as MANDATORY constraints — they go into N+1's OUT clauses (what N+1 won't do because slice N said "later"), or N+1's ACs (what N+1 MUST do because slice N said "the next consumer must"), or N+1's design surface (open questions slice N flagged). When reviewing slice N+1, verify each of slice N's forward observations is either folded into N+1 OR explicitly carried forward (not silently dropped).
+1. **Folded** — the next slice turns the observation into acceptance criteria, OUT scope, or implementation constraints.
+2. **Rejected** — the next slice explicitly rejects the observation with canonical-source evidence.
+3. **Carried forward** — the next slice records that the observation remains relevant but is outside current scope.
+4. **Retired** — the next slice records that the observation no longer applies because the target surface changed.
+
+Silent inheritance is invalid: a slice that touches the relevant surface should not ignore an upstream forward observation without one of the four dispositions above.
+
+**Data points**: Slice 2 r2 L-r2-1 origin (operator-tunable params via constructor) → Slice 3 inherited as OUT scope. Slice 3.7 rejected the inherited "extend JobContext" note after canonical-source revalidation and preserved handler classification. Slice 4.2 accepted the Slice 4.1/4.2 Path B inheritance only after reviewers hardened it through the `StageDef.buildPrompt?` fold.
+
+**How to apply**: when drafting slice N+1, read slice N's forward observations as inputs. For every observation touching N+1's file scope, add a short disposition in the draft or close-out: Folded, Rejected, Carried forward, or Retired. Rejections and retirements should cite canonical source by function/symbol name (see § 9.1) or immutable full commit SHA, not mutable line numbers.
 
 ### 9.5 Smoke-regeneration audit preservation
 
@@ -172,21 +206,75 @@ This converts § 9.3 from a post-hoc explanation pattern into a checkable verifi
 
 **Sub-pattern: Path B charter-vs-engine decoupling** (deferred for now; first observed in v3.3 cycle hc-codex r1 H1 fold). When an amendment introduces fields that the existing engine cannot mechanically enforce, two paths: (A) block amendment merge on engine slice landing; (B) soften charter to operator-attestation-and-audit, defer mechanical enforcement to follow-on engine slice. Path B is preferable when charter is policy and engine is enforcement, because coupling them creates an ordering loop. Track for promotion to its own subsection once a second amendment cycle exercises the same pattern.
 
-### 9.7 Methodology divergence between review lanes
+### 9.7 Methodology diversity between review lanes
 
-**Rule**: review lanes employing different methodologies — **textual conformance review** (read AC text against impl text) vs **behavioral verification** (smoke + CLI permutations + execution probes) — catch different finding classes. The dual-lane protocol's catch coverage depends on methodological diversity, not just reviewer count. Same-methodology lane pairs would miss the same finding class.
+**Rule**: review lanes employing different methodologies — textual conformance review and behavioral verification — catch different finding classes. The dual-lane protocol's coverage depends on methodological diversity, not reviewer count alone.
 
-**Data points**: Slice 3.5 cycle (2026-04-29) showed the pattern across three rounds (slice-approval, Gate 1, Gate 2). Each round had zero finding overlap between Claude (textual) and Codex (behavioral) lanes. Concrete catches: cz-Codex Gate 2 r1 caught `LLM_PROVIDER` unset → throws (v1.2 line 98 `Defaults: LLM_PROVIDER=fake` violation) by running `bun src/bin/report-run.ts <jobId>` with the env var unset; cz-Claude (textual) read the same spec but didn't probe the env-unset path. cz-Claude Gate 2 r1 + hc-Claude Gate 1 r1 both independently caught visibility-log textual-spec ordering inversion (`AFTER argv parsing`); Codex lanes (behavioral) didn't flag because impl behavior is correct in the observed paths. Pattern observed N=3 within Slice 3.5; not yet validated across distinct slices.
+At gates that require two lanes, the gate SHOULD preserve methodology diversity:
 
-**How to apply**: each review artifact MUST tag its findings with the methodology that surfaced them — `[method: behavioral]` (smoke / CLI permutation / execution probe), `[method: textual]` (AC text vs impl text reading), or `[method: hybrid]` (both methods independently confirmed). Tagging is data-collection discipline; reviewer behavior need not change. Reviewer artifacts SHOULD include a "Methodology summary" section listing methodologies applied per round (e.g., "Smoke executed: yes; CLI permutations: 7; AC text vs impl text reading: yes"). After **N=5+ instances across distinct slices** (not rounds within one slice), the diagnostic base supports a follow-on charter amendment decision.
+- one textual stream: AC/prose/source inspection, product-fit checks, fold-traceability;
+- one behavioral stream: smoke execution, CLI permutations, runtime probes, archive-checkout reproduction.
 
-Until then, do NOT homogenize methodology across lanes (i.e., do NOT require each lane to do both methods). Homogenization dissolves the divergence signal that the dual-lane protocol depends on.
+Do not homogenize lanes by requiring every reviewer to perform both methods. Homogenization erases the diagnostic signal that dual-lane review was designed to provide.
 
-**Tagging format**: each finding heading includes `[method: behavioral|textual|hybrid]` suffix. Example:
-- `### M-r1-1: opts.startStage parameter unused on resume path [method: textual]`
-- `### M-r1-1: LLM_PROVIDER does not default to fake [method: behavioral]`
+Each review artifact MUST tag finding methodology with `[method: textual]`, `[method: behavioral]`, or `[method: hybrid]`. Each artifact SHOULD include a short methodology summary naming the concrete checks performed.
 
-**Promotion path**: at N=5+ distinct slices, evaluate **gate-level methodology-completeness** as the v3.4 amendment shape (each gate must include at least one behavioral stream + at least one textual stream — preserves lane specialization), NOT lane-level homogenization (each lane does both methods — dissolves divergence signal).
+**Data points**: Slice 3.5 showed zero finding overlap across textual and behavioral lanes. Slice 3.6 added severity-divergent cross-confirmation where textual and behavioral lanes both found recovery/idempotence risk through different evidence. Slice 3.7 exercised both methodologies on a handler-slice DB recovery-audit wiring without producing divergence findings, demonstrating that methodology coverage is sustainable across slice classifications. Slice 4.1 and Slice 4.2 added cross-methodology confirmations where different methods independently found the same contract gap.
+
+**Promotion update in v3.4**: the N=5 threshold from v3.3 is now met across five distinct slices: 3.5, 3.6, 3.7, 4.1, and 4.2. The v3.4 rule is gate-level methodology coverage: when a gate requires two lanes, preserve at least one textual stream and one behavioral stream.
+
+### 9.8 Cross-methodology convergence fold trigger
+
+**Rule**: when textual and behavioral lanes independently identify the same finding class in the same gate or review round, treat the issue as real and fold structurally by default.
+
+"Structurally" means the fold changes the contract or implementation mechanism so the runtime/spec equivalence gap closes. Documentation-only, time-box, or discipline-only folds are allowed only when the draft records why a structural fold is infeasible or out of proportion.
+
+**Data points**:
+
+- Slice 4.1: textual and behavioral lanes both identified the research manifest gap; Path W resolved it structurally with canonical `research/brief.md` using existing `file_non_empty`.
+- Slice 4.2: textual and behavioral lanes both identified static research self-wrapping as non-equivalent to trusted runtime wrapping; Path B resolved it structurally with `StageDef.buildPrompt?` and runtime prompt construction.
+
+**How to apply**: if both lanes flag the same class, the fold matrix should mark it `cross-confirmed`. The drafter may still choose a smaller fold than either reviewer proposed, but the fold should close the underlying equivalence gap rather than merely promise future discipline.
+
+### 9.9 Fold-design pass
+
+**Rule**: when reviewers converge on a problem but the narrowest correct mechanism is unclear, run a fold-design pass before drafting the next revision. Fold-design is not a new standing reviewer lane; it is a focused mechanism-selection step.
+
+Fold-design asks:
+
+1. What is the smallest structural change that closes the finding?
+2. Can an existing rule kind, helper, or framework seam satisfy the contract without expanding framework surface?
+3. If framework expansion is necessary, which files become IN scope and which prior freezes are intentionally reopened?
+4. Does the fold change slice classification?
+
+**Data point**: Slice 4.1 Path W. Review lanes agreed the manifest gap existed, but the surgical mechanism was not "collection-level glob" or "new `requireNonEmpty` rule"; it was a canonical-entry-point file rule (`research/brief.md`) using existing framework.
+
+**How to apply**: the next draft's changelog should identify the chosen fold mechanism and, where relevant, name rejected alternatives in one sentence. This gives r2 reviewers enough context to verify mechanism choice without re-running the entire design debate.
+
+### 9.10 Contract-anchored smoke assertions
+
+**Rule**: when a fold introduces a binding runtime-observable clause to close a review finding, the next draft MUST either:
+
+1. add or update a smoke assertion that checks the clause; OR
+2. record why a smoke assertion is infeasible or out of proportion for that slice.
+
+For binding runtime-observable clauses that are not introduced to close a review finding, the slice SHOULD add or update a smoke assertion when feasible.
+
+This applies especially to clauses introduced to close review findings. The contract should be pinned in three places when practical: the draft text, implementation, and smoke evidence.
+
+**Data point**: Slice 4.2 Polish-1 required `buildDraftEnPrompt` output to start with the exact `DRAFT_EN_PROMPT` prefix. The implementation enforced the prefix and `draft-en-stage-smoke` asserted it, turning a documentation coupling into a runtime-detected invariant.
+
+**How to apply**: in the fold changelog, mark runtime-observable binding clauses and name the smoke scenario that checks them. If a smoke is infeasible or out of proportion, record why in the draft or close-out.
+
+### 9.11 Pre-relay fold compression
+
+**Rule**: for framework, framework-conservative, or borderline slices, the operator SHOULD use a pre-relay fold pass before formal slice-approval dispatch when a planning lane is available.
+
+Pre-relay fold compression is advisory, not a replacement for formal review. It exists to remove obvious scope/accounting contradictions before they consume reviewer rounds.
+
+**Data points**: Slice 4.1 v1.0 → planning analysis → v1.1 → planning review → v1.2 compressed classification and seam-location issues before formal slice approval. Slice 4.2 pre-relay analysis surfaced the static-vs-dynamic prompt boundary before reviewers cross-confirmed it in r1.
+
+**How to apply**: pre-relay analysis should identify likely reviewer flags, not pre-decide them. Formal reviewers remain free to raise different severities. Divergence between pre-relay severity and in-cycle severity is expected because pre-relay is fold-design assistance, not a gate.
 
 ## Out of scope for this doc
 
