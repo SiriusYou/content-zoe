@@ -1,9 +1,9 @@
 # draft-en-stage smoke evidence
 
 - Command: `bun run draft-en-stage-smoke`
-- Started: 2026-05-01T05:22:29.653Z
-- Finished: 2026-05-01T05:22:29.655Z
-- Scenario root: /Users/youjia/.openclaw-worktrees/R9Z88BgITW5vgCxZ7MYPi/target/.runs/draft-en-stage-smoke/2026-05-01T05-22-29.652Z (removed by finally-cleanup)
+- Started: 2026-05-01T13:02:52.284Z
+- Finished: 2026-05-01T13:02:52.287Z
+- Scenario root: /Users/youjia/dev/content-zoe/.runs/draft-en-stage-smoke/2026-05-01T13-02-52.284Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|

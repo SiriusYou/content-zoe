@@ -164,9 +164,11 @@ async function runHappyPath(dir: string): Promise<string[]> {
   assert(state.status === "awaiting_approval", `expected awaiting_approval, got ${state.status}`);
   assert(state.lastStage === Stage.TRANSLATE_ZH, `expected final translate_zh, got ${state.lastStage}`);
   assert(!existsSync(resolve(dir, ".runs", "happy", "attempt-2")), "attempt-2 must not exist");
+  assertEditedReportMarker(dir, "happy", 1);
   return [
     "CLI path exited 0 with the fake-provider visibility log.",
     "run-state.json reached awaiting_approval at translate_zh in attempt-1.",
+    "report.en.md contains the fake edit marker after edit_en.",
   ];
 }
 
@@ -200,9 +202,11 @@ async function runEnOnlySkip(dir: string): Promise<string[]> {
   assert(result.status === "awaiting_approval", `expected awaiting_approval, got ${result.status}`);
   const state = readState(dir, "en-only", 1);
   assert(state.lastStage === Stage.EDIT_EN, `expected edit_en terminal, got ${state.lastStage}`);
+  assertEditedReportMarker(dir, "en-only", 1);
   return [
     "FakeProvider omitted translate_zh, so an incorrect translation call would have failed.",
     "locales=['en'] terminated after edit_en.",
+    "report.en.md contains the fake edit marker before awaiting approval.",
   ];
 }
 
@@ -642,6 +646,21 @@ function writeCarryForwardFiles(attemptDir: string): void {
   writeFileSync(resolve(attemptDir, "research", "notes.md"), "notes\n");
   writeFileSync(resolve(attemptDir, "sources.json"), "[]\n");
   writeFileSync(resolve(attemptDir, "report.en.md"), "English report\n");
+}
+
+function assertEditedReportMarker(
+  cwd: string,
+  jobId: string,
+  attemptNumber: number,
+): void {
+  const report = readFileSync(
+    resolve(cwd, ".runs", jobId, `attempt-${attemptNumber}`, "report.en.md"),
+    "utf8",
+  );
+  assert(
+    report.includes("Synthetic fake-provider edited English report"),
+    "expected report.en.md to contain the fake edit marker",
+  );
 }
 
 function seedJobRow(cwd: string, jobId: string): void {

@@ -367,7 +367,11 @@ function publishResumeBootstrap(params: {
 
   const carryForward = carryForwardPathsForStartStage(restartStage);
   const deletedFiles =
-    priorState.status === "ok" ? [] : failedStageOutputPaths(priorState.lastStage);
+    priorState.status === "ok"
+      ? []
+      : failedStageOutputPaths(priorState.lastStage).filter(
+          (relPath) => !carryForward.includes(relPath),
+        );
   const recoveryCleanup: RecoveryCleanup = {
     fromAttempt: prior.attemptNumber,
     copiedFromAttempt: prior.attemptNumber,

@@ -1,9 +1,9 @@
 # research-stage smoke evidence
 
 - Command: `bun run research-stage-smoke`
-- Started: 2026-04-30T13:49:20.704Z
-- Finished: 2026-04-30T13:49:20.706Z
-- Scenario root: /Users/youjia/.openclaw-worktrees/4x3AUVbi-E64e7wNEnmzk/target/.runs/research-stage-smoke/2026-04-30T13-49-20.704Z (removed by finally-cleanup)
+- Started: 2026-05-01T13:02:55.916Z
+- Finished: 2026-05-01T13:02:55.919Z
+- Scenario root: /Users/youjia/dev/content-zoe/.runs/research-stage-smoke/2026-05-01T13-02-55.916Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|

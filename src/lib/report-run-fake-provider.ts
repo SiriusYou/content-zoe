@@ -54,6 +54,14 @@ class ReportRunFakeProvider extends FakeProvider {
       return `fake output for ${Stage.DRAFT_EN}`;
     }
 
+    if (
+      this.enabledStages.has(Stage.EDIT_EN) &&
+      prompt.startsWith(STAGES[Stage.EDIT_EN].prompt)
+    ) {
+      writeEditArtifacts(cwd);
+      return `fake output for ${Stage.EDIT_EN}`;
+    }
+
     return super.runPrompt(prompt, cwd, timeoutMs);
   }
 }
@@ -79,5 +87,19 @@ function writeDraftArtifacts(runDir: string): void {
   writeFileSync(
     path.resolve(runDir, "report.en.md"),
     "# English Report\n\nSynthetic fake-provider English draft for report-run smoke coverage.\n",
+  );
+}
+
+function writeEditArtifacts(runDir: string): void {
+  writeFileSync(
+    path.resolve(runDir, "report.en.md"),
+    [
+      "# English Report",
+      "",
+      "Synthetic fake-provider edited English report for report-run smoke coverage.",
+      "",
+      "<!-- EVIDENCE_GRADE_WARN: Synthetic fake-provider warning marker for edit_en smoke coverage. -->",
+      "",
+    ].join("\n"),
   );
 }
