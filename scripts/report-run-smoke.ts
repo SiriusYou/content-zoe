@@ -165,10 +165,12 @@ async function runHappyPath(dir: string): Promise<string[]> {
   assert(state.lastStage === Stage.TRANSLATE_ZH, `expected final translate_zh, got ${state.lastStage}`);
   assert(!existsSync(resolve(dir, ".runs", "happy", "attempt-2")), "attempt-2 must not exist");
   assertEditedReportMarker(dir, "happy", 1);
+  assertTranslatedReportMarker(dir, "happy", 1);
   return [
     "CLI path exited 0 with the fake-provider visibility log.",
     "run-state.json reached awaiting_approval at translate_zh in attempt-1.",
     "report.en.md contains the fake edit marker after edit_en.",
+    "report.zh.md is non-empty and contains the fake translation marker after translate_zh.",
   ];
 }
 
@@ -203,10 +205,15 @@ async function runEnOnlySkip(dir: string): Promise<string[]> {
   const state = readState(dir, "en-only", 1);
   assert(state.lastStage === Stage.EDIT_EN, `expected edit_en terminal, got ${state.lastStage}`);
   assertEditedReportMarker(dir, "en-only", 1);
+  assert(
+    !existsSync(resolve(dir, ".runs", "en-only", "attempt-1", "report.zh.md")),
+    "report.zh.md must remain absent for en-only runs",
+  );
   return [
     "FakeProvider omitted translate_zh, so an incorrect translation call would have failed.",
     "locales=['en'] terminated after edit_en.",
     "report.en.md contains the fake edit marker before awaiting approval.",
+    "report.zh.md remained absent for the en-only run.",
   ];
 }
 
@@ -660,6 +667,22 @@ function assertEditedReportMarker(
   assert(
     report.includes("Synthetic fake-provider edited English report"),
     "expected report.en.md to contain the fake edit marker",
+  );
+}
+
+function assertTranslatedReportMarker(
+  cwd: string,
+  jobId: string,
+  attemptNumber: number,
+): void {
+  const report = readFileSync(
+    resolve(cwd, ".runs", jobId, `attempt-${attemptNumber}`, "report.zh.md"),
+    "utf8",
+  );
+  assert(report.trim().length > 0, "expected report.zh.md to be non-empty");
+  assert(
+    report.includes("Synthetic fake-provider Chinese translation"),
+    "expected report.zh.md to contain the fake translation marker",
   );
 }
 

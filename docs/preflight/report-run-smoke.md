@@ -1,15 +1,15 @@
 # report-run smoke evidence
 
 - Command: `bun run report-run-smoke`
-- Started: 2026-05-01T13:04:02.743Z
-- Finished: 2026-05-01T13:04:02.998Z
-- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-01T13-04-02.743Z (removed by finally-cleanup)
+- Started: 2026-05-02T02:32:02.587Z
+- Finished: 2026-05-02T02:32:02.829Z
+- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-02T02-32-02.586Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
-| happy-path | PASS | CLI path exited 0 with the fake-provider visibility log.<br>run-state.json reached awaiting_approval at translate_zh in attempt-1.<br>report.en.md contains the fake edit marker after edit_en. |
+| happy-path | PASS | CLI path exited 0 with the fake-provider visibility log.<br>run-state.json reached awaiting_approval at translate_zh in attempt-1.<br>report.en.md contains the fake edit marker after edit_en.<br>report.zh.md is non-empty and contains the fake translation marker after translate_zh. |
 | default-llm-provider-when-unset | PASS | CLI path ran with LLM_PROVIDER absent from the child environment.<br>runtime-config defaulted to FakeProvider and emitted the fake-provider visibility log. |
-| en-only-skip | PASS | FakeProvider omitted translate_zh, so an incorrect translation call would have failed.<br>locales=['en'] terminated after edit_en.<br>report.en.md contains the fake edit marker before awaiting approval. |
+| en-only-skip | PASS | FakeProvider omitted translate_zh, so an incorrect translation call would have failed.<br>locales=['en'] terminated after edit_en.<br>report.en.md contains the fake edit marker before awaiting approval.<br>report.zh.md remained absent for the en-only run. |
 | stage-failure-mid-run | PASS | Missing edit_en canned prompt produced the same non-ok loop result the CLI maps to failure.<br>The composition-root exit-code branch maps that non-ok stage result to exit 2.<br>run-state.json recorded status=error and lastStage=edit_en. |
 | resume-after-failure | PASS | Resume from failed edit_en started at edit_en; missing research/draft prompts were never called.<br>Atomic attempt-2 includes carry-forward files and recoveryCleanup audit data. |
 | env-purity-static-check | PASS | Only runtime-config.ts reads process.env among the checked runtime files.<br>process.argv appears only in src/bin/report-run.ts.<br>src/bin/report-run.ts and src/lib/report-loop.ts contain no child_process or Bun.spawn references. |

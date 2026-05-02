@@ -62,6 +62,14 @@ class ReportRunFakeProvider extends FakeProvider {
       return `fake output for ${Stage.EDIT_EN}`;
     }
 
+    if (
+      this.enabledStages.has(Stage.TRANSLATE_ZH) &&
+      prompt.startsWith(STAGES[Stage.TRANSLATE_ZH].prompt)
+    ) {
+      writeTranslateArtifacts(cwd);
+      return `fake output for ${Stage.TRANSLATE_ZH}`;
+    }
+
     return super.runPrompt(prompt, cwd, timeoutMs);
   }
 }
@@ -99,6 +107,18 @@ function writeEditArtifacts(runDir: string): void {
       "Synthetic fake-provider edited English report for report-run smoke coverage.",
       "",
       "<!-- EVIDENCE_GRADE_WARN: Synthetic fake-provider warning marker for edit_en smoke coverage. -->",
+      "",
+    ].join("\n"),
+  );
+}
+
+function writeTranslateArtifacts(runDir: string): void {
+  writeFileSync(
+    path.resolve(runDir, "report.zh.md"),
+    [
+      "# 中文报告",
+      "",
+      "Synthetic fake-provider Chinese translation for report-run smoke coverage.",
       "",
     ].join("\n"),
   );

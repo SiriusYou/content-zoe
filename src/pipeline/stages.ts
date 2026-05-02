@@ -1,18 +1,14 @@
 import { DRAFT_EN_STAGE } from "./draft-en.ts";
 import { EDIT_EN_STAGE } from "./edit-en.ts";
 import { RESEARCH_STAGE } from "./research.ts";
+import { TRANSLATE_ZH_STAGE } from "./translate-zh.ts";
 import { Stage, type StageDef } from "./types.ts";
 
 export const STAGES: Record<Stage, StageDef> = {
   [Stage.RESEARCH]: RESEARCH_STAGE,
   [Stage.DRAFT_EN]: DRAFT_EN_STAGE,
   [Stage.EDIT_EN]: EDIT_EN_STAGE,
-  [Stage.TRANSLATE_ZH]: {
-    stage: Stage.TRANSLATE_ZH,
-    prompt: "Run the Chinese translation stage.",
-    timeoutMs: 600_000,
-    manifest: { rules: [] },
-  },
+  [Stage.TRANSLATE_ZH]: TRANSLATE_ZH_STAGE,
 };
 
 export type TerminalStage = "awaiting_approval";
