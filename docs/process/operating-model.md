@@ -48,6 +48,15 @@ Each arrow captures prior decisions as immutable input to the next step. A worke
 | HUMAN APPROVAL | operator via Reviews page | approve/reject + optional requiredChanges | `/dashboard/reviews` |
 | MERGE + MEMORY UPDATE | Zoe merge-loop commits into content-zoe's branch; hc-Claude writes hc-memory; cz-Claude writes cz-memory | commit SHA in content-zoe + memory index entries both sides | content-zoe git + both memory dirs |
 
+Review artifacts are written to the reviewer's owning repo, not to the implementation repo by default:
+
+- Slice-approval artifacts live in `content-zoe/.omx/artifacts/`.
+- Gate 1 artifacts live in `openclaw-healthcare/.omx/artifacts/`.
+- Gate 2 artifacts live in `content-zoe/.omx/artifacts/`.
+- content-zoe charter or operating-model amendment review artifacts live in `content-zoe/.omx/artifacts/` unless the amendment is explicitly hc-internal.
+
+Mirrors are permitted when useful for cross-session lookup, but mirrored artifacts must be byte-identical and the review relay must cite the canonical path. When an artifact is copied to a secondary path, the SHA-256 must remain unchanged and the close-out should record which path is canonical.
+
 Mode glossary (DIRECT / A / B / C / D / E / R) is defined in `PLAN.md`.
 
 ## 5. Failure lanes
@@ -119,6 +128,33 @@ Working-tree reads are acceptable only for generated evidence files that exist s
 
 **Origin**: Slice 3.7 and Slice 4.1/4.2 implementation reviews. Immutable full-SHA reads prevented review drift when worker cleanup, branch advancement, or operator-side worktree state changed after implementation.
 
+### Review artifact write-path discipline
+
+Reviewers SHOULD write review artifacts to the canonical artifact path for their lane, as defined in § 4.
+
+Review artifacts SHOULD include a load-bearing refs table near the top naming the target implementation SHA, base SHA, locked draft SHA, predecessor review SHAs when relevant, and any mirrored artifact paths. Artifact SHA-256 values should be recorded in full when used for cross-session lookup.
+
+If an artifact is written to the wrong repo because the reviewer cwd drifted, the operator may reconcile it by copying it to the canonical path only if the byte-identical SHA is preserved. The close-out should record the reconciliation.
+
+**Origin**: Slice 4.3 hc-Codex Gate 1 artifact routing divergence and reconciliation; Slice 4.4 hc-Codex Gate 1 direct hc-side landing.
+
+### Behavioral verification execution discipline
+
+When a behavioral review re-runs smokes or commands that regenerate evidence files, reviewers SHOULD use a disposable archive checkout of the immutable target commit when feasible:
+
+1. Resolve the target implementation to a full commit SHA.
+2. Create a disposable temp directory from `git archive <full-sha>`.
+3. Run the behavioral verification commands in that checkout.
+4. Discard the checkout after recording command outcomes.
+
+This pairs with immutable source-read discipline: source inspection uses `git show <full-sha>:<path>`; behavioral execution uses a disposable checkout of the same full SHA.
+
+If a command requires operator-only auth, reviewers who are not the operator-authorized execution lane do not run it and record it as not run. Live-worktree execution is allowed only for commands that are otherwise permitted and cannot be reproduced in an archive checkout for an explicitly recorded reason.
+
+Review artifacts should record whether behavioral verification used a disposable archive checkout and should name any commands not run because of operator-only boundaries.
+
+**Origin**: Slice 4.3 cz-Codex Gate 2 disposable archive checkout; Slice 4.4 hc-Codex/Gate 2 behavioral replay reuse.
+
 ### Review artifact baseline metric
 
 The current v3.3 steady-state baseline for a completed implementation slice is 8 review artifacts:
@@ -128,6 +164,14 @@ The current v3.3 steady-state baseline for a completed implementation slice is 8
 - 2 Gate 2 artifacts: cz-Codex + cz-Claude.
 
 This is a planning metric, not a pass/fail rule. Handler slices may use fewer slice-approval artifacts when charter permits. Extra artifacts are expected when findings require additional folds. Close-out should record deviations from the baseline so future campaign planning uses observed cycle cost rather than intuition.
+
+Close-out should distinguish at least three metrics:
+
+- artifact count versus the 8-artifact implementation-slice baseline;
+- r1-clean status: whether slice-approval r1 found zero findings;
+- Gate-clean status: whether Gate 1 and Gate 2 cleared first round after slice-approval folds.
+
+r1-clean and Gate-clean measure different things. r1-clean is a draft-quality signal; Gate-clean is an implementation-quality signal after accepted folds.
 
 **Origin**: Slice 4.1 and Slice 4.2 both closed at the 8-artifact baseline despite different classification pressure.
 
@@ -233,6 +277,8 @@ Each review artifact MUST tag finding methodology with `[method: textual]`, `[me
 
 - Slice 4.1: textual and behavioral lanes both identified the research manifest gap; Path W resolved it structurally with canonical `research/brief.md` using existing `file_non_empty`.
 - Slice 4.2: textual and behavioral lanes both identified static research self-wrapping as non-equivalent to trusted runtime wrapping; Path B resolved it structurally with `StageDef.buildPrompt?` and runtime prompt construction.
+- Slice 4.3 under operative v3.4: textual LOW + behavioral MEDIUM both identified sentinel smoke coverage gap; severity arbitration resolved to MEDIUM and v1.1 folded structurally by adding `<<<OPERATOR_FEEDBACK>>>` coverage.
+- Slice 4.4 under operative v3.4: textual LOW + behavioral MEDIUM both identified advisory-directive prompt coverage gap; severity arbitration resolved to MEDIUM and v1.1 folded structurally by adding directive constants, A6 mapping rows, and prompt-boundary smoke assertions.
 
 **How to apply**: if both lanes flag the same class, the fold matrix should mark it `cross-confirmed`. The drafter may still choose a smaller fold than either reviewer proposed, but the fold should close the underlying equivalence gap rather than merely promise future discipline.
 
@@ -260,19 +306,43 @@ Fold-design asks:
 
 For binding runtime-observable clauses that are not introduced to close a review finding, the slice SHOULD add or update a smoke assertion when feasible.
 
-This applies especially to clauses introduced to close review findings. The contract should be pinned in three places when practical: the draft text, implementation, and smoke evidence.
+At draft time, any slice that claims contract-anchored smoke coverage or introduces/modifies runtime-observable acceptance criteria MUST include an explicit runtime-observable clause sweep. The sweep enumerates each acceptance-criterion clause whose satisfaction is observable at runtime, prompt-construction time, filesystem state, manifest state, event/log state, or CLI output. Each enumerated clause gets one of:
 
-**Data point**: Slice 4.2 Polish-1 required `buildDraftEnPrompt` output to start with the exact `DRAFT_EN_PROMPT` prefix. The implementation enforced the prefix and `draft-en-stage-smoke` asserted it, turning a documentation coupling into a runtime-detected invariant.
+- a required smoke assertion;
+- a prompt-level or static-identity assertion when downstream model behavior is infeasible to validate under fake providers;
+- an infeasibility or out-of-proportion note.
 
-**How to apply**: in the fold changelog, mark runtime-observable binding clauses and name the smoke scenario that checks them. If a smoke is infeasible or out of proportion, record why in the draft or close-out.
+Two clauses are "of the same class" when they share verification feasibility and structural origin. For example, Slice 4.4's length-ratio guidance, Markdown structure preservation, and Evidence Grade warning preservation were one advisory-directive class: all three originated in A3, all three were prompt-level instructions, and all three had downstream behavior that FakeProvider could not validate. Mapping one instance required sweeping the other two before dispatch.
+
+The contract should be pinned in three places when practical: the draft text, implementation, and smoke evidence. For prompt clauses, a robust implementation is often: spec text -> exported directive/prefix constant -> smoke imports the same constant and asserts prompt inclusion or prefix identity.
+
+**Data points**:
+
+- Slice 4.2 Polish-1 required `buildDraftEnPrompt` output to start with the exact `DRAFT_EN_PROMPT` prefix. The implementation enforced the prefix and `draft-en-stage-smoke` asserted it.
+- Slice 4.3 folded sentinel coverage structurally by requiring smoke coverage for all four sentinels, including `<<<OPERATOR_FEEDBACK>>>`.
+- Slice 4.4 v1.0 attempted draft-time mapping but missed Markdown and Evidence Grade advisory directives; v1.1 closed the gap by adding prompt-level assertions and an infeasibility note for downstream LLM-output quality under FakeProvider.
+- Slice 4.4's two-file stage asserted input preservation by checking `report.en.md` remained byte-identical while `report.zh.md` was produced.
+
+**How to apply**: before dispatching slice-approval, sweep the draft's acceptance criteria for runtime-observable MUST/SHOULD clauses. For each, add a smoke mapping row or an explicit infeasibility note. If one instance of a clause class is mapped, sweep for all other instances of the same class before dispatch.
 
 ### 9.11 Pre-relay fold compression
 
-**Rule**: for framework, framework-conservative, or borderline slices, the operator SHOULD use a pre-relay fold pass before formal slice-approval dispatch when a planning lane is available.
+**Rule**: for framework, framework-conservative, borderline, or high-surface handler slices, the operator SHOULD use a pre-relay fold pass before formal slice-approval dispatch when a planning lane is available.
 
-Pre-relay fold compression is advisory, not a replacement for formal review. It exists to remove obvious scope/accounting contradictions before they consume reviewer rounds.
+Pre-relay fold compression is advisory, not a replacement for formal review. It exists to remove obvious scope/accounting contradictions before they consume reviewer rounds and to synthesize a fold matrix after r1 findings arrive.
 
-**Data points**: Slice 4.1 v1.0 → planning analysis → v1.1 → planning review → v1.2 compressed classification and seam-location issues before formal slice approval. Slice 4.2 pre-relay analysis surfaced the static-vs-dynamic prompt boundary before reviewers cross-confirmed it in r1.
+When used after r1, the pre-relay fold matrix SHOULD identify:
+
+1. each finding or cross-confirmed finding class;
+2. severity arbitration when lanes disagree;
+3. whether § 9.8 structural fold default fires;
+4. the smallest proposed fold mechanism;
+5. which draft section should change;
+6. which risks the r2 review should check.
+
+Close-out should record a compression metric: r1 finding count -> number of draft fold cycles -> r2 residual finding count. This is a process-quality metric, not a gate.
+
+**Data points**: Slice 4.1 and Slice 4.2 used pre-relay analysis to compress classification and seam-location issues before formal approval. Slice 4.4 used post-r1 pre-relay fold compression: 4 r1 findings -> one v1.1 fold cycle -> both r2 lanes 0/0/0.
 
 **How to apply**: pre-relay analysis should identify likely reviewer flags, not pre-decide them. Formal reviewers remain free to raise different severities. Divergence between pre-relay severity and in-cycle severity is expected because pre-relay is fold-design assistance, not a gate.
 
