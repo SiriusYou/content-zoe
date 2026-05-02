@@ -1,4 +1,4 @@
-export const APPROVAL_SUMMARY_MAX_CHARS = 6000;
+export const APPROVAL_SUMMARY_MAX_CHARS = 3500;
 export const EVIDENCE_GRADE_WARN_RE =
   /<!--\s*EVIDENCE_GRADE_WARN:\s*([\s\S]*?)\s*-->/g;
 export const TRUNCATION_MARKER = "\n\n[approval-summary truncated]";
@@ -19,6 +19,7 @@ export interface ComposeApprovalSummaryOptions {
 }
 
 const PREVIEW_MAX_CHARS = 900;
+const PREVIEW_TRUNCATION_MARKER = "\n\n[preview truncated]";
 
 export function composeApprovalSummary(
   opts: ComposeApprovalSummaryOptions,
@@ -31,12 +32,7 @@ export function composeApprovalSummary(
     throw new Error("approval summary requires report.zh.md text for locales=en,zh");
   }
 
-  const warnings = [
-    ...extractEvidenceWarnings(opts.reportEnText),
-    ...(opts.reportZhText === undefined
-      ? []
-      : extractEvidenceWarnings(opts.reportZhText)),
-  ];
+  const warnings = extractEvidenceWarnings(opts.reportEnText);
 
   const lines = [
     "# Approval Summary",
@@ -94,7 +90,7 @@ function previewText(text: string): string {
     .replaceAll("\r", "\n")
     .trim();
   if (normalized.length <= PREVIEW_MAX_CHARS) return normalized;
-  return `${normalized.slice(0, PREVIEW_MAX_CHARS)}${TRUNCATION_MARKER}`;
+  return `${normalized.slice(0, PREVIEW_MAX_CHARS)}${PREVIEW_TRUNCATION_MARKER}`;
 }
 
 function stripEvidenceWarnings(text: string): string {

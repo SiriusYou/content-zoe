@@ -44,6 +44,7 @@ type ScenarioName =
   | "summary-length-bound"
   | "compose-deterministic"
   | "db-persistence-existing-job"
+  | "db-persistence-en-only-existing-job"
   | "stage-failure-no-approval-persistence"
   | "persistence-failure-nonzero"
   | "missing-job-nonfatal"
@@ -65,6 +66,7 @@ const SCENARIOS: ScenarioName[] = [
   "summary-length-bound",
   "compose-deterministic",
   "db-persistence-existing-job",
+  "db-persistence-en-only-existing-job",
   "stage-failure-no-approval-persistence",
   "persistence-failure-nonzero",
   "missing-job-nonfatal",
@@ -146,6 +148,8 @@ async function scenarioImpl(
       return runComposeDeterministic();
     case "db-persistence-existing-job":
       return runDbPersistenceExistingJob(dir);
+    case "db-persistence-en-only-existing-job":
+      return runDbPersistenceEnOnlyExistingJob(dir);
     case "stage-failure-no-approval-persistence":
       return runStageFailureNoApprovalPersistence(dir);
     case "persistence-failure-nonzero":
@@ -211,9 +215,9 @@ function runEvidenceGradeWarnings(): string[] {
     attemptNumber: 1,
     locales: ["en", "zh"],
     reportEnText:
-      "# Report\n\n<!-- EVIDENCE_GRADE_WARN: first warning payload -->\nBody\n",
+      "# Report\n\n<!-- EVIDENCE_GRADE_WARN: first warning payload -->\nBody\n<!-- EVIDENCE_GRADE_WARN: second warning payload -->\n",
     reportZhText:
-      "# Translation\n\n<!-- EVIDENCE_GRADE_WARN: second warning payload -->\nBody\n",
+      "# Translation\n\n<!-- EVIDENCE_GRADE_WARN: zh-only warning should not surface -->\nBody\n",
     paths: {
       reportEn: ".runs/warnings/attempt-1/report.en.md",
       reportZh: ".runs/warnings/attempt-1/report.zh.md",
@@ -222,14 +226,20 @@ function runEvidenceGradeWarnings(): string[] {
 
   assert(summary.includes("1. first warning payload"), "missing first payload");
   assert(summary.includes("2. second warning payload"), "missing second payload");
+  assert(!summary.includes("zh-only warning should not surface"), "Chinese warning payload leaked");
   assert(!summary.includes("<!-- EVIDENCE_GRADE_WARN"), "warning wrapper leaked");
   return [
-    "Two Evidence Grade warning comments were surfaced as payloads without HTML wrappers.",
+    "Two English Evidence Grade warning comments were surfaced as payloads without HTML wrappers; Chinese warning comments were ignored.",
   ];
 }
 
 function runSummaryLengthBound(): string[] {
-  const large = `# Large\n\n${"x".repeat(APPROVAL_SUMMARY_MAX_CHARS * 3)}`;
+  const warnings = Array.from(
+    { length: 16 },
+    (_, index) =>
+      `<!-- EVIDENCE_GRADE_WARN: warning-${index}-${"x".repeat(300)} -->`,
+  ).join("\n");
+  const large = `# Large\n\n${"x".repeat(APPROVAL_SUMMARY_MAX_CHARS * 3)}\n${warnings}`;
   const summary = composeApprovalSummary({
     jobId: "large",
     attemptNumber: 1,
@@ -248,6 +258,62 @@ function runSummaryLengthBound(): string[] {
     `Oversized summary stayed within ${APPROVAL_SUMMARY_MAX_CHARS} chars and retained ${JSON.stringify(
       TRUNCATION_MARKER,
     )}.`,
+  ];
+}
+
+async function runDbPersistenceEnOnlyExistingJob(dir: string): Promise<string[]> {
+  const jobId = "db-persistence-en-only-existing-job";
+  seedJobRow(dir, jobId, {
+    status: "running",
+    currentStage: Stage.RESEARCH,
+  });
+
+  const result = await runPreparedReportLoop({
+    jobId,
+    locales: ["en"],
+    cwd: dir,
+  });
+  assert(result.status === "awaiting_approval", `expected awaiting_approval, got ${result.status}`);
+  const persisted = persistApprovalSummaryAfterLoop({
+    cwd: dir,
+    jobId,
+    locales: ["en"],
+    runDir: result.runDir,
+    attemptNumber: result.attemptNumber,
+  });
+  assert(persisted.persisted, "expected persistence to update existing en-only row");
+
+  const db = openDb(resolve(dir, ".data", "content.db"));
+  try {
+    const job = findJobById(db, jobId);
+    assert(job !== null, "missing job after en-only persistence");
+    assert(job.status === "awaiting_approval", `unexpected status ${job.status}`);
+    assert(job.current_stage === Stage.EDIT_EN, `unexpected current_stage ${job.current_stage}`);
+    assert(job.attempt_number === 1, `unexpected attempt_number ${job.attempt_number}`);
+    assert(job.run_dir === `.runs/${jobId}`, `unexpected run_dir ${job.run_dir}`);
+    assert(
+      job.primary_report_path === `.runs/${jobId}/attempt-1/report.en.md`,
+      `unexpected primary_report_path ${job.primary_report_path}`,
+    );
+    assert(
+      job.translated_report_path === null,
+      `unexpected translated_report_path ${job.translated_report_path}`,
+    );
+    assert(!existsSync(resolve(result.runDir, "report.zh.md")), "en-only run wrote report.zh.md");
+    assert(
+      (job.approval_summary ?? "").includes("Skipped: locales=en"),
+      "approval_summary missing en-only skip note",
+    );
+    assert(
+      !(job.approval_summary ?? "").includes("report.zh.md"),
+      "en-only summary should not require report.zh.md",
+    );
+  } finally {
+    db.close();
+  }
+
+  return [
+    "Existing en-only DB row reached awaiting_approval with current_stage=edit_en, translated_report_path=null, and an en-only skip note.",
   ];
 }
 
@@ -479,10 +545,15 @@ async function runAlreadyCompleteIdempotent(dir: string): Promise<string[]> {
 }
 
 function runNoPromptSurfaceStaticCheck(): string[] {
-  const diff = runGitDiff(["--", "src/pipeline/approval-summary.ts", "src/bin/report-run.ts"]);
-  const addedLines = diff
-    .split("\n")
-    .filter((line) => line.startsWith("+") && !line.startsWith("+++"));
+  const checkedFiles = [
+    "src/pipeline/approval-summary.ts",
+    "src/bin/report-run.ts",
+  ];
+  const addedLines = checkedFiles.flatMap((file) =>
+    readFileSync(resolve(repoRoot, file), "utf8")
+      .split("\n")
+      .map((line) => `${file}: ${line}`),
+  );
   const forbidden = [
     /buildPrompt/,
     /\.runPrompt\s*\(/,
@@ -494,7 +565,7 @@ function runNoPromptSurfaceStaticCheck(): string[] {
   );
   assert(hits.length === 0, `prompt-surface additions found: ${JSON.stringify(hits)}`);
   return [
-    "Added TS lines contain no buildPrompt, provider runPrompt call, prompt delimiter constants, or prompt-file references.",
+    "Committed runtime TS files contain no buildPrompt, provider runPrompt call, prompt delimiter constants, or prompt-file references.",
   ];
 }
 
@@ -577,17 +648,6 @@ function seedJobRow(
   } finally {
     db.close();
   }
-}
-
-function runGitDiff(args: string[]): string {
-  const proc = Bun.spawnSync({
-    cmd: ["git", "diff", ...args],
-    cwd: repoRoot,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  assert(proc.exitCode === 0, new TextDecoder().decode(proc.stderr));
-  return new TextDecoder().decode(proc.stdout);
 }
 
 function sha256File(file: string): string {
