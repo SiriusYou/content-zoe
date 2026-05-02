@@ -1,9 +1,9 @@
 # approval-summary smoke evidence
 
 - Command: `bun run approval-summary-smoke`
-- Started: 2026-05-02T12:41:19.151Z
-- Finished: 2026-05-02T12:41:19.233Z
-- Scenario root: /Users/youjia/.openclaw-worktrees/ED4ICcj64TOGDbO4EG6ox/target/.runs/approval-summary-smoke/2026-05-02T12-41-19.150Z (removed by finally-cleanup)
+- Started: 2026-05-02T12:46:18.000Z
+- Finished: 2026-05-02T12:46:18.079Z
+- Scenario root: /Users/youjia/.openclaw-worktrees/ED4ICcj64TOGDbO4EG6ox/target/.runs/approval-summary-smoke/2026-05-02T12-46-17.999Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
