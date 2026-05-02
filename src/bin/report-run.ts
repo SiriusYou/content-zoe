@@ -14,7 +14,13 @@ import path from "node:path";
 
 import { CodexCliProvider } from "../llm/codex-cli.ts";
 import type { LLMProvider } from "../llm/provider.ts";
-import { findJobById, openDb, recordRecoveryCleanup } from "../db.ts";
+import {
+  type DbClient,
+  findJobById,
+  openDb,
+  recordRecoveryCleanup,
+  updateJob,
+} from "../db.ts";
 import { createReportRunFakeProvider } from "../lib/report-run-fake-provider.ts";
 import { loadRuntimeConfig } from "../lib/runtime-config.ts";
 import {
@@ -24,6 +30,7 @@ import {
   type RunState,
   type RunStateStatus,
 } from "../lib/report-loop.ts";
+import { composeApprovalSummary } from "../pipeline/approval-summary.ts";
 import { nextStage, STAGES } from "../pipeline/stages.ts";
 import { Stage, type ManifestRule } from "../pipeline/types.ts";
 
@@ -66,6 +73,26 @@ export interface RecordRecoveryCleanupAuditOptions {
   recoveryCleanup?: RecoveryCleanup;
 }
 
+export interface PersistApprovalSummaryOptions {
+  cwd: string;
+  jobId: string;
+  locales: readonly Locale[];
+  runDir: string;
+  attemptNumber: number;
+  dbOps?: Partial<PersistApprovalSummaryDbOps>;
+}
+
+export interface PersistApprovalSummaryResult {
+  persisted: boolean;
+  skippedReason?: string;
+}
+
+export interface PersistApprovalSummaryDbOps {
+  openDb: typeof openDb;
+  findJobById: typeof findJobById;
+  updateJob: typeof updateJob;
+}
+
 interface AttemptEntry {
   attemptNumber: number;
   dir: string;
@@ -79,6 +106,11 @@ const defaultFsOps: FileSystemOps = {
   renameSync,
   rmSync,
   writeFileSync,
+};
+const defaultPersistDbOps: PersistApprovalSummaryDbOps = {
+  openDb,
+  findJobById,
+  updateJob,
 };
 
 function parseArgs(argv: readonly string[]): CliArgs {
@@ -202,6 +234,19 @@ async function main(): Promise<number> {
       return 2;
     }
 
+    const persistence = persistApprovalSummaryAfterLoop({
+      cwd: config.cwd,
+      jobId: args.jobId,
+      locales: args.locales,
+      runDir: result.runDir,
+      attemptNumber: result.attemptNumber,
+    });
+    if (!persistence.persisted) {
+      console.error(
+        `[report-run] approval-summary persistence skipped: ${persistence.skippedReason}`,
+      );
+    }
+
     if (result.alreadyComplete) {
       console.error("[report-run] already complete: awaiting_approval");
     } else {
@@ -211,6 +256,79 @@ async function main(): Promise<number> {
   } catch (err) {
     console.error(formatError(err));
     return 1;
+  }
+}
+
+export function persistApprovalSummaryAfterLoop(
+  opts: PersistApprovalSummaryOptions,
+): PersistApprovalSummaryResult {
+  const dbOps = { ...defaultPersistDbOps, ...opts.dbOps };
+  const cwd = realpathSync(opts.cwd);
+  const runDir = realpathSync(opts.runDir);
+  assertInsideCwd(runDir, cwd);
+  assertRealpathInsideCwd(runDir, cwd);
+
+  const dbPath = path.resolve(cwd, ".data", "content.db");
+  const db: DbClient = dbOps.openDb(dbPath);
+  try {
+    const existing = dbOps.findJobById(db, opts.jobId);
+    if (!existing) {
+      return {
+        persisted: false,
+        skippedReason: `no jobs row found for ${JSON.stringify(opts.jobId)}`,
+      };
+    }
+
+    const displayPaths = approvalSummaryDisplayPaths({
+      cwd,
+      runDir,
+      locales: opts.locales,
+    });
+    const reportEnText = readRequiredArtifact(runDir, "report.en.md");
+    const reportZhText = opts.locales.includes("zh")
+      ? readRequiredArtifact(runDir, "report.zh.md")
+      : undefined;
+    const summary = composeApprovalSummary({
+      jobId: opts.jobId,
+      attemptNumber: opts.attemptNumber,
+      locales: opts.locales,
+      reportEnText,
+      reportZhText,
+      paths: displayPaths,
+    });
+
+    if (summary.trim().length === 0) {
+      throw new Error("approval summary composition produced an empty summary");
+    }
+
+    const result = dbOps.updateJob(db, opts.jobId, {
+      status: "awaiting_approval",
+      current_stage: opts.locales.includes("zh")
+        ? Stage.TRANSLATE_ZH
+        : Stage.EDIT_EN,
+      attempt_number: opts.attemptNumber,
+      run_dir: `.runs/${opts.jobId}`,
+      primary_report_path: displayPaths.reportEn,
+      translated_report_path: displayPaths.reportZh ?? null,
+      sources_path: displayPaths.sources ?? null,
+      approval_summary: summary,
+      updated_at: Math.floor(Date.now() / 1000),
+      error: null,
+      last_notify_error: null,
+      notified_at: null,
+    });
+    if (result.rowsAffected !== 1) {
+      throw new Error(
+        `approval-summary persistence updated ${result.rowsAffected} rows for ${JSON.stringify(
+          opts.jobId,
+        )}`,
+      );
+    }
+    return { persisted: true };
+  } catch (err) {
+    throw new Error(`approval-summary persistence failed: ${formatError(err)}`);
+  } finally {
+    db.close();
   }
 }
 
@@ -536,6 +654,40 @@ function manifestRulePath(rule: ManifestRule): string | undefined {
   if ("path" in rule) return rule.path;
   if ("glob" in rule) return rule.glob;
   return undefined;
+}
+
+function approvalSummaryDisplayPaths(params: {
+  cwd: string;
+  runDir: string;
+  locales: readonly Locale[];
+}): { reportEn: string; reportZh?: string; sources?: string } {
+  const reportEn = displayPath(params.cwd, path.resolve(params.runDir, "report.en.md"));
+  const reportZh = params.locales.includes("zh")
+    ? displayPath(params.cwd, path.resolve(params.runDir, "report.zh.md"))
+    : undefined;
+  const sourcesPath = path.resolve(params.runDir, "sources.json");
+  const sources = existsSync(sourcesPath) ? displayPath(params.cwd, sourcesPath) : undefined;
+
+  return {
+    reportEn,
+    reportZh,
+    sources,
+  };
+}
+
+function displayPath(cwd: string, absolutePath: string): string {
+  assertInsideCwd(absolutePath, cwd);
+  const relative = path.relative(cwd, absolutePath);
+  if (relative.startsWith(".")) return relative.replaceAll(path.sep, "/");
+  return `.${path.sep}${relative}`.replaceAll(path.sep, "/");
+}
+
+function readRequiredArtifact(runDir: string, relPath: string): string {
+  const artifactPath = path.resolve(runDir, relPath);
+  if (!existsSync(artifactPath)) {
+    throw new Error(`required approval-summary artifact is missing: ${relPath}`);
+  }
+  return readFileSync(artifactPath, "utf8");
 }
 
 function isStage(value: unknown): value is Stage {

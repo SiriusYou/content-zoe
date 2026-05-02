@@ -1,13 +1,14 @@
 # report-run smoke evidence
 
 - Command: `bun run report-run-smoke`
-- Started: 2026-05-02T02:32:02.587Z
-- Finished: 2026-05-02T02:32:02.829Z
-- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-02T02-32-02.586Z (removed by finally-cleanup)
+- Started: 2026-05-02T12:41:19.145Z
+- Finished: 2026-05-02T12:41:19.457Z
+- Scenario root: /Users/youjia/.openclaw-worktrees/ED4ICcj64TOGDbO4EG6ox/target/.runs/report-run-smoke/2026-05-02T12-41-19.145Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
 | happy-path | PASS | CLI path exited 0 with the fake-provider visibility log.<br>run-state.json reached awaiting_approval at translate_zh in attempt-1.<br>report.en.md contains the fake edit marker after edit_en.<br>report.zh.md is non-empty and contains the fake translation marker after translate_zh. |
+| approval-summary-continuity | PASS | Seeded CLI run persisted a non-empty approval_summary with job-root run_dir and attempt-local report paths.<br>A completed resume stayed idempotent: no attempt-2 and the persisted approval_summary remained unchanged. |
 | default-llm-provider-when-unset | PASS | CLI path ran with LLM_PROVIDER absent from the child environment.<br>runtime-config defaulted to FakeProvider and emitted the fake-provider visibility log. |
 | en-only-skip | PASS | FakeProvider omitted translate_zh, so an incorrect translation call would have failed.<br>locales=['en'] terminated after edit_en.<br>report.en.md contains the fake edit marker before awaiting approval.<br>report.zh.md remained absent for the en-only run. |
 | stage-failure-mid-run | PASS | Missing edit_en canned prompt produced the same non-ok loop result the CLI maps to failure.<br>The composition-root exit-code branch maps that non-ok stage result to exit 2.<br>run-state.json recorded status=error and lastStage=edit_en. |

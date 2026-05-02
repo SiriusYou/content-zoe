@@ -35,6 +35,7 @@ import { Stage } from "../src/pipeline/types.ts";
 
 type ScenarioName =
   | "happy-path"
+  | "approval-summary-continuity"
   | "default-llm-provider-when-unset"
   | "en-only-skip"
   | "stage-failure-mid-run"
@@ -56,6 +57,7 @@ interface ScenarioOutcome {
 
 const SCENARIOS: ScenarioName[] = [
   "happy-path",
+  "approval-summary-continuity",
   "default-llm-provider-when-unset",
   "en-only-skip",
   "stage-failure-mid-run",
@@ -130,6 +132,8 @@ async function scenarioImpl(
   switch (name) {
     case "happy-path":
       return runHappyPath(dir);
+    case "approval-summary-continuity":
+      return runApprovalSummaryContinuity(dir);
     case "default-llm-provider-when-unset":
       return runDefaultLlmProviderWhenUnset(dir);
     case "en-only-skip":
@@ -191,6 +195,55 @@ async function runDefaultLlmProviderWhenUnset(dir: string): Promise<string[]> {
   return [
     "CLI path ran with LLM_PROVIDER absent from the child environment.",
     "runtime-config defaulted to FakeProvider and emitted the fake-provider visibility log.",
+  ];
+}
+
+async function runApprovalSummaryContinuity(dir: string): Promise<string[]> {
+  const jobId = "approval-continuity";
+  seedJobRow(dir, jobId);
+
+  const first = runReportRunCli(dir, [jobId, "--locales=en,zh"]);
+  assert(first.exitCode === 0, `expected initial exit 0, got ${first.exitCode}: ${first.stderr}`);
+
+  const db = openDb(resolve(dir, ".data", "content.db"));
+  let summaryAfterFirst: string;
+  try {
+    const job = findJobById(db, jobId);
+    assert(job !== null, "missing seeded job after first run");
+    assert(job.status === "awaiting_approval", `expected awaiting_approval, got ${job.status}`);
+    assert(job.current_stage === Stage.TRANSLATE_ZH, `expected translate_zh, got ${job.current_stage}`);
+    assert(job.run_dir === `.runs/${jobId}`, `unexpected run_dir ${job.run_dir}`);
+    assert(
+      job.primary_report_path === `.runs/${jobId}/attempt-1/report.en.md`,
+      `unexpected primary_report_path ${job.primary_report_path}`,
+    );
+    assert(
+      job.translated_report_path === `.runs/${jobId}/attempt-1/report.zh.md`,
+      `unexpected translated_report_path ${job.translated_report_path}`,
+    );
+    assert((job.approval_summary ?? "").includes("Approval Summary"), "missing approval_summary");
+    summaryAfterFirst = job.approval_summary ?? "";
+  } finally {
+    db.close();
+  }
+
+  const second = runReportRunCli(dir, [jobId, "--locales=en,zh", "--resume"]);
+  assert(second.exitCode === 0, `expected resume exit 0, got ${second.exitCode}: ${second.stderr}`);
+  assert(second.stderr.includes("already complete"), "expected already complete stderr");
+  assert(!existsSync(resolve(dir, ".runs", jobId, "attempt-2")), "attempt-2 must not be created");
+
+  const dbAfterResume = openDb(resolve(dir, ".data", "content.db"));
+  try {
+    const job = findJobById(dbAfterResume, jobId);
+    assert(job !== null, "missing seeded job after resume");
+    assert(job.approval_summary === summaryAfterFirst, "approval_summary changed during idempotent resume");
+  } finally {
+    dbAfterResume.close();
+  }
+
+  return [
+    "Seeded CLI run persisted a non-empty approval_summary with job-root run_dir and attempt-local report paths.",
+    "A completed resume stayed idempotent: no attempt-2 and the persisted approval_summary remained unchanged.",
   ];
 }
 
