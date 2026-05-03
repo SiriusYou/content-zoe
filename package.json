@@ -21,6 +21,8 @@
     "approval-summary-smoke": "bun scripts/approval-summary-smoke.ts",
     "report-run-smoke": "bun scripts/report-run-smoke.ts",
     "notifier-smoke": "bun scripts/notifier-smoke.ts",
+    "bot": "bun src/telegram/bot.ts",
+    "bot-smoke": "bun scripts/bot-smoke.ts",
     "db:smoke": "bun scripts/db-smoke.ts"
   },
   "devDependencies": {
