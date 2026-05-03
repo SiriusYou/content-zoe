@@ -76,6 +76,14 @@ Gate 1 reviews engine correctness and always runs first. It proves the branch is
 - Operator approves engine-side completion.
 - On rejection at Gate 1, the task is routed back through harness re-execute so the worker iterates on the same `agent/*` branch with amended commits, or it is replaced by a fresh worker run with a revised spec. No commits flow to Gate 2 until Gate 1 approves.
 
+Gate 1 classifies edits to bounded-reopen files as:
+
+- accepted bounded deviation: the file was predeclared on the committed PLAN.md/TODOS.md approved-slice line, the path was serialized into the worker packet's mechanical declared-file-scope list, the intake carried matching `bounded_reopen_files` trigger/boundary fields, the worker evidence explains why the trigger fired, and the diff stays inside the boundary;
+- retask/re-intake: the file was not predeclared, the path was missing from the mechanical declared-file-scope packet, bounded metadata was missing, the trigger changed materially, or the needed edit is broader than the boundary;
+- hold for authority repair: the operator wants to preserve the current branch or commit history, but the authority surfaces are incomplete. The operator MUST amend committed PLAN.md/TODOS.md scope and packet/intake metadata, then rerun Gate 1 before Gate 2 or merge.
+
+Gate 1 should reject any worker handback that treats an undeclared file as bounded solely because a prior slice or draft discussed similar risk. If the operator intentionally merges without repairing the authority surfaces, record it as a manual charter override outside the bounded-reopen success path, not as an accepted Gate 1 bounded disposition.
+
 ### Gate 2: Target-Side Review
 
 Gate 2 reviews product and content correctness. It runs only after Gate 1 approves.
@@ -119,6 +127,29 @@ openclaw-healthcare workers committing to content-zoe are the only currently per
 - Never edit `~/dev/content-zoe/AGENTS.md`; it is a thin pointer per `f2f8a6b`.
 - Never edit `~/dev/content-zoe/ROLE_POSITIONING.md` through worker execution.
 - Never edit `~/dev/content-zoe/CLAUDE.md` through worker execution.
+
+Bounded reopen is a declared-scope subtype, not an exception to declared scope.
+
+A PLAN.md/TODOS.md approved-slice line MAY list a file as:
+
+`<path> (BOUNDED-REOPEN-IF-NEEDED: <short trigger>)`
+
+Example:
+
+`src/bin/report-run.ts (BOUNDED-REOPEN-IF-NEEDED: recovery-carry-forward-only; no CLI/env/schema changes)`
+
+Such a file is declared scope for mechanical file-scope purposes only when it is serialized into the worker execution packet's mechanical declared-file-scope list as a plain repo-relative path or allowed glob. It remains OUT by default for worker intent. The worker may edit it only when the named trigger becomes true and the edit stays inside the stated boundary.
+
+The approved-slice line is the committed authority surface. The execution packet is the mechanical enforcement surface. A `.omx/drafts/*` table may recommend bounded reopen, but it is not binding worker authority unless the PLAN.md/TODOS.md approved-slice line, the cross-repo intake snapshot, and the worker packet's declared-file-scope list all carry the bounded file.
+
+When a bounded trigger fires, the worker should stop and surface before modifying the file if that is still practical. If the trigger is discovered during an edit or while repairing a failing smoke, the worker may complete the smallest bounded edit, but the commit message or handback MUST identify:
+
+- the bounded file;
+- the trigger that fired;
+- why the edit stayed inside the boundary;
+- which smoke, diff, or reviewer evidence proves no adjacent frozen surface was changed.
+
+An undeclared file that merely appears similar to a bounded-reopen case is not accepted as bounded. It requires ordinary retask/re-intake before merge. An unrepaired merge can only be a manual charter override outside the bounded-reopen success path.
 
 ## Slice Approval Evidence Requirement
 
@@ -180,6 +211,8 @@ For ALL slices (framework or handler):
 - `slice_artifact_path`: path to the cz-Claude review artifact. MUST match the pattern `.omx/artifacts/claude-slice-N-review-YYYY-MM-DD(-rN)?.md`. **For re-reviewed slices, the path MUST point to the latest-suffix artifact** (e.g. `-r3.md` if r3 is the latest). An intake referencing an older-suffix artifact for an amended slice is invalid, even if that older artifact has an approving verdict.
 - `slice_artifact_verdict`: the verbatim final verdict line from the cz-Claude artifact (e.g. `VERDICT: APPROVE-WITH-AMENDMENTS-MET`). MUST be in the approve set.
 - `slice_artifact_sha256`: the cz-Claude artifact file's SHA-256 at intake-submission time.
+- `declared_file_scope_packet`: the repo-relative file/glob list that will be serialized into the worker execution packet's mechanical declared-file-scope field (`tasks.declaredFileScope` or equivalent). When the PLAN.md/TODOS.md approved-slice line includes any `BOUNDED-REOPEN-IF-NEEDED` entry, each bounded path MUST also appear here as a plain path/glob so current scope guards can enforce file membership.
+- `bounded_reopen_files`: required when the PLAN.md/TODOS.md approved-slice line includes any `BOUNDED-REOPEN-IF-NEEDED` entry; otherwise omitted or `none`. Each bounded row MUST include `path`, `trigger`, `boundary`, and `source_line` (the PLAN.md/TODOS.md approved-slice line or adjacent note). Each row's `path` MUST also appear in `declared_file_scope_packet`. The intake snapshot MUST match the committed approved-slice line at intake-submission HEAD.
 
 For framework slices ONLY (additional required fields):
 
@@ -187,9 +220,9 @@ For framework slices ONLY (additional required fields):
 - `codex_review_verdict`: the verbatim final verdict line from the cz-Codex artifact. MUST be in the approve set.
 - `codex_review_sha256`: the cz-Codex artifact file's SHA-256 at intake-submission time.
 
-**Enforcement** — these intake-snapshot fields are **operator attestations** captured at submission time. The operator MUST not submit an intake unless all required fields are present, all verdicts are in the approve set, all SHAs are accurate as of submission, all paths reference latest-suffix artifacts, and `slice_classification` matches the PLAN.md/TODOS.md approved-slice line. A submission that violates any of these constraints is invalid as a matter of charter; the slice is not approved.
+**Enforcement** — these intake-snapshot fields are **operator attestations** captured at submission time. The operator MUST not submit an intake unless all required fields are present, all verdicts are in the approve set, all SHAs are accurate as of submission, all paths reference latest-suffix artifacts, and `slice_classification` matches the PLAN.md/TODOS.md approved-slice line. For bounded reopen, the operator also verifies that every bounded file named in the intake appears on the committed PLAN.md/TODOS.md approved-slice line, appears as a plain path/glob in the packet's mechanical declared-file-scope list, and appears in `bounded_reopen_files` with matching trigger/boundary metadata. No uncommitted draft-only bounded declaration may be used as worker authority. A submission that violates any of these constraints is invalid as a matter of charter; the slice is not approved.
 
-**Mechanical enforcement** of these constraints — i.e., automated rejection of malformed intakes by the openclaw-healthcare intake-submit pipeline — is **deferred to a follow-on hc engine slice**. Until that engine slice lands, validation is operator-attestation-and-audit only: reviewers and the operator can audit intake snapshots against the corresponding cz checkout post-submission, and any violation surfaces in the run log for retroactive correction. Once the engine slice ships, malformed intakes route through the **Gate 1 rejection flow** defined in the Cross-repo authority model — the worker is not started, the operator is notified of the specific invalidation reason, and the operator must resubmit with corrected snapshot fields.
+**Mechanical enforcement** of these constraints — i.e., automated rejection of malformed intakes by the openclaw-healthcare intake-submit pipeline — is **deferred to a follow-on hc engine slice**. Until that engine slice lands, validation is operator-attestation-and-audit only: reviewers and the operator can audit intake snapshots against the corresponding cz checkout post-submission, and any violation surfaces in the run log for retroactive correction. For bounded reopen, Gate 1 reviewers audit the intake snapshot, the committed PLAN.md/TODOS.md line, the serialized declared-file-scope packet, and the worker diff. Once the engine slice ships, malformed intakes route through the **Gate 1 rejection flow** defined in the Cross-repo authority model — the worker is not started, the operator is notified of the specific invalidation reason, and the operator must resubmit with corrected snapshot fields.
 
 For framework slices, both reviewer artifacts are operator attestations captured at submission time; reviewers can audit either hash against the operator's original cz checkout when needed.
 

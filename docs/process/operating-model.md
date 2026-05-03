@@ -155,6 +155,38 @@ Review artifacts should record whether behavioral verification used a disposable
 
 **Origin**: Slice 4.3 cz-Codex Gate 2 disposable archive checkout; Slice 4.4 hc-Codex/Gate 2 behavioral replay reuse.
 
+### Amendment-drafting enforcement-chain trace
+
+When a charter or operating-model amendment introduces a new worker-facing classification, authority surface, scope subtype, or reviewer gate, the draft MUST include an enforcement-chain trace table before r1 review.
+
+The table should cover at least:
+
+- committed authority surface (`PLAN.md`, `TODOS.md`, `ROLE_POSITIONING.md`, or other);
+- operator intake field;
+- worker execution-packet wording;
+- scope-guard or file-scope interpretation;
+- worker stop-and-surface behavior;
+- Gate 1 disposition;
+- Gate 2 disposition when target-side product semantics are affected;
+- close-out or memory surface if the rule creates a reusable corpus signal.
+
+Each row must say `extended`, `not extended`, or `deferred`, with one-sentence rationale. A rule that affects worker authority but leaves any authority-chain row implicit should be treated as an r1 review risk.
+
+**Origin**: v3.5 H1/M-r1-1. The proposed bounded-reopen rule was substantively useful but unsafe until the enforcement chain was traced.
+
+### Review execution mode
+
+Review artifacts SHOULD record execution mode near the top when mode affects evidence interpretation:
+
+- `textual/source-read`;
+- `behavioral/disposable-archive`;
+- `behavioral/live-worktree`;
+- `output-only synthesis`;
+- `not run / operator-only boundary`;
+- other mode with a short reason.
+
+If a tool-enabled review exceeds budget, the operator may accept an output-only synthesis at the canonical artifact path only when it records the target refs, evidence ceiling, omitted checks, and reason the substitution is acceptable. This fallback is not a substitute for required behavioral execution when a gate specifically needs replay evidence; it is a budget/recordkeeping fallback that later lanes may challenge.
+
 ### Review artifact baseline metric
 
 The current v3.3 steady-state baseline for a completed implementation slice is 8 review artifacts:
@@ -273,14 +305,30 @@ Each review artifact MUST tag finding methodology with `[method: textual]`, `[me
 
 "Structurally" means the fold changes the contract or implementation mechanism so the runtime/spec equivalence gap closes. Documentation-only, time-box, or discipline-only folds are allowed only when the draft records why a structural fold is infeasible or out of proportion.
 
+Cross-confirmed findings should be classified by fold shape:
+
+- `merged-fold`: both lanes identify the same class at the same anchor or line range; one fold row normally closes both.
+- `sibling-fold`: both lanes identify the same class on the same upstream surface but at adjacent or different anchors; the fold may need sibling rows under one parent finding class.
+- `complementary-fold`: both lanes identify the same class from different anchors or lens angles; the fold should close the shared contract gap and preserve both evidence paths in the matrix.
+- `lock-step-multi-pair`: multiple independent cross-confirmed pairs fire in the same cycle; each pair should get its own fold row unless one structural change truly closes all pairs.
+
+Severity arbitration remains governed by § 7. Same-severity pairs stay at that severity unless independent escalation criteria apply. Different-severity pairs use the higher severity when they are the same finding class.
+
+The r2 review should verify joint closure for every cross-confirmed pair. A fold that is textually closed in one lane but still behaviorally open in the other has not structurally closed.
+
 **Data points**:
 
 - Slice 4.1: textual and behavioral lanes both identified the research manifest gap; Path W resolved it structurally with canonical `research/brief.md` using existing `file_non_empty`.
 - Slice 4.2: textual and behavioral lanes both identified static research self-wrapping as non-equivalent to trusted runtime wrapping; Path B resolved it structurally with `StageDef.buildPrompt?` and runtime prompt construction.
 - Slice 4.3 under operative v3.4: textual LOW + behavioral MEDIUM both identified sentinel smoke coverage gap; severity arbitration resolved to MEDIUM and v1.1 folded structurally by adding `<<<OPERATOR_FEEDBACK>>>` coverage.
 - Slice 4.4 under operative v3.4: textual LOW + behavioral MEDIUM both identified advisory-directive prompt coverage gap; severity arbitration resolved to MEDIUM and v1.1 folded structurally by adding directive constants, A6 mapping rows, and prompt-boundary smoke assertions.
+- Charter v3.5: cz-Claude M-r1-1 + cz-Codex H1 cross-confirmed the bounded-reopen authority-chain gap; severity arbitrated to HIGH and folded structurally by Path B deferral.
+- Slice 4.5 slice approval: M+M same-severity sibling-fold on inherited PLAN.md column semantics (`jobs.approval_summary` and `jobs.run_dir`).
+- Slice 4.6 slice approval: two M+M cross-confirmed pairs in one cycle, retry-count semantics and A6 boundary static sweep.
+- Slice 4.5 Gate 1: four MEDIUM lock-step pairs jointly closed at r2.
+- Slice 4.6 Gate 1: boundary static-check regex coverage jointly closed at r2.
 
-**How to apply**: if both lanes flag the same class, the fold matrix should mark it `cross-confirmed`. The drafter may still choose a smaller fold than either reviewer proposed, but the fold should close the underlying equivalence gap rather than merely promise future discipline.
+**How to apply**: if both lanes flag the same class, the fold matrix should mark it `cross-confirmed`, name the fold shape, and state the r2 joint-closure check. The drafter may still choose a smaller fold than either reviewer proposed, but the fold should close the underlying equivalence gap rather than merely promise future discipline.
 
 ### 9.9 Fold-design pass
 
@@ -322,12 +370,41 @@ The contract should be pinned in three places when practical: the draft text, im
 - Slice 4.3 folded sentinel coverage structurally by requiring smoke coverage for all four sentinels, including `<<<OPERATOR_FEEDBACK>>>`.
 - Slice 4.4 v1.0 attempted draft-time mapping but missed Markdown and Evidence Grade advisory directives; v1.1 closed the gap by adding prompt-level assertions and an infeasibility note for downstream LLM-output quality under FakeProvider.
 - Slice 4.4's two-file stage asserted input preservation by checking `report.en.md` remained byte-identical while `report.zh.md` was produced.
+- Slice 4.5 Gate 1 found a plain-`git diff` static check vacuity after commit. Slice 4.6 preemptively folded that lesson by reading `src/telegram/notifier.ts` directly.
+- Slice 4.5 and Slice 4.6 showed that contract constants (`APPROVAL_SUMMARY_MAX_CHARS`, retry delays, notifier limits, marker strings) need smoke calibration when they encode product behavior.
+- Slice 4.6 Gate 1 showed that boundary regex coverage belongs to the spec-declared negative invariant list, not to reviewer memory.
+
+Static guardrail smokes must be non-vacuous. A smoke that checks absence or presence of source patterns MUST inspect committed source files directly or inspect a stable explicit `base..HEAD` diff. Plain `git diff` in a clean committed checkout is not sufficient because it can pass after commit without inspecting the target surface.
+
+When an acceptance criterion binds a constant value, limit, marker string, retry sequence, or exported directive, the draft should prefer a three-anchor contract:
+
+1. spec text names the value or invariant;
+2. implementation exports or centralizes the value where practical;
+3. smoke imports the value or asserts exact source/runtime identity.
+
+For every runtime-observable prompt directive, either:
+
+1. export it as a named constant and assert it by exact-string or structural smoke coverage; or
+2. explicitly mark it as real-run-only / FakeProvider-infeasible in the draft.
+
+The smoke does not need to prove the LLM obeys the directive under FakeProvider. It only needs to prove the directive is materialized into the prompt. Real output quality remains later calibration/eval.
+
+When a MUST clause has a negative branch ("if not X, MUST NOT Y", "zero rows affected MUST NOT insert event", "no real network call"), the negative branch is a runtime-observable clause and should receive its own smoke row or explicit infeasibility note. Covering only the positive branch is incomplete when the negative branch prevents product-state corruption.
+
+For boundary/static checks, every spec-declared negative invariant should have a corresponding static assertion row. Reviewers should accept functionally equivalent regex or parser variants when they cover the same realistic regression vector; the fold ask need not force exact regex spelling.
+
+Drafts that include static guardrail rows should include:
+
+| Directive / Contract | Where Defined | Smoke Assertion | If Not Smokeable, Why |
+|---|---|---|---|
+
+Use this table for prompt directives, static guardrails, constants, and negative invariants whenever the slice introduces or modifies runtime-observable acceptance criteria.
 
 **How to apply**: before dispatching slice-approval, sweep the draft's acceptance criteria for runtime-observable MUST/SHOULD clauses. For each, add a smoke mapping row or an explicit infeasibility note. If one instance of a clause class is mapped, sweep for all other instances of the same class before dispatch.
 
-### 9.11 Pre-relay fold compression
+### 9.11 Pre-relay fold compression and fold-to-layer discipline
 
-**Rule**: for framework, framework-conservative, borderline, or high-surface handler slices, the operator SHOULD use a pre-relay fold pass before formal slice-approval dispatch when a planning lane is available.
+**Rule**: for framework, framework-conservative, borderline, high-surface handler, or charter-amendment cycles, the operator SHOULD use a pre-relay fold pass before formal dispatch when a planning lane is available.
 
 Pre-relay fold compression is advisory, not a replacement for formal review. It exists to remove obvious scope/accounting contradictions before they consume reviewer rounds and to synthesize a fold matrix after r1 findings arrive.
 
@@ -335,16 +412,80 @@ When used after r1, the pre-relay fold matrix SHOULD identify:
 
 1. each finding or cross-confirmed finding class;
 2. severity arbitration when lanes disagree;
-3. whether § 9.8 structural fold default fires;
+3. § 9.8 fold shape, when cross-confirmed;
 4. the smallest proposed fold mechanism;
-5. which draft section should change;
-6. which risks the r2 review should check.
+5. the layer where the gap actually lives: spec text, implementation runtime, smoke coverage, evidence docs, reviewer execution mode, or operator process;
+6. which draft or implementation section should change;
+7. which risks r2 should check.
 
-Close-out should record a compression metric: r1 finding count -> number of draft fold cycles -> r2 residual finding count. This is a process-quality metric, not a gate.
+Folds should land at the layer where the gap exists. If a finding is a smoke-coverage gap and runtime behavior is already correct, prefer a smoke/evidence fold over runtime churn. If a finding is a runtime/spec mismatch, documentation-only folds are insufficient unless the matrix records why runtime change is infeasible or out of proportion.
 
-**Data points**: Slice 4.1 and Slice 4.2 used pre-relay analysis to compress classification and seam-location issues before formal approval. Slice 4.4 used post-r1 pre-relay fold compression: 4 r1 findings -> one v1.1 fold cycle -> both r2 lanes 0/0/0.
+Close-out should record a compression metric: r1 finding count -> unique fold entries -> fold cycles -> r2 residual finding count. Use all four fields when the data is known. If an older close-out recorded only the prior three-part metric, later summaries may backfill the missing fold-entry count with an explicit reconstruction note. This is a process-quality metric, not a gate.
+
+**Data points**:
+
+- Slice 4.4 slice approval: `4 -> 1 -> 1 -> 0`.
+- Charter v3.5: `8 -> 1 -> 1 -> 0`.
+- Slice 4.5 slice approval: `6 -> 1 -> 1 -> 0`.
+- Slice 4.5 Gate 1: `9 -> 5 -> 1 -> 0`.
+- Slice 4.6 slice approval: `5 -> 5 -> 1 -> 0`.
+- Slice 4.6 Gate 1: `3 -> 1 -> 1 -> 0`.
 
 **How to apply**: pre-relay analysis should identify likely reviewer flags, not pre-decide them. Formal reviewers remain free to raise different severities. Divergence between pre-relay severity and in-cycle severity is expected because pre-relay is fold-design assistance, not a gate.
+
+### 9.12 BOUNDED-REOPEN-IF-NEEDED authority chain
+
+`BOUNDED-REOPEN-IF-NEEDED` is a declared-scope subtype for files that are normally OUT for a slice but may need a narrow edit if a named implementation-time condition fires.
+
+It is not an exception to declared scope.
+
+A bounded reopen is valid only when all of the following are true:
+
+1. the file is listed on the committed PLAN.md/TODOS.md approved-slice line or adjacent committed scope note using `BOUNDED-REOPEN-IF-NEEDED`;
+2. the declaration names a trigger and boundary;
+3. the cross-repo intake snapshot carries matching `bounded_reopen_files` fields;
+4. the same path is serialized into the worker execution packet's mechanical declared-file-scope list (`tasks.declaredFileScope` or equivalent) as a plain repo-relative path/glob;
+5. the worker handback or commit evidence states whether the trigger fired;
+6. if the file changed, Gate 1 verifies committed scope, packet scope, trigger metadata, boundary, and minimality.
+
+Example approved-slice shape:
+
+`[x] (cz-Claude approved YYYY-MM-DD; cz-Codex approved YYYY-MM-DD; classification=framework) Slice N: title — file scope: src/new.ts, scripts/new-smoke.ts, src/bin/report-run.ts (BOUNDED-REOPEN-IF-NEEDED: recovery-carry-forward-only; no CLI/env/schema changes)`
+
+Required intake fields when any bounded file exists:
+
+```yaml
+declared_file_scope_packet:
+  - src/new.ts
+  - scripts/new-smoke.ts
+  - src/bin/report-run.ts
+bounded_reopen_files:
+  - path: src/bin/report-run.ts
+    trigger: recovery-carry-forward-only
+    boundary: no CLI/env/schema changes; preserve existing report loop contract
+    source_line: PLAN.md Slice N approved-slice line
+```
+
+Worker behavior:
+
+- Treat bounded files as OUT unless the trigger fires.
+- Stop and surface before first edit when practical.
+- If discovered during an edit or smoke repair, complete only the smallest bounded change and mark the handback `BOUNDED-REOPEN-USED`.
+- Do not broaden the boundary without retask/re-intake and rerun Gate 1 after the authority surfaces are repaired.
+
+Gate 1 behavior:
+
+- Accept as bounded only when committed scope, packet declared-file-scope, intake metadata, trigger evidence, and minimality all match.
+- Retask/re-intake when a needed edit is not predeclared, missing from packet declared-file-scope, missing bounded metadata, or exceeds the boundary.
+- Hold for authority repair when the operator wants to preserve branch history: amend committed scope and packet/intake metadata, then rerun Gate 1 before Gate 2 or merge.
+- Treat undeclared "looks bounded" edits as ordinary scope violations. An unrepaired merge is a manual charter override outside the bounded-reopen success path.
+
+Draft-only status:
+
+- `.omx/drafts/*` may use `BOUNDED-REOPEN-IF-NEEDED` as planning language, but draft-only declarations do not authorize worker edits because `.omx/` is gitignored and workers operate from a checked-out target worktree.
+- A draft that includes bounded reopen should also specify how the committed PLAN.md/TODOS.md line and intake snapshot will carry it.
+
+**Origin**: Slice 4.1 + Slice 4.3 impl-time bounded `src/bin/report-run.ts` reopen, Slice 4.4 draft-time predeclaration, v3.5 H1/M-r1-1 Path B deferral, and Slice 4.5/4.6 deferral preservation.
 
 ## Out of scope for this doc
 
