@@ -191,8 +191,9 @@ export function createBotTick(dependencies: TickDependencies): BotTick {
       }
 
       running = true;
-      const db = dependencies.openDb(dependencies.dbPath);
+      let db: DbClient | undefined;
       try {
+        db = dependencies.openDb(dependencies.dbPath);
         const notifierResult = await dependencies.notifyPendingApprovals({
           db,
           sender: dependencies.sender,
@@ -202,7 +203,7 @@ export function createBotTick(dependencies: TickDependencies): BotTick {
         return { status: "ran", notifierResult };
       } finally {
         try {
-          db.close();
+          db?.close();
         } finally {
           running = false;
         }

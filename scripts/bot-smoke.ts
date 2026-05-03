@@ -26,6 +26,7 @@ type ScenarioName =
   | "bot-config-fail-closed"
   | "tick-calls-notifier"
   | "overlap-guard"
+  | "open-db-failure-releases-guard"
   | "telegram-sender-adapter"
   | "no-command-handlers"
   | "boundary-static-check"
@@ -48,6 +49,7 @@ const SCENARIOS: readonly ScenarioName[] = [
   "bot-config-fail-closed",
   "tick-calls-notifier",
   "overlap-guard",
+  "open-db-failure-releases-guard",
   "telegram-sender-adapter",
   "no-command-handlers",
   "boundary-static-check",
@@ -139,6 +141,8 @@ async function scenarioImpl(
       return runTickCallsNotifier(dir);
     case "overlap-guard":
       return runOverlapGuard(dir);
+    case "open-db-failure-releases-guard":
+      return runOpenDbFailureReleasesGuard(dir);
     case "telegram-sender-adapter":
       return runTelegramSenderAdapter();
     case "no-command-handlers":
@@ -203,6 +207,14 @@ function runBotConfigFailClosed(dir: string): string[] {
     env: { TELEGRAM_BOT_TOKEN: "token", OPERATOR_CHAT_IDS: "1,bad" },
     cwd: dir,
   });
+  const emptyToken = loadBotConfig({
+    env: { TELEGRAM_BOT_TOKEN: "   ", OPERATOR_CHAT_IDS: "1" },
+    cwd: dir,
+  });
+  const missingAllowlist = loadBotConfig({
+    env: { TELEGRAM_BOT_TOKEN: "token" },
+    cwd: dir,
+  });
   let timerCalls = 0;
 
   try {
@@ -225,10 +237,28 @@ function runBotConfigFailClosed(dir: string): string[] {
 
   assert(!missingToken.ok, "missing token config was accepted");
   assert(!malformedAllowlist.ok, "malformed allowlist config was accepted");
+  assert(!emptyToken.ok, "empty token config was accepted");
+  assert(!missingAllowlist.ok, "missing allowlist config was accepted");
+  assert(
+    missingToken.errors.includes("TELEGRAM_BOT_TOKEN is required"),
+    "missing token failure did not identify token",
+  );
+  assert(
+    malformedAllowlist.errors.includes("OPERATOR_CHAT_IDS must be a comma-separated integer allowlist"),
+    "malformed allowlist failure did not identify OPERATOR_CHAT_IDS",
+  );
+  assert(
+    emptyToken.errors.includes("TELEGRAM_BOT_TOKEN is required"),
+    "empty token failure did not identify token",
+  );
+  assert(
+    missingAllowlist.errors.includes("OPERATOR_CHAT_IDS must be a comma-separated integer allowlist"),
+    "missing allowlist failure did not identify OPERATOR_CHAT_IDS",
+  );
   assert(timerCalls === 0, "invalid config started timer work");
 
   return [
-    "Invalid token or allowlist config returned closed failures.",
+    "Missing/empty token and missing/malformed allowlist config returned specific closed failures.",
     "Runtime start rejected invalid config before timer, DB, sender, or network work.",
   ];
 }
@@ -321,6 +351,50 @@ async function runOverlapGuard(dir: string): Promise<string[]> {
   return [
     "While one notifier execution was in flight, a concurrent tick returned skipped without opening another notifier run.",
     "After the first tick released, a later tick ran normally.",
+  ];
+}
+
+async function runOpenDbFailureReleasesGuard(dir: string): Promise<string[]> {
+  const db = fakeDb();
+  let openAttempts = 0;
+  let notifierCalls = 0;
+
+  const tick = createBotTick({
+    dbPath: resolve(dir, "content.db"),
+    openDb: () => {
+      openAttempts += 1;
+      if (openAttempts === 1) {
+        throw new Error("db open failed");
+      }
+      return db;
+    },
+    sender: async () => undefined,
+    now: () => 1,
+    sleep: async () => undefined,
+    notifyPendingApprovals: async () => {
+      notifierCalls += 1;
+      return notifierResult({ selected: 1, sent: 1 });
+    },
+  });
+
+  let threw = false;
+  try {
+    await tick.tick();
+  } catch (err) {
+    threw = err instanceof Error && err.message === "db open failed";
+  }
+
+  const second = await tick.tick();
+
+  assert(threw, "first DB-open failure was not surfaced");
+  assert(second.status === "ran", "tick stayed skipped after DB-open failure");
+  assert(openAttempts === 2, `expected two DB open attempts, got ${openAttempts}`);
+  assert(notifierCalls === 1, `expected one notifier call after recovery, got ${notifierCalls}`);
+  assert(db.closeCalls === 1, `expected successful DB handle to close once, got ${db.closeCalls}`);
+
+  return [
+    "A thrown openDb failure surfaced to the caller and released the overlap guard.",
+    "The next tick opened the DB again, ran the notifier, and closed the successful DB handle.",
   ];
 }
 
@@ -424,8 +498,10 @@ function runBoundaryStaticCheck(): string[] {
   const forbiddenRuntimePatterns: [RegExp, string][] = [
     [/src\/llm|from\s+["'][^"']*\/llm\//, "LLM import"],
     [/src\/prompts|from\s+["'][^"']*\/prompts\//, "prompt import"],
+    [/runPrompt|\.runPrompt\s*\(|StageDef\.buildPrompt|<<<|buildPrompt/, "prompt-producing surface"],
     [/from\s+["'][^"']*preflight\.ts["']|assertCodexAvailable|codex-smoke/, "preflight/Codex dependency"],
     [new RegExp(["report", "run"].join(":")), "operator report command dependency"],
+    [/child_process|node:child_process|Bun\.spawn|(?<![\w.])spawn\s*\(/, "process spawn surface"],
     [/INSERT\s+INTO\s+jobs|casUpdateJob|insertEvent|findJobById/, "duplicate notifier/DB mutation logic"],
   ];
   for (const [file, source] of changedSources) {
@@ -450,15 +526,25 @@ function runDependencyBoundaryCheck(): string[] {
   const packageJson = JSON.parse(readSource("package.json")) as {
     scripts?: Record<string, string>;
     dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
   };
 
   const telegramDependencyPattern =
     /from ["'](?:grammy|telegraf)["']|require\(["'](?:grammy|telegraf)["']\)/;
   assert(!telegramDependencyPattern.test(notifierSource), "notifier imports Telegram dependency");
+  const declaredTelegramDeps = ["grammy", "telegraf"].filter(
+    (name) => packageJson.dependencies?.[name] || packageJson.devDependencies?.[name],
+  );
+  const botTelegramImports = [
+    ...botSource.matchAll(new RegExp(telegramDependencyPattern, "g")),
+  ];
   assert(
-    !telegramDependencyPattern.test(botSource) ||
-      [...botSource.matchAll(new RegExp(telegramDependencyPattern, "g"))].length >= 1,
-    "unexpected Telegram dependency scan result",
+    botTelegramImports.length === 0 || declaredTelegramDeps.length > 0,
+    "bot imports Telegram SDK without package dependency",
+  );
+  assert(
+    declaredTelegramDeps.length === 0 || botTelegramImports.length > 0,
+    "Telegram SDK dependency declared without bot.ts import",
   );
   assert(
     packageJson.scripts?.bot === "bun src/telegram/bot.ts",
@@ -505,6 +591,7 @@ function runNoPreflightCodexSurvivability(): string[] {
     [/preflight\.ts|assertCodexAvailable/, "preflight dependency"],
     [/codex-smoke/, "codex smoke dependency"],
     [/src\/llm|from\s+["'][^"']*\/llm\//, "LLM dependency"],
+    [/runPrompt|\.runPrompt\s*\(|StageDef\.buildPrompt|<<<|buildPrompt|src\/prompts/, "prompt-producing dependency"],
     [new RegExp(["report", "run"].join(":")), "operator report command dependency"],
   ];
 
