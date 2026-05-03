@@ -20,6 +20,7 @@
     "report:run": "bun src/bin/report-run.ts",
     "approval-summary-smoke": "bun scripts/approval-summary-smoke.ts",
     "report-run-smoke": "bun scripts/report-run-smoke.ts",
+    "notifier-smoke": "bun scripts/notifier-smoke.ts",
     "db:smoke": "bun scripts/db-smoke.ts"
   },
   "devDependencies": {
