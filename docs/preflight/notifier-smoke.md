@@ -1,9 +1,9 @@
 # Notifier Smoke Evidence
 
 - Command: `bun run notifier-smoke`
-- Started: 2026-05-03T04:18:50.071Z
-- Finished: 2026-05-03T04:18:50.120Z
-- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-notifier-smoke-2026-05-03T04-18-50.071Z (removed by finally-cleanup)
+- Started: 2026-05-03T04:31:30.569Z
+- Finished: 2026-05-03T04:31:30.604Z
+- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-notifier-smoke-2026-05-03T04-31-30.569Z (removed by finally-cleanup)
 - Result: 10/10 PASS
 - Default notification limit: 10
 

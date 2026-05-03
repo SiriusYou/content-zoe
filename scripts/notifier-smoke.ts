@@ -468,11 +468,14 @@ function runBoundaryStaticCheck(): string[] {
   const forbiddenPatterns: [RegExp, string][] = [
     [/process\.env/, "env read"],
     [/process\.argv/, "argv read"],
-    [/\bBun\.spawn\b|\bspawnSync\b|\bexecFile\b|\bexecSync\b/, "process spawn"],
+    [
+      /(?:from|import)\s+["']node:child_process["']|require\(["']node:child_process["']\)|(?:from|import)\s+["']child_process["']|require\(["']child_process["']\)|\bBun\.spawn\b|\bspawn\s*\(|\bspawnSync\b|\bexecFile\b|\bexecSync\b/,
+      "process spawn",
+    ],
     [/from ["'](?:grammy|telegraf)["']|require\(["'](?:grammy|telegraf)["']\)/, "real Telegram SDK import"],
     [/api\.telegram\.org/, "direct Telegram API literal"],
     [/report\.(?:en|zh)\.md|sources\.json|readFileSync\([^)]*report|readFileSync\([^)]*source/i, "report/source file read"],
-    [/\bLLMProvider\b|src\/llm|src\/prompts|composePrompt|PROMPT_DELIMITER/, "LLM prompt-producing surface"],
+    [/\bLLMProvider\b|src\/llm|src\/prompts|composePrompt|PROMPT_DELIMITER|\.runPrompt\s*\(|StageDef\.buildPrompt|<<</, "LLM prompt-producing surface"],
   ];
 
   for (const [pattern, label] of forbiddenPatterns) {
