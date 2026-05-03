@@ -1,9 +1,9 @@
 # Bot Smoke Evidence
 
 - Command: `bun run bot-smoke`
-- Started: 2026-05-03T17:36:56.854Z
-- Finished: 2026-05-03T17:36:56.867Z
-- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-03T17-36-56.854Z (removed by finally-cleanup)
+- Started: 2026-05-03T17:42:26.269Z
+- Finished: 2026-05-03T17:42:26.284Z
+- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-03T17-42-26.269Z (removed by finally-cleanup)
 - Result: 12/12 PASS
 
 ## Evidence Ceiling
@@ -23,6 +23,6 @@ This smoke exercises deterministic allowlist parsing, injected bot runtime seams
 | no-command-handlers | PASS | Inspected bot.ts directly and found no command/hears/message handler registrations. |
 | boundary-static-check | PASS | Stable base/status scope check saw only declared files: docs/preflight/bot-smoke.md, package.json, scripts/bot-smoke.ts, src/telegram/allowlist.ts, src/telegram/bot.ts.<br>Changed source surfaces contain no prompt/LLM/preflight/Codex dependency, operator report command dependency, DB schema/migration touch, or duplicate notifier mutation logic.<br>Smoke source contains no Telegram fetch/API network path. |
 | dependency-boundary-check | PASS | Telegram SDK dependency imports are absent outside bot.ts; notifier.ts remains dependency-free.<br>package.json exposes only the expected bot runtime and bot-smoke command surfaces for this slice. |
-| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-03T17-36-56.854Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
+| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-03T17-42-26.269Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
 | no-preflight-codex-survivability | PASS | Bot and allowlist surfaces have no preflight, Codex smoke, LLM, prompt, or operator report command dependency. |
 | no-command-placeholder-registrations | PASS | bot.ts contains no approve/reject/status strings and no inert command placeholder wording. |
