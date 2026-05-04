@@ -8,10 +8,12 @@ import {
   type NotifyPendingApprovalsResult,
 } from "./notifier.ts";
 import { parseOperatorChatIds } from "./allowlist.ts";
+import { handleRejectCommand } from "./commands.ts";
 
 export const TELEGRAM_BOT_TOKEN_ENV = "TELEGRAM_BOT_TOKEN";
 export const OPERATOR_CHAT_IDS_ENV = "OPERATOR_CHAT_IDS";
 export const DEFAULT_TICK_INTERVAL_MS = 10_000;
+export const DEFAULT_COMMAND_POLL_INTERVAL_MS = 2_000;
 
 export interface BotConfig {
   readonly token: string;
@@ -49,6 +51,31 @@ export interface TelegramHttpTransportOptions {
   readonly apiRoot?: string;
 }
 
+export type TelegramCommandName = "reject";
+
+export interface TelegramCommandContext {
+  readonly chatId: number;
+  readonly text: string;
+  reply(text: string): Promise<void> | void;
+}
+
+export type TelegramCommandHandler = (
+  context: TelegramCommandContext,
+) => Promise<void> | void;
+
+export interface TelegramCommandTransport {
+  onCommand(command: TelegramCommandName, handler: TelegramCommandHandler): void;
+  start(): void;
+  stop(): void;
+}
+
+export interface TelegramHttpCommandTransportOptions
+  extends TelegramHttpTransportOptions {
+  readonly timer?: RuntimeTimer;
+  readonly pollIntervalMs?: number;
+  readonly onError?: (err: unknown) => void;
+}
+
 export interface CreateTelegramSenderOptions {
   readonly chatIds: readonly number[];
   readonly transport: TelegramTransport;
@@ -83,11 +110,13 @@ export interface StartBotRuntimeOptions {
   readonly openDb?: (dbPath: string) => DbClient;
   readonly sender?: ApprovalNotificationSender;
   readonly transport?: TelegramTransport;
+  readonly commandTransport?: TelegramCommandTransport;
   readonly notifyPendingApprovals?: typeof defaultNotifyPendingApprovals;
   readonly now?: () => number;
   readonly sleep?: (delayMs: number) => Promise<void> | void;
   readonly timer?: RuntimeTimer;
   readonly onTickError?: (err: unknown) => void;
+  readonly onCommandError?: (err: unknown) => void;
 }
 
 export interface BotRuntime {
@@ -181,6 +210,135 @@ export function createTelegramHttpTransport(
   };
 }
 
+export function createTelegramHttpCommandTransport(
+  options: TelegramHttpCommandTransportOptions,
+): TelegramCommandTransport {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const apiRoot = options.apiRoot ?? "https://api.telegram.org";
+  const timer = options.timer ?? defaultRuntimeTimer();
+  const pollIntervalMs =
+    options.pollIntervalMs ?? DEFAULT_COMMAND_POLL_INTERVAL_MS;
+  const onError =
+    options.onError ??
+    ((err: unknown) => {
+      console.error(err);
+    });
+  const handlers = new Map<TelegramCommandName, TelegramCommandHandler>();
+  const sender = createTelegramHttpTransport({
+    token: options.token,
+    fetchImpl,
+    apiRoot,
+  });
+  let offset = 0;
+  let running = false;
+  let intervalHandle: unknown;
+
+  async function poll(): Promise<void> {
+    if (running) {
+      return;
+    }
+
+    running = true;
+    try {
+      const url = new URL(`${apiRoot}/bot${options.token}/getUpdates`);
+      url.searchParams.set("timeout", "0");
+      if (offset > 0) {
+        url.searchParams.set("offset", String(offset));
+      }
+
+      const response = await fetchImpl(url, { method: "GET" });
+      if (!response.ok) {
+        throw new Error(`Telegram getUpdates failed with HTTP ${response.status}`);
+      }
+
+      const body = (await response.json()) as {
+        ok?: boolean;
+        result?: readonly TelegramUpdate[];
+      };
+      if (body.ok !== true || !Array.isArray(body.result)) {
+        throw new Error("Telegram getUpdates returned malformed payload");
+      }
+
+      for (const update of body.result) {
+        if (typeof update.update_id === "number") {
+          offset = Math.max(offset, update.update_id + 1);
+        }
+
+        const text = update.message?.text;
+        const chatId = update.message?.chat?.id;
+        if (typeof text !== "string" || typeof chatId !== "number") {
+          continue;
+        }
+
+        const command = commandNameFromText(text);
+        const handler = command === null ? undefined : handlers.get(command);
+        if (handler === undefined) {
+          continue;
+        }
+
+        await handler({
+          chatId,
+          text,
+          reply(replyText) {
+            return sender.sendMessage(chatId, replyText);
+          },
+        });
+      }
+    } finally {
+      running = false;
+    }
+  }
+
+  return {
+    onCommand(command, handler): void {
+      handlers.set(command, handler);
+    },
+    start(): void {
+      if (intervalHandle !== undefined) {
+        return;
+      }
+      intervalHandle = timer.setInterval(() => {
+        void poll().catch(onError);
+      }, pollIntervalMs);
+      void poll().catch(onError);
+    },
+    stop(): void {
+      if (intervalHandle !== undefined) {
+        timer.clearInterval(intervalHandle);
+        intervalHandle = undefined;
+      }
+    },
+  };
+}
+
+export interface RegisterRejectCommandOptions {
+  readonly dbPath: string;
+  readonly operatorChatIds: readonly number[];
+  readonly openDb: (dbPath: string) => DbClient;
+  readonly now: () => number;
+}
+
+export function registerRejectCommand(
+  commandTransport: TelegramCommandTransport,
+  options: RegisterRejectCommandOptions,
+): void {
+  commandTransport.onCommand("reject", async (context) => {
+    const db = options.openDb(options.dbPath);
+    try {
+      await handleRejectCommand({
+        db,
+        text: context.text,
+        chatId: context.chatId,
+        operatorChatIds: options.operatorChatIds,
+        now: options.now,
+        reply: (text) => context.reply(text),
+      });
+    } finally {
+      db.close();
+    }
+  });
+}
+
 export function createBotTick(dependencies: TickDependencies): BotTick {
   let running = false;
 
@@ -221,17 +379,19 @@ export function startBotRuntime(options: StartBotRuntimeOptions = {}): BotRuntim
   }
 
   const config = configResult.config;
+  const openDb = options.openDb ?? defaultOpenDb;
+  const now = options.now ?? (() => Math.floor(Date.now() / 1000));
   const transport = options.transport ?? createTelegramHttpTransport({ token: config.token });
   const sender =
     options.sender ??
     createTelegramSender({ chatIds: config.operatorChatIds, transport });
   const tickController = createBotTick({
     dbPath: config.dbPath,
-    openDb: options.openDb ?? defaultOpenDb,
+    openDb,
     sender,
     notifyPendingApprovals:
       options.notifyPendingApprovals ?? defaultNotifyPendingApprovals,
-    now: options.now ?? (() => Math.floor(Date.now() / 1000)),
+    now,
     sleep: options.sleep ?? ((delayMs) => Bun.sleep(delayMs)),
   });
   const timer = options.timer ?? defaultRuntimeTimer();
@@ -240,17 +400,51 @@ export function startBotRuntime(options: StartBotRuntimeOptions = {}): BotRuntim
     ((err: unknown) => {
       console.error(err);
     });
+  const onCommandError =
+    options.onCommandError ??
+    ((err: unknown) => {
+      console.error(err);
+    });
+  const commandTransport =
+    options.commandTransport ??
+    createTelegramHttpCommandTransport({
+      token: config.token,
+      timer,
+      onError: onCommandError,
+    });
+  registerRejectCommand(commandTransport, {
+    dbPath: config.dbPath,
+    operatorChatIds: config.operatorChatIds,
+    openDb,
+    now,
+  });
   const handle = timer.setInterval(() => {
     void tickController.tick().catch(onTickError);
   }, config.tickIntervalMs);
+  commandTransport.start();
 
   return {
     config,
     tick: tickController.tick,
     stop(): void {
       timer.clearInterval(handle);
+      commandTransport.stop();
     },
   };
+}
+
+interface TelegramUpdate {
+  readonly update_id?: number;
+  readonly message?: {
+    readonly text?: string;
+    readonly chat?: {
+      readonly id?: number;
+    };
+  };
+}
+
+function commandNameFromText(text: string): TelegramCommandName | null {
+  return /^\/reject(?:@\w+)?(?:\s|$)/.test(text.trim()) ? "reject" : null;
 }
 
 function defaultRuntimeTimer(): RuntimeTimer {
