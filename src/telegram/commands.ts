@@ -77,7 +77,7 @@ const awaitingApprovalStatus = "awaiting_approval";
 const queuedStatus = "queued";
 const rejectedEventType = "rejected";
 const unauthorizedEventType = "unauthorized";
-const rejectCommandPattern = /^\/reject(?:@\w+)?\s+(\S+)\s+(\S+)\s+(\S+)(?:\s+([\s\S]*))?$/;
+const rejectCommandPattern = /^\/reject(?:@\w+)?(?:\s+(\S+))?(?:\s+(\S+))?(?:\s+(\S+))?(?:\s+([\s\S]*))?$/;
 const positiveIntegerPattern = /^\d+$/;
 const rejectScopes = ["en", "zh", "bundle"] as const;
 const rejectTypes = [
@@ -105,8 +105,11 @@ export function parseRejectCommand(text: string): ParseRejectCommandResult {
   }
 
   const [, jobId, attemptToken, scopeTypeToken, rawReason] = match;
+  if (jobId === undefined) {
+    return { ok: false, code: "INVALID_COMMAND" };
+  }
+
   if (
-    jobId === undefined ||
     attemptToken === undefined ||
     scopeTypeToken === undefined ||
     !positiveIntegerPattern.test(attemptToken)
@@ -258,7 +261,7 @@ async function rejectWithTransaction(
     if (updated.rowsAffected !== 1) {
       dependencies.db.exec("ROLLBACK");
       transactionOpen = false;
-      const code = classifyRaceLoss(dependencies.db, job, command);
+      const code = classifyRaceLoss(dependencies.db, command);
       return replyWithError(dependencies, code, command.jobId);
     }
 
@@ -295,7 +298,6 @@ function rejectPreconditionError(
 
 function classifyRaceLoss(
   db: DbClient,
-  originalJob: Job,
   command: ParsedRejectCommand,
 ): RejectCommandErrorCode {
   const current = findJobById(db, command.jobId);
@@ -305,12 +307,6 @@ function classifyRaceLoss(
   const preconditionError = rejectPreconditionError(current, command);
   if (preconditionError !== null) {
     return preconditionError;
-  }
-  if (
-    current.status !== originalJob.status ||
-    current.attempt_number !== originalJob.attempt_number
-  ) {
-    return "REJECT_RACE_LOST";
   }
   return "REJECT_RACE_LOST";
 }

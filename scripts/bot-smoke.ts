@@ -567,10 +567,16 @@ function runRejectCommandParse(): string[] {
   for (const input of invalidInputs) {
     assert(!parseRejectCommand(input).ok, `invalid command parsed: ${input}`);
   }
+  const missingScope = parseRejectCommand("/reject parseable-job 1");
+  assert(!missingScope.ok, "missing scope:type parsed");
+  assert(missingScope.jobId === "parseable-job", "missing scope:type did not preserve parseable job ID");
+  const missingJob = parseRejectCommand("/reject");
+  assert(!missingJob.ok, "missing job parsed");
+  assert(missingJob.jobId === undefined, "missing job exposed a job ID");
 
   return [
     "Canonical /reject parsed deterministically, trimmed reason text, and produced the exact operator guidance reply.",
-    "Malformed, unsafe, unknown, extra-colon, and overlong-reason variants were rejected.",
+    "Malformed, unsafe, unknown, extra-colon, and overlong-reason variants were rejected while preserving parseable job IDs.",
   ];
 }
 
@@ -949,12 +955,28 @@ async function runRejectAllowlistedMalformedVisible(dir: string): Promise<string
       now: () => 8_600_000_000,
       reply: (text) => replies.push(text),
     });
+    await handleRejectCommand({
+      db,
+      text: "/reject",
+      chatId: 123,
+      operatorChatIds: [123],
+      now: () => 8_600_000_001,
+      reply: (text) => replies.push(text),
+    });
 
-    assert(replies[0] === formatRejectErrorReply("INVALID_COMMAND"), "malformed allowed command did not get visible INVALID_COMMAND");
+    assert(
+      replies[0] === formatRejectErrorReply("INVALID_COMMAND", "malformed"),
+      "malformed allowed command with parseable job did not include job ID",
+    );
+    assert(
+      replies[1] === formatRejectErrorReply("INVALID_COMMAND"),
+      "malformed allowed command without parseable job did not get bare INVALID_COMMAND",
+    );
     assert(eventCount(db) === 0, "malformed allowed command wrote unauthorized event");
 
     return [
-      "Allowlisted malformed command received a visible INVALID_COMMAND reply and wrote no unauthorized audit event.",
+      "Allowlisted malformed command received a visible INVALID_COMMAND reply with job ID when parseable, and bare INVALID_COMMAND when no job ID was parseable.",
+      "Malformed allowlisted commands wrote no unauthorized audit event.",
     ];
   } finally {
     close();
