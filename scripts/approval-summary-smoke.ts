@@ -13,6 +13,11 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  assertNoForbiddenPatterns,
+  PROMPT_PRODUCING_SURFACE_PATTERNS,
+  type ForbiddenPattern,
+} from "./lib/static-guardrails.ts";
+import {
   findJobById,
   insertJob,
   openDb,
@@ -549,21 +554,20 @@ function runNoPromptSurfaceStaticCheck(): string[] {
     "src/pipeline/approval-summary.ts",
     "src/bin/report-run.ts",
   ];
-  const addedLines = checkedFiles.flatMap((file) =>
-    readFileSync(resolve(repoRoot, file), "utf8")
-      .split("\n")
-      .map((line) => `${file}: ${line}`),
-  );
-  const forbidden = [
-    /buildPrompt/,
-    /\.runPrompt\s*\(/,
-    /src\/prompts|\.\.\/prompts|from\s+["'][^"']*prompts/,
-    /PROMPT|DELIMITER|BEGIN_|END_/,
+  const forbidden: readonly ForbiddenPattern[] = [
+    ...PROMPT_PRODUCING_SURFACE_PATTERNS,
+    [/\.\.\/prompts/, "prompt import"],
+    [/PROMPT|DELIMITER|BEGIN_|END_/, "prompt delimiter surface"],
   ];
-  const hits = addedLines.filter((line) =>
-    forbidden.some((pattern) => pattern.test(line)),
-  );
-  assert(hits.length === 0, `prompt-surface additions found: ${JSON.stringify(hits)}`);
+
+  for (const file of checkedFiles) {
+    assertNoForbiddenPatterns(
+      readFileSync(resolve(repoRoot, file), "utf8"),
+      forbidden,
+      file,
+    );
+  }
+
   return [
     "Committed runtime TS files contain no buildPrompt, provider runPrompt call, prompt delimiter constants, or prompt-file references.",
   ];

@@ -1,8 +1,16 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  assertNoForbiddenPatterns,
+  PROCESS_SPAWN_PATTERNS,
+  PROMPT_SURFACE_PATTERNS,
+  readRepoSource,
+  TELEGRAM_SDK_IMPORT_PATTERNS,
+  type ForbiddenPattern,
+} from "./lib/static-guardrails.ts";
 import {
   findEventsByJob,
   findJobById,
@@ -457,30 +465,23 @@ function runMessageContractStaticCheck(): string[] {
 }
 
 function runBoundaryStaticCheck(): string[] {
-  const notifierSource = readFileSync(
-    resolve(repoRoot, "src", "telegram", "notifier.ts"),
-    "utf8",
-  );
+  const notifierSource = readRepoSource(repoRoot, "src/telegram/notifier.ts");
   const packageJson = JSON.parse(
-    readFileSync(resolve(repoRoot, "package.json"), "utf8"),
+    readRepoSource(repoRoot, "package.json"),
   ) as { scripts?: Record<string, string> };
 
-  const forbiddenPatterns: [RegExp, string][] = [
+  const forbiddenPatterns: readonly ForbiddenPattern[] = [
     [/process\.env/, "env read"],
     [/process\.argv/, "argv read"],
-    [
-      /(?:from|import)\s+["']node:child_process["']|require\(["']node:child_process["']\)|(?:from|import)\s+["']child_process["']|require\(["']child_process["']\)|\bBun\.spawn\b|\bspawn\s*\(|\bspawnSync\b|\bexecFile\b|\bexecSync\b/,
-      "process spawn",
-    ],
-    [/from ["'](?:grammy|telegraf)["']|require\(["'](?:grammy|telegraf)["']\)/, "real Telegram SDK import"],
+    ...PROCESS_SPAWN_PATTERNS,
+    ...TELEGRAM_SDK_IMPORT_PATTERNS,
     [/api\.telegram\.org/, "direct Telegram API literal"],
     [/report\.(?:en|zh)\.md|sources\.json|readFileSync\([^)]*report|readFileSync\([^)]*source/i, "report/source file read"],
-    [/\bLLMProvider\b|src\/llm|src\/prompts|composePrompt|PROMPT_DELIMITER|\.runPrompt\s*\(|StageDef\.buildPrompt|<<</, "LLM prompt-producing surface"],
+    ...PROMPT_SURFACE_PATTERNS,
+    [/\bLLMProvider\b|composePrompt|PROMPT_DELIMITER/, "LLM prompt-producing surface"],
   ];
 
-  for (const [pattern, label] of forbiddenPatterns) {
-    assert(!pattern.test(notifierSource), `notifier.ts contains forbidden ${label}`);
-  }
+  assertNoForbiddenPatterns(notifierSource, forbiddenPatterns, "notifier.ts");
   assert(
     packageJson.scripts?.["notifier-smoke"] === "bun scripts/notifier-smoke.ts",
     "package.json notifier-smoke script missing or unexpected",

@@ -1,9 +1,19 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  assertChangedFilesWithinScope,
+  assertNoChangedDirectories,
+  assertNoChangedFiles,
+  assertNoForbiddenPatterns,
+  changedFilesAgainstBase as getChangedFilesAgainstBase,
+  PROCESS_SPAWN_PATTERNS,
+  PROMPT_SURFACE_PATTERNS,
+  readRepoSource,
+  type ForbiddenPattern,
+} from "./lib/static-guardrails.ts";
 import type { DbClient } from "../src/db.ts";
 import { parseOperatorChatIds } from "../src/telegram/allowlist.ts";
 import {
@@ -65,15 +75,15 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
-const targetBase = "8baf22573c748d3ce39fad64b74a3396e8b8cacd";
+const targetBase = "8b1aef93b8751160e34d4b97d7bc4fec257c8c0c";
 const declaredScope = new Set([
-  "src/telegram/allowlist.ts",
-  "src/telegram/bot.ts",
+  "scripts/lib/static-guardrails.ts",
+  "scripts/approval-summary-smoke.ts",
   "scripts/bot-smoke.ts",
+  "scripts/notifier-smoke.ts",
+  "docs/preflight/approval-summary-smoke.md",
   "docs/preflight/bot-smoke.md",
-  "package.json",
-  "bun.lock",
-  "bun.lockb",
+  "docs/preflight/notifier-smoke.md",
 ]);
 
 async function main(): Promise<number> {
@@ -463,13 +473,8 @@ function runNoCommandHandlers(): string[] {
 
 function runBoundaryStaticCheck(): string[] {
   const changed = changedFilesAgainstBase();
-  const outOfScope = changed.filter((file) => !declaredScope.has(file));
-  assert(
-    outOfScope.length === 0,
-    `changed files outside declared scope: ${outOfScope.join(", ")}`,
-  );
-
-  for (const forbidden of [
+  assertChangedFilesWithinScope(changed, declaredScope);
+  assertNoChangedFiles(changed, [
     "src/telegram/notifier.ts",
     "src/bin/report-run.ts",
     "src/lib/report-loop.ts",
@@ -478,36 +483,26 @@ function runBoundaryStaticCheck(): string[] {
     "src/db.ts",
     "src/preflight.ts",
     "src/promote.ts",
-  ]) {
-    assert(!changed.includes(forbidden), `frozen file changed: ${forbidden}`);
-  }
-  assert(
-    changed.every(
-      (file) =>
-        !file.startsWith("src/pipeline/") &&
-        !file.startsWith("src/migrations/") &&
-        !file.startsWith("src/llm/") &&
-        !file.startsWith("src/prompts/"),
-    ),
-    "changed files touched frozen directory scope",
-  );
+  ]);
+  assertNoChangedDirectories(changed, [
+    "src/pipeline/",
+    "src/migrations/",
+    "src/llm/",
+    "src/prompts/",
+  ]);
 
   const changedSources = changed
     .filter((file) => file === "src/telegram/bot.ts" || file === "src/telegram/allowlist.ts")
     .map((file) => [file, readSource(file)] as const);
-  const forbiddenRuntimePatterns: [RegExp, string][] = [
-    [/src\/llm|from\s+["'][^"']*\/llm\//, "LLM import"],
-    [/src\/prompts|from\s+["'][^"']*\/prompts\//, "prompt import"],
-    [/runPrompt|\.runPrompt\s*\(|StageDef\.buildPrompt|<<<|buildPrompt/, "prompt-producing surface"],
+  const forbiddenRuntimePatterns: readonly ForbiddenPattern[] = [
+    ...PROMPT_SURFACE_PATTERNS,
     [/from\s+["'][^"']*preflight\.ts["']|assertCodexAvailable|codex-smoke/, "preflight/Codex dependency"],
     [new RegExp(["report", "run"].join(":")), "operator report command dependency"],
-    [/child_process|node:child_process|Bun\.spawn|(?<![\w.])spawn\s*\(/, "process spawn surface"],
+    ...PROCESS_SPAWN_PATTERNS,
     [/INSERT\s+INTO\s+jobs|casUpdateJob|insertEvent|findJobById/, "duplicate notifier/DB mutation logic"],
   ];
   for (const [file, source] of changedSources) {
-    for (const [pattern, label] of forbiddenRuntimePatterns) {
-      assert(!pattern.test(source), `${file} contains forbidden ${label}`);
-    }
+    assertNoForbiddenPatterns(source, forbiddenRuntimePatterns, file);
   }
 
   const smokeSource = readSource("scripts/bot-smoke.ts");
@@ -587,17 +582,14 @@ function runNoPreflightCodexSurvivability(): string[] {
   const botSource = readSource("src/telegram/bot.ts");
   const allowlistSource = readSource("src/telegram/allowlist.ts");
   const combined = `${botSource}\n${allowlistSource}`;
-  const forbiddenPatterns: [RegExp, string][] = [
+  const forbiddenPatterns: readonly ForbiddenPattern[] = [
     [/preflight\.ts|assertCodexAvailable/, "preflight dependency"],
     [/codex-smoke/, "codex smoke dependency"],
-    [/src\/llm|from\s+["'][^"']*\/llm\//, "LLM dependency"],
-    [/runPrompt|\.runPrompt\s*\(|StageDef\.buildPrompt|<<<|buildPrompt|src\/prompts/, "prompt-producing dependency"],
+    ...PROMPT_SURFACE_PATTERNS,
     [new RegExp(["report", "run"].join(":")), "operator report command dependency"],
   ];
 
-  for (const [pattern, label] of forbiddenPatterns) {
-    assert(!pattern.test(combined), `bot surfaces contain ${label}`);
-  }
+  assertNoForbiddenPatterns(combined, forbiddenPatterns, "bot surfaces");
 
   return [
     "Bot and allowlist surfaces have no preflight, Codex smoke, LLM, prompt, or operator report command dependency.",
@@ -623,25 +615,11 @@ function runNoCommandPlaceholderRegistrations(): string[] {
 }
 
 function changedFilesAgainstBase(): string[] {
-  const committed = execGit(["diff", "--name-only", `${targetBase}..HEAD`]);
-  const working = execGit(["status", "--short", "--untracked-files=all"])
-    .split("\n")
-    .filter((line) => line.trim().length > 0)
-    .map((line) => line.slice(3).trim())
-    .map((line) => line.replace(/^.* -> /, ""));
-
-  return [...new Set([...splitLines(committed), ...working])].sort();
-}
-
-function execGit(args: readonly string[]): string {
-  return execFileSync("git", [...args], {
-    cwd: repoRoot,
-    encoding: "utf8",
-  });
+  return getChangedFilesAgainstBase(repoRoot, targetBase);
 }
 
 function readSource(relativePath: string): string {
-  return readFileSync(resolve(repoRoot, relativePath), "utf8");
+  return readRepoSource(repoRoot, relativePath);
 }
 
 function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {
@@ -704,13 +682,6 @@ function fakeDb(): DbClient & { closeCalls: number } {
       this.closeCalls += 1;
     },
   } as DbClient & { closeCalls: number };
-}
-
-function splitLines(value: string): string[] {
-  return value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
 }
 
 function assertArrayEquals(
