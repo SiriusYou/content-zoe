@@ -128,6 +128,19 @@ openclaw-healthcare workers committing to content-zoe are the only currently per
 - Never edit `~/dev/content-zoe/ROLE_POSITIONING.md` through worker execution.
 - Never edit `~/dev/content-zoe/CLAUDE.md` through worker execution.
 
+Review-only micro-cycles are a narrow driver-lane exception for non-product support changes.
+
+They may create and push content-zoe commits only when operating-model § 7 micro-cycle eligibility is satisfied, both required review lanes approve, and the operator explicitly authorizes the push after review. The target commit must be either:
+
+- an operator-owned local commit; or
+- an operator-supervised driver-lane local commit created outside hc-worker execution, with the authoring mode recorded in the dispatch and review artifact.
+
+No hc-worker, worker execution packet, intake snapshot, or bounded-reopen authority is implied by a micro-cycle.
+
+Micro-cycles are unavailable for runtime product code, any `src/` file, database schema or migrations, command grammar, prompt templates, LLM/provider code, authorization semantics, retry/CAS behavior, approval/promotion/publish behavior, or any worker/scope authority surface.
+
+Normative edits to operative governance files are not micro-cycle work. Operative governance files include `ROLE_POSITIONING.md`, `docs/process/operating-model.md`, `PLAN.md` / `TODOS.md` approval or scope lines, `AGENTS.md`, and any future committed file that controls worker authority, operator-only boundaries, reviewer gates, or file-scope rules. Pure typo or formatting edits to such files may use a micro-cycle only when the review artifacts explicitly attest that no normative meaning changed.
+
 Bounded reopen is a declared-scope subtype, not an exception to declared scope.
 
 A PLAN.md/TODOS.md approved-slice line MAY list a file as:

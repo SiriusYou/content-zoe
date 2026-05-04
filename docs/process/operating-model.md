@@ -11,11 +11,11 @@
 | Repo | Who may mutate | Scope |
 |---|---|---|
 | `openclaw-healthcare` | oh-healthcare workers only (via Zoe runtime) | engine evolution scoped to cross-repo target support (`source_repo_path` column + propagation). Any other change uses oh-healthcare's own SDD flow. |
-| `content-zoe` | oh-healthcare workers only for `src/` / schema / tests / product code. hc-Claude for governance artifacts like this file. cz-Claude for spec/plan authorship in `docs/specs/` and `docs/plans/`. | never writes into oh-healthcare. |
+| `content-zoe` | oh-healthcare workers only for runtime product code, any `src/` file, schema, migrations, tests under `src/`, command grammar, prompt templates, LLM/provider code, authorization, approval, promotion, publish, and other product behavior. hc-Claude for governance artifacts like this file, and for review-only micro-cycles per § 7 when the diff is limited to non-product test/smoke/evidence/docs/governance-support files. cz-Claude for spec/plan authorship in `docs/specs/` and `docs/plans/`. | never writes into oh-healthcare. |
 
 **Enforced invariants:**
 - Content-zoe → oh-healthcare writes are forbidden (per `~/.claude/projects/-Users-youjia-dev-content-zoe/memory/feedback_readonly_reference_repos.md`).
-- Driver agents (hc-Claude, cz-Claude, hc-Codex) do NOT edit content-zoe product code directly. All product code lands through workers.
+- Driver agents (hc-Claude, cz-Claude, hc-Codex) do NOT edit content-zoe runtime product code directly. All runtime product code lands through workers. Driver-lane direct edits to non-product test/smoke/evidence/docs/governance-support files are permitted only under § 7 review-only micro-cycle eligibility and require dual-lane approval before push.
 - Drivers MAY author specs/plans in `content-zoe/docs/` and governance artifacts in `content-zoe/docs/process/` — these are coordination artifacts, not product code.
 
 ## 2. Actor roster
@@ -206,6 +206,51 @@ Close-out should distinguish at least three metrics:
 r1-clean and Gate-clean measure different things. r1-clean is a draft-quality signal; Gate-clean is an implementation-quality signal after accepted folds.
 
 **Origin**: Slice 4.1 and Slice 4.2 both closed at the 8-artifact baseline despite different classification pressure.
+
+### Review-only micro-cycles
+
+A review-only micro-cycle is a narrow Phase shape for behaviorally inert refactors that are too important to push without dual-lane review but too small for a full slice cycle.
+
+Eligibility is strict. A micro-cycle may be used only when all are true:
+
+1. the change is behaviorally inert at the product/runtime surface;
+2. the cumulative diff touches only non-product test, smoke, evidence, docs, or governance-support files;
+3. no `src/` file changes whatsoever;
+4. no DB schema, migration, event/status vocabulary, command grammar, prompt template, LLM/provider, authorization, retry/CAS, approval, promotion, publish behavior, worker authority, file-scope rule, operator-only boundary, or reviewer-gate change;
+5. no normative edit to operative governance files (`ROLE_POSITIONING.md`, `docs/process/operating-model.md`, `PLAN.md` / `TODOS.md` approval or scope lines, `AGENTS.md`, or future committed authority files), except pure typo/formatting edits whose artifacts explicitly attest no normative effect;
+6. the operator records the target SHA, base SHA, declared file scope, implementation authoring mode, and reason a full slice cycle is out of proportion before review starts;
+7. two independent review lanes run: one textual/source-read lane and one behavioral/replay lane;
+8. both lanes return `VERDICT: APPROVE` or `VERDICT: APPROVE-WITH-AMENDMENTS-MET` before push.
+
+Implementation authority is part of eligibility. The target commit must be created before review as an operator-owned local commit or an explicitly operator-supervised driver-lane local commit. No hc-worker, worker execution packet, intake snapshot, or bounded-reopen authority is implied. If a worker, worker packet, target-side product semantics, or bounded file is needed, use an ordinary slice cycle.
+
+Required dispatch metadata:
+
+- phase number and short subject;
+- base SHA and target SHA;
+- declared file scope;
+- implementation authoring mode (`operator-local` or `operator-supervised-driver`) and actor;
+- reason the change is behaviorally inert and a full slice cycle is out of proportion;
+- commands or evidence expected from the behavioral lane;
+- commands that remain operator-only or out of scope.
+
+Required artifacts:
+
+- one textual artifact in the reviewer-owning repo at `.omx/artifacts/claude-phase-<phase>-microreview-YYYY-MM-DD(-rN).md`, unless the dispatch names a different canonical path;
+- one behavioral artifact in the reviewer-owning repo at `.omx/artifacts/codex-phase-<phase>-microreview-YYYY-MM-DD(-rN).md`, unless the dispatch names a different canonical path;
+- both artifacts must include target/base SHAs, declared scope, implementation authoring mode, review execution mode, verdict line using the standard `VERDICT:` vocabulary, and any commands intentionally not run;
+- r2 and later rounds use the same original date with `-r2`, `-r3`, ... suffixes; the latest suffix is operative for that lane;
+- byte-identical mirrors into the target repo are permitted but optional; the close-out must cite the canonical path and SHA-256 for each lane.
+
+Allowed outcomes:
+
+- both lanes approve r1: operator may push immediately and close out the micro-cycle;
+- either lane returns findings: fold within the micro-cycle, then run an r2 micro-review limited to the fold;
+- either lane finds product/runtime behavior or authority-surface change: stop the micro-cycle and reclassify as an ordinary slice or charter cycle.
+
+Micro-cycles do not replace slice approval, Gate 1, or Gate 2 for product work. They are explicitly unavailable for worker-implemented feature slices, normative governance amendments, and any change that needs a locked spec, committed PLAN/TODOS authority, or worker execution packet.
+
+Origin: Phase 4.14 smoke-helper extraction (`8b1aef9..b1a904d`) reviewed by hc-Claude textual lane and hc-Codex behavioral lane, both approving r1, with no runtime product file diff and no `report:run` / real Telegram execution.
 
 ## 8. One-line summary
 
@@ -402,6 +447,33 @@ Use this table for prompt directives, static guardrails, constants, and negative
 
 **How to apply**: before dispatching slice-approval, sweep the draft's acceptance criteria for runtime-observable MUST/SHOULD clauses. For each, add a smoke mapping row or an explicit infeasibility note. If one instance of a clause class is mapped, sweep for all other instances of the same class before dispatch.
 
+Static guardrail helper extraction is allowed and encouraged when multiple smokes enforce the same conceptual forbidden surface.
+
+Extraction must be coverage-preserving or coverage-raising:
+
+1. each old inline pattern's realistic regression vector remains covered;
+2. if patterns differ across smokes, the shared catalog should normalize to the strongest defensible coverage rather than the weakest common subset;
+3. false-positive reduction is acceptable only when real regression vectors remain covered;
+4. the review should explicitly check for regex narrowing on import aliases, path aliases, alternate import grammar, and runtime-specific spellings;
+5. helper labels may become more specific, but any external consumer of label strings must be identified before the label changes.
+
+Shared static catalogs should separate concept classes. For example:
+
+- prompt-producing surface (`buildPrompt`, `.runPrompt(`, prompt-file imports, sentinel delimiters);
+- LLM provider imports;
+- process-spawn surfaces (`node:child_process`, `child_process`, `Bun.spawn`, `spawnSync`, `execFile`, `execSync`);
+- real-network surfaces (`api.telegram.org`, raw `fetch` to Telegram, real SDK constructors);
+- operator-only command surfaces (`report:run`).
+
+Stable feature guardrails and volatile per-cycle scope guards should be separate when practical:
+
+- stable feature guard: checks the permanent invariant for a product surface, such as "bot runtime has no command handlers yet" or "notifier has no Telegram SDK import";
+- per-cycle scope guard: checks that the current cycle touched only the declared files relative to a stated base SHA.
+
+Do not hide a per-cycle base SHA and declared scope inside a long-lived feature smoke unless the cycle intentionally owns updating those values. If a feature smoke must carry per-cycle scope temporarily, the close-out should record whether a dedicated cycle-scope smoke or reusable helper is warranted.
+
+Origin: Phase 4.14 extracted `scripts/lib/static-guardrails.ts` after repeated boundary-static-check omissions across Slice 4.6 and Slice 4.7. The extraction preserved smoke counts while centralizing prompt/process/Telegram guardrails and widening process-spawn coverage.
+
 ### 9.11 Pre-relay fold compression and fold-to-layer discipline
 
 **Rule**: for framework, framework-conservative, borderline, high-surface handler, or charter-amendment cycles, the operator SHOULD use a pre-relay fold pass before formal dispatch when a planning lane is available.
@@ -430,6 +502,10 @@ Close-out should record a compression metric: r1 finding count -> unique fold en
 - Slice 4.5 Gate 1: `9 -> 5 -> 1 -> 0`.
 - Slice 4.6 slice approval: `5 -> 5 -> 1 -> 0`.
 - Slice 4.6 Gate 1: `3 -> 1 -> 1 -> 0`.
+- Slice 4.7 Gate 1: `4 -> 4 -> 1 -> 0` (hc-Claude 3 findings + hc-Codex 1 finding; one atomic intra-scope fold; both lanes r2 clean).
+- Phase 4.14 review-only micro-cycle: `1 -> 1 -> 0 -> 0` (one LOW non-blocking forward observation carried as a disposition entry; no fold cycle and no r2 required); r1 dual-lane approve.
+
+For micro-cycles, record carried forward observations as disposition entries when they are reviewed and accepted rather than silently excluded from the metric. A LOW finding explicitly carried as a forward observation is not an r2 residual if the approving reviewer labels it non-blocking and the operator accepts that disposition in close-out.
 
 **How to apply**: pre-relay analysis should identify likely reviewer flags, not pre-decide them. Formal reviewers remain free to raise different severities. Divergence between pre-relay severity and in-cycle severity is expected because pre-relay is fold-design assistance, not a gate.
 
@@ -486,6 +562,37 @@ Draft-only status:
 - A draft that includes bounded reopen should also specify how the committed PLAN.md/TODOS.md line and intake snapshot will carry it.
 
 **Origin**: Slice 4.1 + Slice 4.3 impl-time bounded `src/bin/report-run.ts` reopen, Slice 4.4 draft-time predeclaration, v3.5 H1/M-r1-1 Path B deferral, and Slice 4.5/4.6 deferral preservation.
+
+### 9.13 Cross-slice learning tags and corpus-to-structural-fix loop
+
+When a finding class recurs across slices or gates, review artifacts SHOULD add a compact learning tag block:
+
+| Field | Value |
+|---|---|
+| finding_class | short class name |
+| source_slice | slice or phase where observed |
+| residual_risk | low / medium / high |
+| promotion_candidate | yes / no / maybe |
+
+Optional extra fields may include `escalation_evidence`, `related_slice`, or `suggested_structural_fix` when the recurrence points to a specific helper, rule, or workflow change.
+
+Learning tags are not findings by themselves. They are corpus-index entries that help close-outs decide whether an observation has crossed from local fix to structural pattern.
+
+Promotion criteria:
+
+- one high-severity recurrence with the same class and surface; or
+- two medium/low recurrences across distinct slices or gates; or
+- one recurrence plus a successful structural fix that has shipped, been reviewed, and eliminated the omission vector.
+
+When a learning tag is promoted, the next close-out should choose one disposition:
+
+1. Fold now as a micro-cycle when the fix is behaviorally inert, non-product, and outside operative governance authority surfaces.
+2. Fold now as a charter or operating-model amendment when the fix changes normative governance, reviewer gates, worker authority, operator-only boundaries, or committed file-scope rules.
+3. Fold into the next product slice when the fix naturally belongs to that slice's declared scope.
+4. Carry forward with an explicit threshold if more evidence is needed.
+5. Reject or retire with canonical-source evidence.
+
+Origin: Slice 4.7 Gate 1 introduced Cross-Slice Learning Tags for `boundary-static-check`; Phase 4.13 close-out promoted the recurrence; Phase 4.14 implemented a shared static guardrail helper within hours. This is the first canonical corpus-to-structural-fix loop: the corpus did not merely describe a pattern, it directly caused a structural refactor.
 
 ## Out of scope for this doc
 
