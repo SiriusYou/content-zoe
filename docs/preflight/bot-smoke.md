@@ -1,9 +1,9 @@
 # Bot Smoke Evidence
 
 - Command: `bun run bot-smoke`
-- Started: 2026-05-06T04:27:05.913Z
-- Finished: 2026-05-06T04:27:06.063Z
-- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T04-27-05.912Z (removed by finally-cleanup)
+- Started: 2026-05-06T04:33:26.621Z
+- Finished: 2026-05-06T04:33:26.747Z
+- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T04-33-26.621Z (removed by finally-cleanup)
 - Result: 42/42 PASS
 
 ## Evidence Ceiling
@@ -54,5 +54,5 @@ This smoke exercises deterministic allowlist parsing, injected bot runtime seams
 | no-status-handler | PASS | Changed command surfaces register /approve and /reject while containing no /status handler or placeholder. |
 | boundary-static-check | PASS | Stable base/status scope check saw only declared files: docs/preflight/bot-smoke.md, scripts/bot-smoke.ts, scripts/lib/static-guardrails.ts, src/promote.ts, src/telegram/bot.ts, src/telegram/commands.ts.<br>Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.<br>Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and git post-step concept-class coverage is active. |
 | dependency-boundary-check | PASS | Telegram SDK/network concept-class checks are shared and absent from notifier.ts, commands.ts, and promote.ts.<br>package.json exposes only the expected bot runtime and bot-smoke command surfaces for this slice. |
-| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T04-27-05.912Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
+| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T04-33-26.621Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
 | no-preflight-codex-survivability | PASS | Bot, allowlist, and command surfaces have no preflight, Codex smoke, LLM, prompt, process-spawn, or report-run execution dependency. |
