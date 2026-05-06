@@ -8,7 +8,8 @@ import {
   type NotifyPendingApprovalsResult,
 } from "./notifier.ts";
 import { parseOperatorChatIds } from "./allowlist.ts";
-import { handleRejectCommand } from "./commands.ts";
+import { handleApproveCommand, handleRejectCommand } from "./commands.ts";
+import type { GitCommitter, PromoteJobHooks } from "../promote.ts";
 
 export const TELEGRAM_BOT_TOKEN_ENV = "TELEGRAM_BOT_TOKEN";
 export const OPERATOR_CHAT_IDS_ENV = "OPERATOR_CHAT_IDS";
@@ -20,6 +21,7 @@ export interface BotConfig {
   readonly operatorChatIds: readonly number[];
   readonly dbPath: string;
   readonly tickIntervalMs: number;
+  readonly cwd?: string;
 }
 
 export interface BotConfigFailure {
@@ -51,7 +53,7 @@ export interface TelegramHttpTransportOptions {
   readonly apiRoot?: string;
 }
 
-export type TelegramCommandName = "reject";
+export type TelegramCommandName = "approve" | "reject";
 
 export interface TelegramCommandContext {
   readonly chatId: number;
@@ -117,6 +119,9 @@ export interface StartBotRuntimeOptions {
   readonly timer?: RuntimeTimer;
   readonly onTickError?: (err: unknown) => void;
   readonly onCommandError?: (err: unknown) => void;
+  readonly cwd?: string;
+  readonly committer?: GitCommitter;
+  readonly publishHooks?: PromoteJobHooks;
 }
 
 export interface BotRuntime {
@@ -172,6 +177,7 @@ export function loadBotConfig(options: LoadBotConfigOptions = {}): BotConfigResu
       operatorChatIds: allowlist.chatIds,
       dbPath: options.dbPath ?? defaultBotDbPath(cwd),
       tickIntervalMs,
+      cwd,
     },
   };
 }
@@ -318,6 +324,40 @@ export interface RegisterRejectCommandOptions {
   readonly now: () => number;
 }
 
+export interface RegisterApproveCommandOptions {
+  readonly dbPath: string;
+  readonly operatorChatIds: readonly number[];
+  readonly openDb: (dbPath: string) => DbClient;
+  readonly cwd: string;
+  readonly now: () => number;
+  readonly committer?: GitCommitter;
+  readonly publishHooks?: PromoteJobHooks;
+}
+
+export function registerApproveCommand(
+  commandTransport: TelegramCommandTransport,
+  options: RegisterApproveCommandOptions,
+): void {
+  commandTransport.onCommand("approve", async (context) => {
+    const db = options.openDb(options.dbPath);
+    try {
+      await handleApproveCommand({
+        db,
+        text: context.text,
+        chatId: context.chatId,
+        operatorChatIds: options.operatorChatIds,
+        cwd: options.cwd,
+        now: options.now,
+        committer: options.committer,
+        publishHooks: options.publishHooks,
+        reply: (text) => context.reply(text),
+      });
+    } finally {
+      db.close();
+    }
+  });
+}
+
 export function registerRejectCommand(
   commandTransport: TelegramCommandTransport,
   options: RegisterRejectCommandOptions,
@@ -379,6 +419,7 @@ export function startBotRuntime(options: StartBotRuntimeOptions = {}): BotRuntim
   }
 
   const config = configResult.config;
+  const cwd = config.cwd ?? options.cwd ?? process.cwd();
   const openDb = options.openDb ?? defaultOpenDb;
   const now = options.now ?? (() => Math.floor(Date.now() / 1000));
   const transport = options.transport ?? createTelegramHttpTransport({ token: config.token });
@@ -412,6 +453,15 @@ export function startBotRuntime(options: StartBotRuntimeOptions = {}): BotRuntim
       timer,
       onError: onCommandError,
     });
+  registerApproveCommand(commandTransport, {
+    dbPath: config.dbPath,
+    operatorChatIds: config.operatorChatIds,
+    openDb,
+    cwd,
+    now,
+    committer: options.committer,
+    publishHooks: options.publishHooks,
+  });
   registerRejectCommand(commandTransport, {
     dbPath: config.dbPath,
     operatorChatIds: config.operatorChatIds,
@@ -444,7 +494,14 @@ interface TelegramUpdate {
 }
 
 function commandNameFromText(text: string): TelegramCommandName | null {
-  return /^\/reject(?:@\w+)?(?:\s|$)/.test(text.trim()) ? "reject" : null;
+  const trimmed = text.trim();
+  if (/^\/approve(?:@\w+)?(?:\s|$)/.test(trimmed)) {
+    return "approve";
+  }
+  if (/^\/reject(?:@\w+)?(?:\s|$)/.test(trimmed)) {
+    return "reject";
+  }
+  return null;
 }
 
 function defaultRuntimeTimer(): RuntimeTimer {

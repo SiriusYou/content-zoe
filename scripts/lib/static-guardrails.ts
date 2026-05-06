@@ -25,6 +25,21 @@ export const TELEGRAM_SDK_IMPORT_PATTERNS: readonly ForbiddenPattern[] = [
   [/from ["'](?:grammy|telegraf)["']|require\(["'](?:grammy|telegraf)["']\)/, "real Telegram SDK import"],
 ];
 
+export const TELEGRAM_SDK_NETWORK_PATTERNS: readonly ForbiddenPattern[] = [
+  ...TELEGRAM_SDK_IMPORT_PATTERNS,
+  [/\b(?:Bot|Telegraf)\b|\bnew\s+(?:Bot|Telegraf)\s*\(/, "Telegram SDK constructor/runtime"],
+  [/\.(?:command|hears|launch)\s*\(/, "Telegram SDK runtime registration"],
+  [/https:\/\/api\.telegram\.org|apiRoot.*api\.telegram\.org/, "Telegram API URL surface"],
+  [/\bfetch\s*\(/, "network fetch surface"],
+  [/\bsendMessage\b|\bgetUpdates\b/, "Telegram API method surface"],
+];
+
+export const GIT_POST_STEP_PATTERNS: readonly ForbiddenPattern[] = [
+  [/\bbuildGitCommitPlan\b|\bGitCommitPlan\b|\bGitCommitter\b/, "git post-step seam"],
+  [/["']git["']\s*,\s*["']add["']\s*,\s*["']--["']/, "git add path-bounded argv"],
+  [/["']git["']\s*,\s*["']commit["'][\s\S]*["']--["']/, "git commit pathspec-bounded argv"],
+];
+
 export function readRepoSource(repoRoot: string, relativePath: string): string {
   return readFileSync(resolve(repoRoot, relativePath), "utf8");
 }

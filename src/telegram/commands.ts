@@ -5,7 +5,15 @@ import {
   type DbClient,
   type Job,
 } from "../db.ts";
+import {
+  PromoteError,
+  promoteJob,
+  type GitCommitter,
+  type PromoteJobHooks,
+  type PromoteJobResult,
+} from "../promote.ts";
 
+export const APPROVE_COMMAND = "approve";
 export const REJECT_COMMAND = "reject";
 export const REJECT_REASON_MAX_CHARS = 500;
 
@@ -26,6 +34,36 @@ export type RejectCommandErrorCode =
   | "STALE_ATTEMPT"
   | "STATUS_MISMATCH"
   | "REJECT_RACE_LOST";
+
+export type ApproveCommandErrorCode =
+  | "INVALID_COMMAND"
+  | "UNKNOWN_JOB"
+  | "STALE_ATTEMPT"
+  | "STATUS_MISMATCH"
+  | "PUBLISH_SOURCE_MISSING"
+  | "PUBLISH_ARTIFACT_DIVERGED"
+  | "APPROVE_RACE_LOST"
+  | "PUBLISH_FAILED";
+
+export interface ParsedApproveCommand {
+  readonly jobId: string;
+  readonly attemptNumber: number;
+}
+
+export interface ParseApproveCommandSuccess {
+  readonly ok: true;
+  readonly command: ParsedApproveCommand;
+}
+
+export interface ParseApproveCommandFailure {
+  readonly ok: false;
+  readonly code: Extract<ApproveCommandErrorCode, "INVALID_COMMAND">;
+  readonly jobId?: string;
+}
+
+export type ParseApproveCommandResult =
+  | ParseApproveCommandSuccess
+  | ParseApproveCommandFailure;
 
 export interface ParsedRejectCommand {
   readonly jobId: string;
@@ -63,6 +101,18 @@ export interface RejectCommandDependencies {
   readonly beforeCas?: (job: Job, command: ParsedRejectCommand) => Promise<void> | void;
 }
 
+export interface ApproveCommandDependencies {
+  readonly db: DbClient;
+  readonly text: string;
+  readonly chatId: number;
+  readonly operatorChatIds: readonly number[];
+  readonly cwd: string;
+  readonly now: () => number;
+  readonly reply: (text: string) => Promise<void> | void;
+  readonly committer?: GitCommitter;
+  readonly publishHooks?: PromoteJobHooks;
+}
+
 export interface RejectCommandResult {
   readonly status:
     | "rejected"
@@ -73,10 +123,23 @@ export interface RejectCommandResult {
   readonly replyText?: string;
 }
 
+export interface ApproveCommandResult {
+  readonly status:
+    | "published"
+    | "idempotent"
+    | "error"
+    | "unauthorized_audited"
+    | "unauthorized_ignored";
+  readonly code?: ApproveCommandErrorCode;
+  readonly replyText?: string;
+  readonly publishResult?: PromoteJobResult;
+}
+
 const awaitingApprovalStatus = "awaiting_approval";
 const queuedStatus = "queued";
 const rejectedEventType = "rejected";
 const unauthorizedEventType = "unauthorized";
+const approveCommandPattern = /^\/approve(?:@\w+)?(?:\s+(\S+))?(?:\s+(\S+))?(?:\s+(\S+))?$/;
 const rejectCommandPattern = /^\/reject(?:@\w+)?(?:\s+(\S+))?(?:\s+(\S+))?(?:\s+(\S+))?(?:\s+([\s\S]*))?$/;
 const positiveIntegerPattern = /^\d+$/;
 const rejectScopes = ["en", "zh", "bundle"] as const;
@@ -97,6 +160,39 @@ const validScopeTypes: Readonly<Record<RejectType, readonly RejectScope[]>> = {
   translation_off: ["zh"],
   other: ["en", "zh", "bundle"],
 };
+
+export function parseApproveCommand(text: string): ParseApproveCommandResult {
+  const match = approveCommandPattern.exec(text.trim());
+  if (!match) {
+    return parseApproveRecoverableJobId(text);
+  }
+
+  const [, jobId, attemptToken, extraToken] = match;
+  if (jobId === undefined) {
+    return { ok: false, code: "INVALID_COMMAND" };
+  }
+
+  if (
+    attemptToken === undefined ||
+    extraToken !== undefined ||
+    !positiveIntegerPattern.test(attemptToken)
+  ) {
+    return { ok: false, code: "INVALID_COMMAND", jobId };
+  }
+
+  const attemptNumber = Number(attemptToken);
+  if (!Number.isSafeInteger(attemptNumber) || attemptNumber < 1) {
+    return { ok: false, code: "INVALID_COMMAND", jobId };
+  }
+
+  return {
+    ok: true,
+    command: {
+      jobId,
+      attemptNumber,
+    },
+  };
+}
 
 export function parseRejectCommand(text: string): ParseRejectCommandResult {
   const match = rejectCommandPattern.exec(text.trim());
@@ -154,6 +250,66 @@ export function parseRejectCommand(text: string): ParseRejectCommandResult {
       reason: reason.length === 0 ? null : reason,
     },
   };
+}
+
+export async function handleApproveCommand(
+  dependencies: ApproveCommandDependencies,
+): Promise<ApproveCommandResult> {
+  const parsed = parseApproveCommand(dependencies.text);
+  const authorized = isAllowedChatId(
+    dependencies.operatorChatIds,
+    dependencies.chatId,
+  );
+
+  if (!parsed.ok) {
+    if (authorized) {
+      return replyWithApproveError(dependencies, parsed.code, parsed.jobId);
+    }
+    return { status: "unauthorized_ignored" };
+  }
+
+  if (!authorized) {
+    const job = findJobById(dependencies.db, parsed.command.jobId);
+    if (job === null) {
+      return { status: "unauthorized_ignored" };
+    }
+
+    insertEvent(dependencies.db, {
+      job_id: job.id,
+      attempt_number: job.attempt_number,
+      type: unauthorizedEventType,
+      payload: JSON.stringify({
+        command: APPROVE_COMMAND,
+        chat_id: dependencies.chatId,
+      }),
+      created_at: dependencies.now(),
+    });
+    return { status: "unauthorized_audited" };
+  }
+
+  try {
+    const publishResult = await promoteJob({
+      db: dependencies.db,
+      cwd: dependencies.cwd,
+      jobId: parsed.command.jobId,
+      attemptNumber: parsed.command.attemptNumber,
+      now: dependencies.now,
+      committer: dependencies.committer,
+      hooks: dependencies.publishHooks,
+    });
+    const replyText = approveSuccessReply(publishResult);
+    await dependencies.reply(replyText);
+    return {
+      status: publishResult.status,
+      replyText,
+      publishResult,
+    };
+  } catch (err) {
+    if (err instanceof PromoteError) {
+      return replyWithApproveError(dependencies, err.code, err.jobId ?? parsed.command.jobId);
+    }
+    throw err;
+  }
 }
 
 export function isValidRejectScopeType(
@@ -321,6 +477,23 @@ async function replyWithError(
   return { status: "error", code, replyText };
 }
 
+async function replyWithApproveError(
+  dependencies: ApproveCommandDependencies,
+  code: ApproveCommandErrorCode,
+  jobId?: string,
+): Promise<ApproveCommandResult> {
+  const replyText = formatApproveErrorReply(code, jobId);
+  await dependencies.reply(replyText);
+  return { status: "error", code, replyText };
+}
+
+export function formatApproveErrorReply(
+  code: ApproveCommandErrorCode,
+  jobId?: string,
+): string {
+  return jobId === undefined ? code : `${code}: ${jobId}`;
+}
+
 export function formatRejectErrorReply(
   code: RejectCommandErrorCode,
   jobId?: string,
@@ -332,6 +505,14 @@ export function rejectSuccessReply(command: ParsedRejectCommand): string {
   return `Rejected attempt ${command.attemptNumber}. Run \`bun run report:run ${command.jobId}\` to start attempt ${command.attemptNumber + 1} from ${rewindStageForScope(command.scope)}.`;
 }
 
+export function approveSuccessReply(result: PromoteJobResult): string {
+  const note =
+    result.gitCommitFailed === undefined
+      ? ""
+      : ` Git post-step failed non-blocking: ${result.gitCommitFailed}`;
+  return `Approved attempt ${result.attemptNumber}. Published ${result.jobId} to ${result.artifactDir}/.${note}`;
+}
+
 export function rewindStageForScope(scope: RejectScope): "draft_en" | "translate_zh" {
   return scope === "zh" ? "translate_zh" : "draft_en";
 }
@@ -341,6 +522,18 @@ function isAllowedChatId(
   chatId: number,
 ): boolean {
   return operatorChatIds.includes(chatId);
+}
+
+function parseApproveRecoverableJobId(text: string): ParseApproveCommandFailure {
+  const tokens = text.trim().split(/\s+/).filter(Boolean);
+  const commandToken = tokens[0];
+  if (commandToken === undefined || !/^\/approve(?:@\w+)?$/.test(commandToken)) {
+    return { ok: false, code: "INVALID_COMMAND" };
+  }
+  const jobId = tokens[1];
+  return jobId === undefined
+    ? { ok: false, code: "INVALID_COMMAND" }
+    : { ok: false, code: "INVALID_COMMAND", jobId };
 }
 
 function isRejectScope(value: string): value is RejectScope {

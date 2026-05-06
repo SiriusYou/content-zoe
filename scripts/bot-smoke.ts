@@ -1,4 +1,10 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +17,9 @@ import {
   changedFilesAgainstBase as getChangedFilesAgainstBase,
   PROCESS_SPAWN_PATTERNS,
   PROMPT_SURFACE_PATTERNS,
+  GIT_POST_STEP_PATTERNS,
   TELEGRAM_SDK_IMPORT_PATTERNS,
+  TELEGRAM_SDK_NETWORK_PATTERNS,
   readRepoSource,
   type ForbiddenPattern,
 } from "./lib/static-guardrails.ts";
@@ -38,16 +46,25 @@ import {
   type TelegramTransport,
 } from "../src/telegram/bot.ts";
 import {
+  approveSuccessReply,
+  formatApproveErrorReply,
   REJECT_REASON_MAX_CHARS,
   formatRejectErrorReply,
+  handleApproveCommand,
   handleRejectCommand,
   isValidRejectScopeType,
+  parseApproveCommand,
   parseRejectCommand,
   rejectSuccessReply,
   rewindStageForScope,
   type RejectScope,
   type RejectType,
 } from "../src/telegram/commands.ts";
+import {
+  buildGitCommitPlan,
+  promoteJob,
+  type GitCommitPlan,
+} from "../src/promote.ts";
 import type {
   ApprovalNotification,
   NotifyPendingApprovalsResult,
@@ -73,8 +90,25 @@ type ScenarioName =
   | "reject-unauthorized-known-job"
   | "reject-unauthorized-unknown-job"
   | "reject-allowlisted-malformed-visible"
+  | "approve-command-parse"
+  | "approve-malformed-jobid-preserved"
+  | "approve-unauthorized-known-job"
+  | "approve-unauthorized-unknown-job"
+  | "approve-unknown-job-visible"
+  | "approve-stale-attempt"
+  | "approve-status-mismatch"
+  | "approve-source-validation"
+  | "approve-success-publishes-bundle"
+  | "approve-idempotent-repromote"
+  | "approve-rename-before-db-recovery"
+  | "approve-rename-succeeded-cas-lost"
+  | "approve-checksum-divergence-refused"
+  | "approve-duplicate-prevention"
+  | "approve-race-lost-after-read"
+  | "approve-runs-cleanup"
+  | "approve-git-commit-failure-nonblocking"
   | "bot-command-wiring"
-  | "no-approve-or-status-handler"
+  | "no-status-handler"
   | "boundary-static-check"
   | "dependency-boundary-check"
   | "bot-db-path-cwd"
@@ -108,8 +142,25 @@ const SCENARIOS: readonly ScenarioName[] = [
   "reject-unauthorized-known-job",
   "reject-unauthorized-unknown-job",
   "reject-allowlisted-malformed-visible",
+  "approve-command-parse",
+  "approve-malformed-jobid-preserved",
+  "approve-unauthorized-known-job",
+  "approve-unauthorized-unknown-job",
+  "approve-unknown-job-visible",
+  "approve-stale-attempt",
+  "approve-status-mismatch",
+  "approve-source-validation",
+  "approve-success-publishes-bundle",
+  "approve-idempotent-repromote",
+  "approve-rename-before-db-recovery",
+  "approve-rename-succeeded-cas-lost",
+  "approve-checksum-divergence-refused",
+  "approve-duplicate-prevention",
+  "approve-race-lost-after-read",
+  "approve-runs-cleanup",
+  "approve-git-commit-failure-nonblocking",
   "bot-command-wiring",
-  "no-approve-or-status-handler",
+  "no-status-handler",
   "boundary-static-check",
   "dependency-boundary-check",
   "bot-db-path-cwd",
@@ -122,15 +173,14 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
-const targetBase = "92bc6ced1755f5d1d3b222ebe336f7b247eef5a1";
+const targetBase = "c6dd0123ed52326d4202b4b164e44bd6bd58a1de";
 const declaredScope = new Set([
+  "src/promote.ts",
   "src/telegram/commands.ts",
   "src/telegram/bot.ts",
   "scripts/bot-smoke.ts",
+  "scripts/lib/static-guardrails.ts",
   "docs/preflight/bot-smoke.md",
-  "package.json",
-  "bun.lock",
-  "bun.lockb",
 ]);
 
 const rejectScopes = ["en", "zh", "bundle"] as const satisfies readonly RejectScope[];
@@ -236,10 +286,44 @@ async function scenarioImpl(
       return runRejectUnauthorizedUnknownJob(dir);
     case "reject-allowlisted-malformed-visible":
       return runRejectAllowlistedMalformedVisible(dir);
+    case "approve-command-parse":
+      return runApproveCommandParse();
+    case "approve-malformed-jobid-preserved":
+      return runApproveMalformedJobIdPreserved(dir);
+    case "approve-unauthorized-known-job":
+      return runApproveUnauthorizedKnownJob(dir);
+    case "approve-unauthorized-unknown-job":
+      return runApproveUnauthorizedUnknownJob(dir);
+    case "approve-unknown-job-visible":
+      return runApproveUnknownJobVisible(dir);
+    case "approve-stale-attempt":
+      return runApproveStaleAttempt(dir);
+    case "approve-status-mismatch":
+      return runApproveStatusMismatch(dir);
+    case "approve-source-validation":
+      return runApproveSourceValidation(dir);
+    case "approve-success-publishes-bundle":
+      return runApproveSuccessPublishesBundle(dir);
+    case "approve-idempotent-repromote":
+      return runApproveIdempotentRepromote(dir);
+    case "approve-rename-before-db-recovery":
+      return runApproveRenameBeforeDbRecovery(dir);
+    case "approve-rename-succeeded-cas-lost":
+      return runApproveRenameSucceededCasLost(dir);
+    case "approve-checksum-divergence-refused":
+      return runApproveChecksumDivergenceRefused(dir);
+    case "approve-duplicate-prevention":
+      return runApproveDuplicatePrevention(dir);
+    case "approve-race-lost-after-read":
+      return runApproveRaceLostAfterRead(dir);
+    case "approve-runs-cleanup":
+      return runApproveRunsCleanup(dir);
+    case "approve-git-commit-failure-nonblocking":
+      return runApproveGitCommitFailureNonblocking(dir);
     case "bot-command-wiring":
       return runBotCommandWiring(dir);
-    case "no-approve-or-status-handler":
-      return runNoApproveOrStatusHandler();
+    case "no-status-handler":
+      return runNoStatusHandler();
     case "boundary-static-check":
       return runBoundaryStaticCheck();
     case "dependency-boundary-check":
@@ -983,11 +1067,742 @@ async function runRejectAllowlistedMalformedVisible(dir: string): Promise<string
   }
 }
 
+function runApproveCommandParse(): string[] {
+  const parsed = parseApproveCommand("/approve publish-job 1");
+  assert(parsed.ok, "canonical approve command did not parse");
+  assert(parsed.command.jobId === "publish-job", "approve job ID was not parsed");
+  assert(parsed.command.attemptNumber === 1, "approve attempt was not parsed");
+  assert(
+    approveSuccessReply({
+      status: "published",
+      jobId: "publish-job",
+      attemptNumber: 1,
+      artifactDir: "reports/2026-W18-ai-trends",
+      manifest: fakeManifest("publish-job", 1, "reports/2026-W18-ai-trends"),
+    }) ===
+      "Approved attempt 1. Published publish-job to reports/2026-W18-ai-trends/.",
+    "approve success reply literal drifted",
+  );
+
+  const botMention = parseApproveCommand("/approve@content_zoe_bot publish-job 2");
+  assert(botMention.ok, "bot-mentioned approve command did not parse");
+  assert(botMention.command.attemptNumber === 2, "bot mention attempt drifted");
+
+  const invalidInputs = [
+    "/approve",
+    "/approve publish-job",
+    "/approve publish-job nope",
+    "/approve publish-job 0",
+    "/approve publish-job -1",
+    "/approve publish-job 9007199254740992",
+    "/approve publish-job 1 extra",
+  ];
+  for (const input of invalidInputs) {
+    assert(!parseApproveCommand(input).ok, `invalid approve command parsed: ${input}`);
+  }
+
+  return [
+    "Canonical /approve and bot-mentioned /approve parsed job ID plus positive safe-integer attempt.",
+    "Missing, malformed, zero/negative, unsafe, and extra-token variants were rejected.",
+  ];
+}
+
+async function runApproveMalformedJobIdPreserved(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    const missingAttempt = parseApproveCommand("/approve publish-job");
+    const badAttempt = parseApproveCommand("/approve publish-job nope");
+    const extra = parseApproveCommand("/approve publish-job 1 extra");
+    const bare = parseApproveCommand("/approve");
+    assert(!missingAttempt.ok && missingAttempt.jobId === "publish-job", "missing attempt did not preserve job ID");
+    assert(!badAttempt.ok && badAttempt.jobId === "publish-job", "bad attempt did not preserve job ID");
+    assert(!extra.ok && extra.jobId === "publish-job", "extra token did not preserve job ID");
+    assert(!bare.ok && bare.jobId === undefined, "bare approve invented a job ID");
+
+    const replies: string[] = [];
+    await handleApproveCommand({
+      db,
+      text: "/approve publish-job",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 8_700_000_000,
+      reply: (text) => replies.push(text),
+    });
+    await handleApproveCommand({
+      db,
+      text: "/approve",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 8_700_000_001,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(
+      replies[0] === formatApproveErrorReply("INVALID_COMMAND", "publish-job"),
+      "malformed approve with parseable job did not include job ID",
+    );
+    assert(
+      replies[1] === formatApproveErrorReply("INVALID_COMMAND"),
+      "bare approve did not receive bare INVALID_COMMAND",
+    );
+    assert(eventCount(db) === 0, "malformed allowlisted approve wrote an event");
+
+    return [
+      "Malformed /approve variants preserve a recoverable job ID in parser results and visible replies.",
+      "Bare /approve returns INVALID_COMMAND without inventing a job ID or writing an event.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveUnauthorizedKnownJob(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-unauthorized", {
+      run_dir: ".runs/approve-unauthorized",
+      week_key: "2026-W40",
+    });
+    writeAttemptBundle(dir, "approve-unauthorized", 1);
+    const replies: string[] = [];
+
+    const result = await handleApproveCommand({
+      db,
+      text: "/approve approve-unauthorized 1",
+      chatId: 999,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 8_800_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    const job = requireJob(db, "approve-unauthorized");
+    const unauthorizedEvents = findEventsByJob(db, "approve-unauthorized", "unauthorized");
+    assert(result.status === "unauthorized_audited", "known unauthorized approve was not audited");
+    assert(replies.length === 0, "unauthorized approve received a reply");
+    assert(job.status === "awaiting_approval", "unauthorized approve mutated job");
+    assert(!existsSync(resolve(dir, "reports", "2026-W40-ai-trends")), "unauthorized approve wrote reports");
+    assert(existsSync(resolve(dir, ".runs", "approve-unauthorized", "attempt-1")), "unauthorized approve deleted source");
+    assert(unauthorizedEvents.length === 1, "known unauthorized approve did not write one audit event");
+    const payload = JSON.parse(unauthorizedEvents[0]?.payload ?? "{}") as {
+      command?: string;
+      chat_id?: number;
+    };
+    assert(payload.command === "approve", "unauthorized approve payload omitted command");
+    assert(payload.chat_id === 999, "unauthorized approve payload omitted chat ID");
+
+    return [
+      "Unauthorized parseable known-job approve wrote one unauthorized event, sent no reply, and performed no filesystem or job mutation.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveUnauthorizedUnknownJob(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    const replies: string[] = [];
+    const result = await handleApproveCommand({
+      db,
+      text: "/approve missing-job 1",
+      chatId: 999,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 8_900_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(result.status === "unauthorized_ignored", "unknown unauthorized approve was not ignored");
+    assert(replies.length === 0, "unknown unauthorized approve received a reply");
+    assert(eventCount(db) === 0, "unknown unauthorized approve bypassed FK or wrote an event");
+    assert(!existsSync(resolve(dir, "reports")), "unknown unauthorized approve touched reports");
+
+    return [
+      "Unauthorized unknown-job approve sent no reply, wrote no event, and created no reports directory.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveUnknownJobVisible(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    const replies: string[] = [];
+    await handleApproveCommand({
+      db,
+      text: "/approve missing-job 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 9_100_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(replies[0] === "UNKNOWN_JOB: missing-job", "unknown-job reply was not visible with job ID");
+    assert(eventCount(db) === 0, "unknown job wrote an event");
+    assert(!existsSync(resolve(dir, "reports")), "unknown job touched reports");
+
+    return [
+      "Allowlisted unknown-job approve returned UNKNOWN_JOB with job ID and did not mutate DB/filesystem state.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveStaleAttempt(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-stale", {
+      attempt_number: 2,
+      run_dir: ".runs/approve-stale",
+      week_key: "2026-W41",
+    });
+    writeAttemptBundle(dir, "approve-stale", 2);
+    const replies: string[] = [];
+
+    await handleApproveCommand({
+      db,
+      text: "/approve approve-stale 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 9_200_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(replies[0]?.includes("STALE_ATTEMPT"), "stale approve reply omitted code");
+    assert(replies[0]?.includes("approve-stale"), "stale approve reply omitted job ID");
+    assert(findEventsByJob(db, "approve-stale").length === 0, "stale approve wrote event");
+    assert(!existsSync(resolve(dir, "reports", "2026-W41-ai-trends")), "stale approve published reports");
+    assert(existsSync(resolve(dir, ".runs", "approve-stale", "attempt-2")), "stale approve deleted source");
+
+    return [
+      "Mismatched approve attempts return STALE_ATTEMPT, include the job ID, and leave source/files/events untouched.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveStatusMismatch(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-status", {
+      status: "queued",
+      run_dir: ".runs/approve-status",
+      week_key: "2026-W42",
+    });
+    writeAttemptBundle(dir, "approve-status", 1);
+    const replies: string[] = [];
+
+    await handleApproveCommand({
+      db,
+      text: "/approve approve-status 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 9_300_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(replies[0]?.includes("STATUS_MISMATCH"), "status approve reply omitted code");
+    assert(findEventsByJob(db, "approve-status").length === 0, "status mismatch wrote event");
+    assert(requireJob(db, "approve-status").status === "queued", "status mismatch mutated job");
+    assert(!existsSync(resolve(dir, "reports", "2026-W42-ai-trends")), "status mismatch published reports");
+
+    return [
+      "Non-awaiting approve returns STATUS_MISMATCH and leaves DB/filesystem state untouched.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveSourceValidation(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    const cases = [
+      { jobId: "missing-en", weekKey: "2026-W43", omit: "report.en.md" },
+      { jobId: "missing-zh", weekKey: "2026-W44", omit: "report.zh.md" },
+      { jobId: "missing-sources", weekKey: "2026-W45", omit: "sources.json" },
+      { jobId: "missing-research", weekKey: "2026-W46", omit: "research" },
+    ] as const;
+
+    for (const scenario of cases) {
+      seedAwaitingJob(db, scenario.jobId, {
+        week_key: scenario.weekKey,
+        run_dir: `.runs/${scenario.jobId}`,
+      });
+      writeAttemptBundle(dir, scenario.jobId, 1, { omit: scenario.omit });
+      const replies: string[] = [];
+      await handleApproveCommand({
+        db,
+        text: `/approve ${scenario.jobId} 1`,
+        chatId: 123,
+        operatorChatIds: [123],
+        cwd: dir,
+        now: () => 9_400_000_000,
+        reply: (text) => replies.push(text),
+      });
+      assert(replies[0]?.includes("PUBLISH_SOURCE_MISSING"), `${scenario.omit} did not fail as missing source`);
+      assert(findEventsByJob(db, scenario.jobId).length === 0, `${scenario.omit} wrote event`);
+      assert(requireJob(db, scenario.jobId).status === "awaiting_approval", `${scenario.omit} mutated status`);
+      assert(existsSync(resolve(dir, ".runs", scenario.jobId, "attempt-1")), `${scenario.omit} deleted failed source`);
+      assert(!existsSync(resolve(dir, "reports", `${scenario.weekKey}-ai-trends`)), `${scenario.omit} published reports`);
+    }
+
+    return [
+      "Missing English, Chinese, sources.json, and research bundle artifacts each return PUBLISH_SOURCE_MISSING.",
+      "Failed source validation writes no events, preserves awaiting_approval, and keeps source attempts for forensics.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveSuccessPublishesBundle(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-success", {
+      week_key: "2026-W47",
+      run_dir: ".runs/approve-success",
+      primary_report_path: ".runs/approve-success/attempt-1/report.en.md",
+      translated_report_path: ".runs/approve-success/attempt-1/report.zh.md",
+      sources_path: ".runs/approve-success/attempt-1/sources.json",
+    });
+    writeAttemptBundle(dir, "approve-success", 1);
+    writeAttemptBundle(dir, "approve-success", 0);
+    const replies: string[] = [];
+    const plans: GitCommitPlan[] = [];
+
+    const result = await handleApproveCommand({
+      db,
+      text: "/approve approve-success 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 9_500_000_000,
+      committer: (plan) => {
+        plans.push(plan);
+        assertPathBoundedGitPlan(plan, "reports/2026-W47-ai-trends");
+      },
+      reply: (text) => replies.push(text),
+    });
+
+    const job = requireJob(db, "approve-success");
+    const promotedEvents = findEventsByJob(db, "approve-success", "promoted");
+    const manifest = promotedManifest(promotedEvents[0]);
+    assert(result.status === "published", "approve success did not report published");
+    assert(replies[0] === "Approved attempt 1. Published approve-success to reports/2026-W47-ai-trends/.", "approve success reply changed");
+    assert(job.status === "published", "job was not published");
+    assert(job.artifact_dir === "reports/2026-W47-ai-trends", "artifact_dir not stored");
+    assert(job.primary_report_path === ".runs/approve-success/attempt-1/report.en.md", "primary report metadata was not preserved");
+    assert(promotedEvents.length === 1, "expected exactly one promoted event");
+    assert(manifest.artifact_dir === "reports/2026-W47-ai-trends", "manifest artifact_dir missing");
+    assert(manifest.job_id === "approve-success", "manifest job ID missing");
+    assert(manifest.attempt_number === 1, "manifest attempt missing");
+    assertArrayEqualsString(
+      manifest.files,
+      ["report.en.md", "report.zh.md", "research/brief.md", "research/notes.md", "sources.json"],
+      "manifest file list",
+    );
+    assert(manifest.sha256["report.en.md"]?.length === 64, "manifest per-file sha missing");
+    assert(manifest.aggregate_sha256.length === 64, "manifest aggregate sha missing");
+    assert(readFileSync(resolve(dir, "reports", "2026-W47-ai-trends", "report.en.md"), "utf8").includes("approve-success"), "final EN report content missing");
+    assert(readFileSync(resolve(dir, "reports", "2026-W47-ai-trends", "report.zh.md"), "utf8").includes("Synthetic zh"), "final ZH report content missing");
+    assert(JSON.parse(readFileSync(resolve(dir, "reports", "2026-W47-ai-trends", "sources.json"), "utf8")).length === 1, "final sources not parseable");
+    assert(!existsSync(resolve(dir, ".runs", "approve-success", "attempt-1")), "approved attempt was not cleaned up");
+    assert(existsSync(resolve(dir, ".runs", "approve-success", "attempt-0")), "other attempt was removed");
+    assert(plans.length === 1, "fake committer did not receive one plan");
+
+    return [
+      "Allowed approve staged and atomically published reports, research, and sources into reports/2026-W47-ai-trends.",
+      "DB row is published with preserved report metadata and exactly one promoted event carrying the authoritative publish_manifest.",
+      "Only the approved attempt was cleaned up and fake git received a path-bounded plan.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveIdempotentRepromote(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-idempotent", {
+      week_key: "2026-W48",
+      run_dir: ".runs/approve-idempotent",
+    });
+    writeAttemptBundle(dir, "approve-idempotent", 1);
+    const firstReplies: string[] = [];
+    const secondReplies: string[] = [];
+
+    await handleApproveCommand({
+      db,
+      text: "/approve approve-idempotent 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 9_600_000_000,
+      reply: (text) => firstReplies.push(text),
+    });
+    assert(!existsSync(resolve(dir, ".runs", "approve-idempotent", "attempt-1")), "first publish did not clean source");
+
+    const result = await handleApproveCommand({
+      db,
+      text: "/approve approve-idempotent 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 9_600_000_001,
+      reply: (text) => secondReplies.push(text),
+    });
+
+    assert(result.status === "idempotent", "second approve after cleanup was not idempotent");
+    assert(secondReplies[0] === "Approved attempt 1. Published approve-idempotent to reports/2026-W48-ai-trends/.", "idempotent reply changed");
+    assert(findEventsByJob(db, "approve-idempotent", "promoted").length === 1, "idempotent re-promote wrote duplicate promoted event");
+
+    return [
+      "Repeated approve after .runs cleanup succeeded by comparing reports/ against promoted publish_manifest.",
+      "The no-op re-promote wrote no duplicate promoted event.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveRenameBeforeDbRecovery(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-crash", {
+      week_key: "2026-W49",
+      run_dir: ".runs/approve-crash",
+    });
+    writeAttemptBundle(dir, "approve-crash", 1);
+    let threw = false;
+    try {
+      await promoteJob({
+        db,
+        cwd: dir,
+        jobId: "approve-crash",
+        attemptNumber: 1,
+        now: () => 9_700_000_000,
+        hooks: {
+          afterFinalRename() {
+            throw new Error("simulated crash after rename");
+          },
+        },
+      });
+    } catch (err) {
+      threw = err instanceof Error && err.message.includes("publish failed");
+    }
+
+    assert(threw, "crash injection did not throw");
+    assert(existsSync(resolve(dir, "reports", "2026-W49-ai-trends")), "rename-before-DB crash did not leave final dir");
+    assert(requireJob(db, "approve-crash").status === "awaiting_approval", "crash mutated DB");
+    assert(findEventsByJob(db, "approve-crash", "promoted").length === 0, "crash wrote promoted event");
+    assert(existsSync(resolve(dir, ".runs", "approve-crash", "attempt-1")), "crash deleted source");
+
+    const replies: string[] = [];
+    await handleApproveCommand({
+      db,
+      text: "/approve approve-crash 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 9_700_000_001,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(replies[0]?.startsWith("Approved attempt 1."), "retry did not recover crash publish");
+    assert(requireJob(db, "approve-crash").status === "published", "retry did not commit DB publish");
+    assert(findEventsByJob(db, "approve-crash", "promoted").length === 1, "retry did not write one promoted event");
+    assert(!existsSync(resolve(dir, ".runs", "approve-crash", "attempt-1")), "retry did not clean source");
+
+    return [
+      "A simulated crash after final rename left reports/ present but DB unmodified and source preserved.",
+      "Retry recovered by checksum and completed the DB publish with one promoted event.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveRenameSucceededCasLost(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-cas-lost", {
+      week_key: "2026-W50",
+      run_dir: ".runs/approve-cas-lost",
+    });
+    writeAttemptBundle(dir, "approve-cas-lost", 1);
+    const replies: string[] = [];
+
+    await handleApproveCommand({
+      db,
+      text: "/approve approve-cas-lost 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 9_800_000_000,
+      publishHooks: {
+        beforeDbCas() {
+          updateJob(db, "approve-cas-lost", {
+            status: "queued",
+            updated_at: 9_800_000_001,
+          });
+        },
+      },
+      reply: (text) => replies.push(text),
+    });
+
+    assert(replies[0]?.includes("STATUS_MISMATCH"), "CAS-lost reply omitted status mismatch");
+    assert(requireJob(db, "approve-cas-lost").status === "queued", "CAS loser overwrote current row");
+    assert(findEventsByJob(db, "approve-cas-lost", "promoted").length === 0, "CAS loser wrote promoted event");
+    assert(!existsSync(resolve(dir, "reports", "2026-W50-ai-trends")), "CAS loser left published-looking reports dir");
+    assert(existsSync(resolve(dir, ".runs", "approve-cas-lost", "attempt-1")), "CAS loser deleted source");
+
+    return [
+      "When final rename succeeded but DB CAS lost to a status change, approve returned a visible error.",
+      "The just-renamed final directory was removed, no promoted event was written, and source remained for forensics.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveChecksumDivergenceRefused(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-diverged", {
+      week_key: "2026-W51",
+      run_dir: ".runs/approve-diverged",
+    });
+    writeAttemptBundle(dir, "approve-diverged", 1);
+    mkdirSync(resolve(dir, "reports", "2026-W51-ai-trends", "research"), { recursive: true });
+    writeFileSync(resolve(dir, "reports", "2026-W51-ai-trends", "report.en.md"), "diverged\n");
+    writeFileSync(resolve(dir, "reports", "2026-W51-ai-trends", "report.zh.md"), "diverged\n");
+    writeFileSync(resolve(dir, "reports", "2026-W51-ai-trends", "sources.json"), "[]\n");
+    writeFileSync(resolve(dir, "reports", "2026-W51-ai-trends", "research", "brief.md"), "diverged\n");
+    const replies: string[] = [];
+
+    await handleApproveCommand({
+      db,
+      text: "/approve approve-diverged 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 9_900_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(replies[0]?.includes("PUBLISH_ARTIFACT_DIVERGED"), "divergence reply omitted code");
+    assert(requireJob(db, "approve-diverged").status === "awaiting_approval", "divergence mutated job");
+    assert(findEventsByJob(db, "approve-diverged").length === 0, "divergence wrote event");
+    assert(existsSync(resolve(dir, ".runs", "approve-diverged", "attempt-1")), "divergence deleted source");
+
+    return [
+      "Preexisting divergent destination checksums were refused with PUBLISH_ARTIFACT_DIVERGED and no DB/source mutation.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveDuplicatePrevention(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-duplicate", {
+      week_key: "2026-W52",
+      run_dir: ".runs/approve-duplicate",
+    });
+    writeAttemptBundle(dir, "approve-duplicate", 1);
+    const firstReplies: string[] = [];
+    const secondReplies: string[] = [];
+
+    await handleApproveCommand({
+      db,
+      text: "/approve approve-duplicate 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 10_000_000_000,
+      reply: (text) => firstReplies.push(text),
+    });
+    await handleApproveCommand({
+      db,
+      text: "/approve approve-duplicate 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 10_000_000_001,
+      reply: (text) => secondReplies.push(text),
+    });
+
+    assert(firstReplies[0]?.startsWith("Approved attempt 1."), "first duplicate approve failed");
+    assert(secondReplies[0]?.startsWith("Approved attempt 1."), "second duplicate approve did not no-op");
+    assert(findEventsByJob(db, "approve-duplicate", "promoted").length === 1, "duplicate approve wrote duplicate promoted events");
+    assert(requireJob(db, "approve-duplicate").attempt_number === 1, "duplicate approve changed attempt");
+
+    return [
+      "A repeated identical approve after publication is idempotent and leaves exactly one promoted event.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveRaceLostAfterRead(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-race", {
+      week_key: "2026-W53",
+      run_dir: ".runs/approve-race",
+    });
+    writeAttemptBundle(dir, "approve-race", 1);
+    const replies: string[] = [];
+
+    await handleApproveCommand({
+      db,
+      text: "/approve approve-race 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 10_100_000_000,
+      publishHooks: {
+        beforeDbCas() {
+          updateJob(db, "approve-race", {
+            attempt_number: 2,
+            updated_at: 10_100_000_001,
+          });
+        },
+      },
+      reply: (text) => replies.push(text),
+    });
+
+    assert(replies[0]?.includes("STALE_ATTEMPT"), "race-lost reply omitted stale code");
+    assert(findEventsByJob(db, "approve-race", "promoted").length === 0, "race loser wrote promoted event");
+    assert(requireJob(db, "approve-race").attempt_number === 2, "race loser overwrote external attempt");
+    assert(!existsSync(resolve(dir, "reports", "2026-W53-ai-trends")), "race loser left final reports dir");
+    assert(existsSync(resolve(dir, ".runs", "approve-race", "attempt-1")), "race loser deleted source");
+
+    return [
+      "An injected interleaving before DB CAS returned STALE_ATTEMPT with no promoted event or orphan reports directory.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveRunsCleanup(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-cleanup", {
+      week_key: "2026-W54",
+      run_dir: ".runs/approve-cleanup",
+    });
+    writeAttemptBundle(dir, "approve-cleanup", 1);
+    writeAttemptBundle(dir, "approve-cleanup", 2);
+    const replies: string[] = [];
+
+    await handleApproveCommand({
+      db,
+      text: "/approve approve-cleanup 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 10_200_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(!existsSync(resolve(dir, ".runs", "approve-cleanup", "attempt-1")), "approved attempt was not cleaned");
+    assert(existsSync(resolve(dir, ".runs", "approve-cleanup", "attempt-2")), "other attempt was cleaned");
+
+    seedAwaitingJob(db, "approve-cleanup-failed", {
+      week_key: "2026-W55",
+      run_dir: ".runs/approve-cleanup-failed",
+    });
+    writeAttemptBundle(dir, "approve-cleanup-failed", 1, { omit: "sources.json" });
+    const failedReplies: string[] = [];
+    await handleApproveCommand({
+      db,
+      text: "/approve approve-cleanup-failed 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 10_200_000_001,
+      reply: (text) => failedReplies.push(text),
+    });
+    assert(failedReplies[0]?.includes("PUBLISH_SOURCE_MISSING"), "failed cleanup guard did not fail source validation");
+    assert(existsSync(resolve(dir, ".runs", "approve-cleanup-failed", "attempt-1")), "failed approve deleted source");
+
+    return [
+      "Successful approve deleted only the current approved attempt directory and preserved another attempt.",
+      "A failed approve preserved its source attempt for forensics.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveGitCommitFailureNonblocking(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-git-fail", {
+      week_key: "2026-W56",
+      run_dir: ".runs/approve-git-fail",
+    });
+    writeAttemptBundle(dir, "approve-git-fail", 1);
+    const replies: string[] = [];
+    const plans: GitCommitPlan[] = [];
+
+    const result = await handleApproveCommand({
+      db,
+      text: "/approve approve-git-fail 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 10_300_000_000,
+      committer: (plan) => {
+        plans.push(plan);
+        assertPathBoundedGitPlan(plan, "reports/2026-W56-ai-trends");
+        throw new Error("fake git failed");
+      },
+      reply: (text) => replies.push(text),
+    });
+
+    const gitEvents = findEventsByJob(db, "approve-git-fail", "git_commit_failed");
+    assert(result.status === "published", "git failure blocked publish");
+    assert(requireJob(db, "approve-git-fail").status === "published", "git failure prevented published row");
+    assert(findEventsByJob(db, "approve-git-fail", "promoted").length === 1, "git failure skipped promoted event");
+    assert(gitEvents.length === 1, "git failure did not write one git_commit_failed event");
+    assert(replies[0]?.includes("Git post-step failed non-blocking"), "git failure note missing from reply");
+    assert(plans.length === 1, "fake committer was not called once");
+    assertPathBoundedGitPlan(buildGitCommitPlan("reports/2026-W56-ai-trends", "2026-W56"), "reports/2026-W56-ai-trends");
+
+    return [
+      "Fake git committer failure was non-blocking: job stayed published and promoted event remained authoritative.",
+      "A git_commit_failed event captured diagnostics and fake plan assertions proved path-bounded argv semantics.",
+    ];
+  } finally {
+    close();
+  }
+}
+
 async function runBotCommandWiring(dir: string): Promise<string[]> {
   const dbPath = resolve(dir, "content.db");
   const db = openDb(dbPath);
+  seedAwaitingJob(db, "approve-wire", {
+    week_key: "2026-W57",
+    run_dir: ".runs/approve-wire",
+  });
   seedAwaitingJob(db, "reject-wire");
   db.close();
+  writeAttemptBundle(dir, "approve-wire", 1);
 
   const commandTransport = new FakeCommandTransport();
   const timer = new FakeTimer();
@@ -1000,6 +1815,7 @@ async function runBotCommandWiring(dir: string): Promise<string[]> {
       operatorChatIds: [123],
       dbPath,
       tickIntervalMs: DEFAULT_TICK_INTERVAL_MS,
+      cwd: dir,
     },
     commandTransport,
     timer,
@@ -1015,6 +1831,11 @@ async function runBotCommandWiring(dir: string): Promise<string[]> {
     now: () => 9_000_000_000,
   });
 
+  const approveReplies = await commandTransport.dispatch(
+    "approve",
+    "/approve approve-wire 1",
+    123,
+  );
   const replies = await commandTransport.dispatch(
     "reject",
     "/reject reject-wire 1 bundle:other operator decision",
@@ -1024,6 +1845,7 @@ async function runBotCommandWiring(dir: string): Promise<string[]> {
 
   const checkDb = openDb(dbPath);
   try {
+    const approvedJob = requireJob(checkDb, "approve-wire");
     const job = requireJob(checkDb, "reject-wire");
     assert(commandTransport.started, "command transport did not start");
     assert(commandTransport.stopped, "command transport did not stop");
@@ -1031,34 +1853,42 @@ async function runBotCommandWiring(dir: string): Promise<string[]> {
     assert(timer.clears === 1, "notifier tick timer was not cleared once");
     assert(notifierCalls === 0, "command dispatch called notifyPendingApprovals");
     assert(outgoingSends.length === 0, "command reply used outgoing notifier transport");
+    assert(commandTransport.handlers.has("approve"), "approve command handler was not registered");
+    assert(commandTransport.handlers.has("reject"), "reject command handler was not registered");
+    assert(!commandTransport.handlers.has("status" as TelegramCommandName), "status command was registered");
+    assert(approveReplies.length === 1, "approve handler did not reply through command seam");
+    assert(approveReplies[0]?.startsWith("Approved attempt 1."), "approve seam reply did not succeed");
     assert(replies.length === 1, "command handler did not reply through command seam");
     assert(replies[0]?.startsWith("Rejected attempt 1."), "command seam reply did not succeed");
+    assert(approvedJob.status === "published", "wired approve did not mutate configured DB");
+    assert(findEventsByJob(checkDb, "approve-wire", "promoted").length === 1, "wired approve did not write promoted event");
     assert(job.status === "queued", "wired command did not mutate configured DB");
     assert(job.attempt_number === 2, "wired command did not increment attempt");
     assert(findEventsByJob(checkDb, "reject-wire", "rejected").length === 1, "wired command did not write reject event");
 
     return [
-      "startBotRuntime registered /reject on a fake command transport, opened the configured DB path, replied through the command seam, and left notifier tick orchestration separate.",
+      "startBotRuntime registered /approve and /reject on a fake command transport, opened the configured DB path per command, replied through the command seam, and left notifier tick orchestration separate.",
+      "/status remained unregistered and command dispatch did not call notifyPendingApprovals.",
     ];
   } finally {
     checkDb.close();
   }
 }
 
-function runNoApproveOrStatusHandler(): string[] {
+function runNoStatusHandler(): string[] {
   const combined = `${readSource("src/telegram/bot.ts")}\n${readSource("src/telegram/commands.ts")}`;
   const forbiddenPatterns = [
-    [/\/approve/, "/approve command literal"],
     [/\/status/, "/status command literal"],
-    [/onCommand\(\s*["']approve["']/, "approve command registration"],
     [/onCommand\(\s*["']status["']/, "status command registration"],
-    [/TODO.*approve|TODO.*status|placeholder.*approve|placeholder.*status/i, "inert approve/status placeholder"],
+    [/TODO.*status|placeholder.*status/i, "inert status placeholder"],
   ] as const satisfies readonly ForbiddenPattern[];
 
   assertNoForbiddenPatterns(combined, forbiddenPatterns, "bot command surfaces");
+  assert(/onCommand\(\s*["']approve["']/.test(combined), "approve command is not registered");
+  assert(/onCommand\(\s*["']reject["']/.test(combined), "reject command is not registered");
 
   return [
-    "Changed command surfaces register only /reject and contain no /approve or /status handler placeholders.",
+    "Changed command surfaces register /approve and /reject while containing no /status handler or placeholder.",
   ];
 }
 
@@ -1074,7 +1904,6 @@ function runBoundaryStaticCheck(): string[] {
     "src/lib/runtime-config.ts",
     "src/db.ts",
     "src/preflight.ts",
-    "src/promote.ts",
   ]);
   assertNoChangedDirectories(changed, [
     "src/pipeline/",
@@ -1084,7 +1913,11 @@ function runBoundaryStaticCheck(): string[] {
   ]);
 
   const changedSources = changed
-    .filter((file) => file === "src/telegram/bot.ts" || file === "src/telegram/commands.ts")
+    .filter((file) =>
+      file === "src/telegram/bot.ts" ||
+      file === "src/telegram/commands.ts" ||
+      file === "src/promote.ts"
+    )
     .map((file) => [file, readChangedSource(file)] as const);
   const forbiddenRuntimePatterns: readonly ForbiddenPattern[] = [
     ...PROMPT_SURFACE_PATTERNS,
@@ -1101,17 +1934,22 @@ function runBoundaryStaticCheck(): string[] {
 
   const smokeSource = readSource("scripts/bot-smoke.ts");
   assert(!/fetch\s*\(|api\.telegram\.org|https:\/\/api\.telegram\.org/.test(smokeSource), "smoke can call Telegram");
+  assert(
+    GIT_POST_STEP_PATTERNS.some(([pattern]) => pattern.test(readSource("src/promote.ts"))),
+    "git post-step concept-class helper did not recognize promote.ts",
+  );
 
   return [
     `Stable base/status scope check saw only declared files: ${changed.join(", ") || "<none>"}.`,
-    "Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or process spawn surface.",
-    "Smoke source contains no Telegram fetch/API network path, and commands.ts does not duplicate notifier orchestration.",
+    "Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.",
+    "Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and git post-step concept-class coverage is active.",
   ];
 }
 
 function runDependencyBoundaryCheck(): string[] {
   const botSource = readSource("src/telegram/bot.ts");
   const commandsSource = readSource("src/telegram/commands.ts");
+  const promoteSource = readSource("src/promote.ts");
   const notifierSource = readSource("src/telegram/notifier.ts");
   const packageJson = JSON.parse(readSource("package.json")) as {
     scripts?: Record<string, string>;
@@ -1121,6 +1959,8 @@ function runDependencyBoundaryCheck(): string[] {
 
   assertNoForbiddenPatterns(notifierSource, TELEGRAM_SDK_IMPORT_PATTERNS, "notifier.ts");
   assertNoForbiddenPatterns(commandsSource, TELEGRAM_SDK_IMPORT_PATTERNS, "commands.ts");
+  assertNoForbiddenPatterns(commandsSource, TELEGRAM_SDK_NETWORK_PATTERNS, "commands.ts Telegram network surface");
+  assertNoForbiddenPatterns(promoteSource, TELEGRAM_SDK_NETWORK_PATTERNS, "promote.ts Telegram network surface");
   const declaredTelegramDeps = ["grammy", "telegraf"].filter(
     (name) => packageJson.dependencies?.[name] || packageJson.devDependencies?.[name],
   );
@@ -1145,7 +1985,7 @@ function runDependencyBoundaryCheck(): string[] {
   );
 
   return [
-    "Telegram SDK dependency imports are absent outside bot.ts; notifier.ts and commands.ts remain dependency-free.",
+    "Telegram SDK/network concept-class checks are shared and absent from notifier.ts, commands.ts, and promote.ts.",
     "package.json exposes only the expected bot runtime and bot-smoke command surfaces for this slice.",
   ];
 }
@@ -1176,7 +2016,8 @@ function runNoPreflightCodexSurvivability(): string[] {
   const botSource = readSource("src/telegram/bot.ts");
   const allowlistSource = readSource("src/telegram/allowlist.ts");
   const commandsSource = readChangedSource("src/telegram/commands.ts");
-  const combined = `${botSource}\n${allowlistSource}\n${commandsSource}`;
+  const promoteSource = readSource("src/promote.ts");
+  const combined = `${botSource}\n${allowlistSource}\n${commandsSource}\n${promoteSource}`;
   const forbiddenPatterns: readonly ForbiddenPattern[] = [
     [/preflight\.ts|assertCodexAvailable/, "preflight dependency"],
     [/codex-smoke/, "codex smoke dependency"],
@@ -1231,6 +2072,79 @@ function seedAwaitingJob(
     created_at: patch.created_at ?? 1_800_000_000,
     updated_at: patch.updated_at ?? 1_800_000_000,
   });
+}
+
+function writeAttemptBundle(
+  cwd: string,
+  jobId: string,
+  attemptNumber: number,
+  options: { omit?: "report.en.md" | "report.zh.md" | "sources.json" | "research" } = {},
+): void {
+  const attemptDir = resolve(cwd, ".runs", jobId, `attempt-${attemptNumber}`);
+  mkdirSync(attemptDir, { recursive: true });
+  if (options.omit !== "report.en.md") {
+    writeFileSync(
+      resolve(attemptDir, "report.en.md"),
+      `# Report EN\n\nSynthetic en report for ${jobId} attempt ${attemptNumber}.\n`,
+    );
+  }
+  if (options.omit !== "report.zh.md") {
+    writeFileSync(
+      resolve(attemptDir, "report.zh.md"),
+      `# Report ZH\n\nSynthetic zh report for ${jobId} attempt ${attemptNumber}.\n`,
+    );
+  }
+  if (options.omit !== "sources.json") {
+    writeFileSync(
+      resolve(attemptDir, "sources.json"),
+      `${JSON.stringify([{ title: "Local source", jobId, attemptNumber }])}\n`,
+    );
+  }
+  if (options.omit !== "research") {
+    mkdirSync(resolve(attemptDir, "research"), { recursive: true });
+    writeFileSync(resolve(attemptDir, "research", "brief.md"), `Brief for ${jobId}\n`);
+    writeFileSync(resolve(attemptDir, "research", "notes.md"), `Notes for ${jobId}\n`);
+  }
+}
+
+function promotedManifest(event: ReturnType<typeof findEventsByJob>[number] | undefined) {
+  assert(event !== undefined, "missing promoted event");
+  const payload = JSON.parse(event.payload ?? "{}") as {
+    publish_manifest?: {
+      artifact_dir: string;
+      job_id: string;
+      attempt_number: number;
+      files: string[];
+      sha256: Record<string, string>;
+      aggregate_sha256: string;
+    };
+  };
+  assert(payload.publish_manifest !== undefined, "promoted event missing publish_manifest");
+  return payload.publish_manifest;
+}
+
+function fakeManifest(jobId: string, attemptNumber: number, artifactDir: string) {
+  return {
+    artifact_dir: artifactDir,
+    job_id: jobId,
+    attempt_number: attemptNumber,
+    files: ["report.en.md"],
+    sha256: {
+      "report.en.md": "0".repeat(64),
+    },
+    aggregate_sha256: "1".repeat(64),
+  };
+}
+
+function assertPathBoundedGitPlan(plan: GitCommitPlan, artifactDir: string): void {
+  assert(plan.artifactDir === artifactDir, "git plan artifactDir drifted");
+  assert(plan.commands.length === 2, "git plan command count drifted");
+  assertArrayEqualsString(plan.commands[0] ?? [], ["git", "add", "--", `${artifactDir}/`], "git add argv");
+  assertArrayEqualsString(
+    plan.commands[1] ?? [],
+    ["git", "commit", "-m", `[content-zoe] publish ${artifactDir.slice("reports/".length, -"ai-trends".length - 1)}`, "--", `${artifactDir}/`],
+    "git commit argv",
+  );
 }
 
 function requireJob(db: DbClient, id: string): Job {
@@ -1382,6 +2296,18 @@ function fakeDb(): DbClient & { closeCalls: number } {
 function assertArrayEquals(
   actual: readonly number[],
   expected: readonly number[],
+  label: string,
+): void {
+  assert(
+    actual.length === expected.length &&
+      actual.every((value, index) => value === expected[index]),
+    `${label} expected [${expected.join(",")}], got [${actual.join(",")}]`,
+  );
+}
+
+function assertArrayEqualsString(
+  actual: readonly string[],
+  expected: readonly string[],
   label: string,
 ): void {
   assert(
