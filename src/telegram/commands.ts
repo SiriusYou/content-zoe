@@ -506,11 +506,14 @@ export function rejectSuccessReply(command: ParsedRejectCommand): string {
 }
 
 export function approveSuccessReply(result: PromoteJobResult): string {
-  const note =
-    result.gitCommitFailed === undefined
-      ? ""
-      : ` Git post-step failed non-blocking: ${result.gitCommitFailed}`;
-  return `Approved attempt ${result.attemptNumber}. Published ${result.jobId} to ${result.artifactDir}/.${note}`;
+  const notes: string[] = [];
+  if (result.cleanupFailed !== undefined) {
+    notes.push(` Cleanup failed non-blocking: ${result.cleanupFailed}`);
+  }
+  if (result.gitCommitFailed !== undefined) {
+    notes.push(` Git post-step failed non-blocking: ${result.gitCommitFailed}`);
+  }
+  return `Approved attempt ${result.attemptNumber}. Published ${result.jobId} to ${result.artifactDir}/.${notes.join("")}`;
 }
 
 export function rewindStageForScope(scope: RejectScope): "draft_en" | "translate_zh" {

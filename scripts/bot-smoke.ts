@@ -102,10 +102,12 @@ type ScenarioName =
   | "approve-idempotent-repromote"
   | "approve-rename-before-db-recovery"
   | "approve-rename-succeeded-cas-lost"
+  | "approve-existing-destination-cas-lost"
   | "approve-checksum-divergence-refused"
   | "approve-duplicate-prevention"
   | "approve-race-lost-after-read"
   | "approve-runs-cleanup"
+  | "approve-cleanup-failure-visible"
   | "approve-git-commit-failure-nonblocking"
   | "bot-command-wiring"
   | "no-status-handler"
@@ -154,10 +156,12 @@ const SCENARIOS: readonly ScenarioName[] = [
   "approve-idempotent-repromote",
   "approve-rename-before-db-recovery",
   "approve-rename-succeeded-cas-lost",
+  "approve-existing-destination-cas-lost",
   "approve-checksum-divergence-refused",
   "approve-duplicate-prevention",
   "approve-race-lost-after-read",
   "approve-runs-cleanup",
+  "approve-cleanup-failure-visible",
   "approve-git-commit-failure-nonblocking",
   "bot-command-wiring",
   "no-status-handler",
@@ -310,6 +314,8 @@ async function scenarioImpl(
       return runApproveRenameBeforeDbRecovery(dir);
     case "approve-rename-succeeded-cas-lost":
       return runApproveRenameSucceededCasLost(dir);
+    case "approve-existing-destination-cas-lost":
+      return runApproveExistingDestinationCasLost(dir);
     case "approve-checksum-divergence-refused":
       return runApproveChecksumDivergenceRefused(dir);
     case "approve-duplicate-prevention":
@@ -318,6 +324,8 @@ async function scenarioImpl(
       return runApproveRaceLostAfterRead(dir);
     case "approve-runs-cleanup":
       return runApproveRunsCleanup(dir);
+    case "approve-cleanup-failure-visible":
+      return runApproveCleanupFailureVisible(dir);
     case "approve-git-commit-failure-nonblocking":
       return runApproveGitCommitFailureNonblocking(dir);
     case "bot-command-wiring":
@@ -1575,6 +1583,78 @@ async function runApproveRenameSucceededCasLost(dir: string): Promise<string[]> 
   }
 }
 
+async function runApproveExistingDestinationCasLost(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-existing-alpha", {
+      week_key: "2026-W57",
+      run_dir: ".runs/approve-existing-alpha",
+    });
+    writeAttemptBundle(dir, "approve-existing-alpha", 1);
+    await leaveFinalDirectoryAfterRenameCrash(db, dir, "approve-existing-alpha", 10_400_000_000);
+
+    updateJob(db, "approve-existing-alpha", {
+      status: "queued",
+      updated_at: 10_400_000_001,
+    });
+    const alphaReplies: string[] = [];
+    await handleApproveCommand({
+      db,
+      text: "/approve approve-existing-alpha 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 10_400_000_002,
+      reply: (text) => alphaReplies.push(text),
+    });
+
+    assert(alphaReplies[0]?.includes("STATUS_MISMATCH"), "pre-retry drift reply omitted status mismatch");
+    assert(requireJob(db, "approve-existing-alpha").status === "queued", "pre-retry drift mutated current row");
+    assert(findEventsByJob(db, "approve-existing-alpha", "promoted").length === 0, "pre-retry drift wrote promoted event");
+    assert(!existsSync(resolve(dir, "reports", "2026-W57-ai-trends")), "pre-retry drift left orphan final dir");
+    assert(existsSync(resolve(dir, ".runs", "approve-existing-alpha", "attempt-1")), "pre-retry drift deleted source");
+
+    seedAwaitingJob(db, "approve-existing-beta", {
+      week_key: "2026-W58",
+      run_dir: ".runs/approve-existing-beta",
+    });
+    writeAttemptBundle(dir, "approve-existing-beta", 1);
+    await leaveFinalDirectoryAfterRenameCrash(db, dir, "approve-existing-beta", 10_400_000_010);
+    const betaReplies: string[] = [];
+
+    await handleApproveCommand({
+      db,
+      text: "/approve approve-existing-beta 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 10_400_000_011,
+      publishHooks: {
+        beforeDbCas() {
+          updateJob(db, "approve-existing-beta", {
+            status: "queued",
+            updated_at: 10_400_000_012,
+          });
+        },
+      },
+      reply: (text) => betaReplies.push(text),
+    });
+
+    assert(betaReplies[0]?.includes("STATUS_MISMATCH"), "retry CAS drift reply omitted status mismatch");
+    assert(requireJob(db, "approve-existing-beta").status === "queued", "retry CAS drift mutated current row");
+    assert(findEventsByJob(db, "approve-existing-beta", "promoted").length === 0, "retry CAS drift wrote promoted event");
+    assert(!existsSync(resolve(dir, "reports", "2026-W58-ai-trends")), "retry CAS drift left orphan final dir");
+    assert(existsSync(resolve(dir, ".runs", "approve-existing-beta", "attempt-1")), "retry CAS drift deleted source");
+
+    return [
+      "Pre-retry status drift after a rename crash removed the unauthoritative final reports dir, wrote no promoted event, and preserved source.",
+      "Retry-time CAS drift during existing-destination recovery also removed the final reports dir and preserved source for forensics.",
+    ];
+  } finally {
+    close();
+  }
+}
+
 async function runApproveChecksumDivergenceRefused(dir: string): Promise<string[]> {
   const { db, close } = openScenarioDb(dir);
   try {
@@ -1747,6 +1827,83 @@ async function runApproveRunsCleanup(dir: string): Promise<string[]> {
   } finally {
     close();
   }
+}
+
+async function runApproveCleanupFailureVisible(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-cleanup-visible", {
+      week_key: "2026-W59",
+      run_dir: ".runs/approve-cleanup-visible",
+    });
+    writeAttemptBundle(dir, "approve-cleanup-visible", 1);
+    const replies: string[] = [];
+
+    const result = await handleApproveCommand({
+      db,
+      text: "/approve approve-cleanup-visible 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 10_250_000_000,
+      publishHooks: {
+        afterFinalRename(context) {
+          rmSync(context.sourceAttemptDir, { recursive: true, force: true });
+        },
+      },
+      reply: (text) => replies.push(text),
+    });
+
+    const cleanupEvents = findEventsByJob(db, "approve-cleanup-visible", "cleanup_failed");
+    const cleanupPayload = JSON.parse(cleanupEvents[0]?.payload ?? "{}") as {
+      artifact_dir?: string;
+      publish_manifest?: { job_id?: string };
+      error?: string;
+    };
+
+    assert(result.status === "published", "cleanup failure blocked publish");
+    assert(result.publishResult?.cleanupFailed !== undefined, "cleanup failure was not returned");
+    assert(replies[0]?.includes("Cleanup failed non-blocking"), "cleanup failure note missing from reply");
+    assert(requireJob(db, "approve-cleanup-visible").status === "published", "cleanup failure prevented published row");
+    assert(findEventsByJob(db, "approve-cleanup-visible", "promoted").length === 1, "cleanup failure skipped promoted event");
+    assert(cleanupEvents.length === 1, "cleanup failure did not write one cleanup_failed event");
+    assert(cleanupPayload.artifact_dir === "reports/2026-W59-ai-trends", "cleanup_failed event artifact_dir drifted");
+    assert(cleanupPayload.publish_manifest?.job_id === "approve-cleanup-visible", "cleanup_failed event manifest missing");
+    assert(typeof cleanupPayload.error === "string" && cleanupPayload.error.length > 0, "cleanup_failed event error missing");
+
+    return [
+      "Injected source cleanup failure was non-blocking: job stayed published and promoted event remained authoritative.",
+      "The approve reply and cleanup_failed event both exposed cleanup diagnostics.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function leaveFinalDirectoryAfterRenameCrash(
+  db: DbClient,
+  dir: string,
+  jobId: string,
+  now: number,
+): Promise<void> {
+  let threw = false;
+  try {
+    await promoteJob({
+      db,
+      cwd: dir,
+      jobId,
+      attemptNumber: 1,
+      now: () => now,
+      hooks: {
+        afterFinalRename() {
+          throw new Error("simulated crash after rename");
+        },
+      },
+    });
+  } catch (err) {
+    threw = err instanceof Error && err.message.includes("publish failed");
+  }
+  assert(threw, `${jobId} crash injection did not throw`);
 }
 
 async function runApproveGitCommitFailureNonblocking(dir: string): Promise<string[]> {

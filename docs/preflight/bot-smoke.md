@@ -1,10 +1,10 @@
 # Bot Smoke Evidence
 
 - Command: `bun run bot-smoke`
-- Started: 2026-05-06T04:33:26.621Z
-- Finished: 2026-05-06T04:33:26.747Z
-- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T04-33-26.621Z (removed by finally-cleanup)
-- Result: 42/42 PASS
+- Started: 2026-05-06T05:27:04.322Z
+- Finished: 2026-05-06T05:27:04.551Z
+- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T05-27-04.320Z (removed by finally-cleanup)
+- Result: 44/44 PASS
 
 ## Evidence Ceiling
 
@@ -45,14 +45,16 @@ This smoke exercises deterministic allowlist parsing, injected bot runtime seams
 | approve-idempotent-repromote | PASS | Repeated approve after .runs cleanup succeeded by comparing reports/ against promoted publish_manifest.<br>The no-op re-promote wrote no duplicate promoted event. |
 | approve-rename-before-db-recovery | PASS | A simulated crash after final rename left reports/ present but DB unmodified and source preserved.<br>Retry recovered by checksum and completed the DB publish with one promoted event. |
 | approve-rename-succeeded-cas-lost | PASS | When final rename succeeded but DB CAS lost to a status change, approve returned a visible error.<br>The just-renamed final directory was removed, no promoted event was written, and source remained for forensics. |
+| approve-existing-destination-cas-lost | PASS | Pre-retry status drift after a rename crash removed the unauthoritative final reports dir, wrote no promoted event, and preserved source.<br>Retry-time CAS drift during existing-destination recovery also removed the final reports dir and preserved source for forensics. |
 | approve-checksum-divergence-refused | PASS | Preexisting divergent destination checksums were refused with PUBLISH_ARTIFACT_DIVERGED and no DB/source mutation. |
 | approve-duplicate-prevention | PASS | A repeated identical approve after publication is idempotent and leaves exactly one promoted event. |
 | approve-race-lost-after-read | PASS | An injected interleaving before DB CAS returned STALE_ATTEMPT with no promoted event or orphan reports directory. |
 | approve-runs-cleanup | PASS | Successful approve deleted only the current approved attempt directory and preserved another attempt.<br>A failed approve preserved its source attempt for forensics. |
+| approve-cleanup-failure-visible | PASS | Injected source cleanup failure was non-blocking: job stayed published and promoted event remained authoritative.<br>The approve reply and cleanup_failed event both exposed cleanup diagnostics. |
 | approve-git-commit-failure-nonblocking | PASS | Fake git committer failure was non-blocking: job stayed published and promoted event remained authoritative.<br>A git_commit_failed event captured diagnostics and fake plan assertions proved path-bounded argv semantics. |
 | bot-command-wiring | PASS | startBotRuntime registered /approve and /reject on a fake command transport, opened the configured DB path per command, replied through the command seam, and left notifier tick orchestration separate.<br>/status remained unregistered and command dispatch did not call notifyPendingApprovals. |
 | no-status-handler | PASS | Changed command surfaces register /approve and /reject while containing no /status handler or placeholder. |
 | boundary-static-check | PASS | Stable base/status scope check saw only declared files: docs/preflight/bot-smoke.md, scripts/bot-smoke.ts, scripts/lib/static-guardrails.ts, src/promote.ts, src/telegram/bot.ts, src/telegram/commands.ts.<br>Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.<br>Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and git post-step concept-class coverage is active. |
 | dependency-boundary-check | PASS | Telegram SDK/network concept-class checks are shared and absent from notifier.ts, commands.ts, and promote.ts.<br>package.json exposes only the expected bot runtime and bot-smoke command surfaces for this slice. |
-| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T04-33-26.621Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
+| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T05-27-04.320Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
 | no-preflight-codex-survivability | PASS | Bot, allowlist, and command surfaces have no preflight, Codex smoke, LLM, prompt, process-spawn, or report-run execution dependency. |

@@ -101,6 +101,7 @@ const awaitingApprovalStatus = "awaiting_approval";
 const publishedStatus = "published";
 const promotedEventType = "promoted";
 const gitCommitFailedEventType = "git_commit_failed";
+const cleanupFailedEventType = "cleanup_failed";
 const requiredSourceMissingMessage = "publish source bundle is missing or invalid";
 
 export async function promoteJob(
@@ -131,6 +132,13 @@ export async function promoteJob(
   }
 
   if (job.status !== awaitingApprovalStatus) {
+    removeFinalUnlessPublishedAuthority({
+      db: options.db,
+      cwd,
+      job,
+      artifactDir,
+      finalArtifactDir,
+    });
     throw new PromoteError("STATUS_MISMATCH", "job is not awaiting approval", job.id);
   }
 
@@ -306,7 +314,7 @@ async function recoverExistingDestination(options: {
     options.job.attempt_number,
   );
   assertManifestEquivalent(options.sourceManifest, finalManifest);
-  return commitPublishedState(options, finalManifest, false);
+  return commitPublishedState(options, finalManifest, true);
 }
 
 async function commitPublishedState(
@@ -351,7 +359,13 @@ async function commitPublishedState(
       options.db.exec("ROLLBACK");
       transactionOpen = false;
       if (cleanupFinalOnCasLoss) {
-        removePathBestEffort(options.finalArtifactDir);
+        removeFinalUnlessPublishedAuthority({
+          db: options.db,
+          cwd: options.cwd,
+          job: options.job,
+          artifactDir: options.artifactDir,
+          finalArtifactDir: options.finalArtifactDir,
+        });
       }
       throw classifyApproveRaceLoss(options.db, options.job);
     }
@@ -404,6 +418,21 @@ async function commitPublishedState(
     rmSync(options.sourceAttemptDir, { recursive: true, force: false });
   } catch (err) {
     cleanupFailed = formatError(err);
+    try {
+      insertEvent(options.db, {
+        job_id: options.job.id,
+        attempt_number: options.job.attempt_number,
+        type: cleanupFailedEventType,
+        payload: JSON.stringify({
+          artifact_dir: options.artifactDir,
+          publish_manifest: manifest,
+          error: cleanupFailed,
+        }),
+        created_at: options.now(),
+      });
+    } catch (eventErr) {
+      cleanupFailed = `${cleanupFailed}; cleanup_failed event write failed: ${formatError(eventErr)}`;
+    }
   }
 
   const gitCommitFailed = await runBestEffortGitCommit(options, manifest);
@@ -457,6 +486,71 @@ function requirePublishedManifest(
     );
   }
   return manifest;
+}
+
+function removeFinalUnlessPublishedAuthority(options: {
+  readonly db: DbClient;
+  readonly cwd: string;
+  readonly job: Job;
+  readonly artifactDir: string;
+  readonly finalArtifactDir: string;
+}): void {
+  if (
+    hasPublishedAuthority(
+      options.db,
+      options.cwd,
+      options.job,
+      options.artifactDir,
+      options.finalArtifactDir,
+    )
+  ) {
+    return;
+  }
+  removePathBestEffort(options.finalArtifactDir);
+}
+
+function hasPublishedAuthority(
+  db: DbClient,
+  cwd: string,
+  job: Job,
+  artifactDir: string,
+  finalArtifactDir: string,
+): boolean {
+  const current = findJobById(db, job.id);
+  if (
+    current === null ||
+    current.status !== publishedStatus ||
+    current.attempt_number !== job.attempt_number ||
+    current.artifact_dir !== artifactDir
+  ) {
+    return false;
+  }
+
+  const event = latestPromotedEvent(db, job.id, job.attempt_number);
+  if (event === null) {
+    return false;
+  }
+
+  try {
+    const manifest = parsePromotedManifest(event);
+    if (
+      manifest.artifact_dir !== artifactDir ||
+      manifest.job_id !== job.id ||
+      manifest.attempt_number !== job.attempt_number
+    ) {
+      return false;
+    }
+    const actualManifest = manifestFromDirectory(
+      cwd,
+      finalArtifactDir,
+      artifactDir,
+      job.id,
+      job.attempt_number,
+    );
+    return manifestsEqual(manifest, actualManifest);
+  } catch {
+    return false;
+  }
 }
 
 function latestPromotedEvent(
