@@ -17,7 +17,6 @@ import {
   changedFilesAgainstBase as getChangedFilesAgainstBase,
   PROCESS_SPAWN_PATTERNS,
   PROMPT_SURFACE_PATTERNS,
-  GIT_POST_STEP_PATTERNS,
   TELEGRAM_SDK_IMPORT_PATTERNS,
   TELEGRAM_SDK_NETWORK_PATTERNS,
   readRepoSource,
@@ -26,6 +25,7 @@ import {
 import {
   findEventsByJob,
   findJobById,
+  insertEvent,
   insertJob,
   openDb,
   updateJob,
@@ -50,11 +50,14 @@ import {
   formatApproveErrorReply,
   REJECT_REASON_MAX_CHARS,
   formatRejectErrorReply,
+  formatStatusErrorReply,
   handleApproveCommand,
   handleRejectCommand,
+  handleStatusCommand,
   isValidRejectScopeType,
   parseApproveCommand,
   parseRejectCommand,
+  parseStatusCommand,
   rejectSuccessReply,
   rewindStageForScope,
   type RejectScope,
@@ -109,8 +112,19 @@ type ScenarioName =
   | "approve-runs-cleanup"
   | "approve-cleanup-failure-visible"
   | "approve-git-commit-failure-nonblocking"
+  | "status-command-parse"
+  | "status-malformed-jobid-preserved"
+  | "status-bare-invalid-no-fake-jobid"
+  | "status-known-job-summary"
+  | "status-unknown-job-visible"
+  | "status-unauthorized-known-job"
+  | "status-unauthorized-unknown-job"
+  | "status-read-only-no-mutation"
+  | "status-published-manifest-authority"
+  | "status-failed-job-error-visible"
+  | "status-last-notify-error-visible"
+  | "status-approval-summary-visible"
   | "bot-command-wiring"
-  | "no-status-handler"
   | "boundary-static-check"
   | "dependency-boundary-check"
   | "bot-db-path-cwd"
@@ -163,8 +177,19 @@ const SCENARIOS: readonly ScenarioName[] = [
   "approve-runs-cleanup",
   "approve-cleanup-failure-visible",
   "approve-git-commit-failure-nonblocking",
+  "status-command-parse",
+  "status-malformed-jobid-preserved",
+  "status-bare-invalid-no-fake-jobid",
+  "status-known-job-summary",
+  "status-unknown-job-visible",
+  "status-unauthorized-known-job",
+  "status-unauthorized-unknown-job",
+  "status-read-only-no-mutation",
+  "status-published-manifest-authority",
+  "status-failed-job-error-visible",
+  "status-last-notify-error-visible",
+  "status-approval-summary-visible",
   "bot-command-wiring",
-  "no-status-handler",
   "boundary-static-check",
   "dependency-boundary-check",
   "bot-db-path-cwd",
@@ -177,13 +202,11 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
-const targetBase = "c6dd0123ed52326d4202b4b164e44bd6bd58a1de";
+const targetBase = "414554e2e5aeeb3aabab67e53c3cc896caea853e";
 const declaredScope = new Set([
-  "src/promote.ts",
   "src/telegram/commands.ts",
   "src/telegram/bot.ts",
   "scripts/bot-smoke.ts",
-  "scripts/lib/static-guardrails.ts",
   "docs/preflight/bot-smoke.md",
 ]);
 
@@ -328,10 +351,32 @@ async function scenarioImpl(
       return runApproveCleanupFailureVisible(dir);
     case "approve-git-commit-failure-nonblocking":
       return runApproveGitCommitFailureNonblocking(dir);
+    case "status-command-parse":
+      return runStatusCommandParse();
+    case "status-malformed-jobid-preserved":
+      return runStatusMalformedJobIdPreserved(dir);
+    case "status-bare-invalid-no-fake-jobid":
+      return runStatusBareInvalidNoFakeJobId(dir);
+    case "status-known-job-summary":
+      return runStatusKnownJobSummary(dir);
+    case "status-unknown-job-visible":
+      return runStatusUnknownJobVisible(dir);
+    case "status-unauthorized-known-job":
+      return runStatusUnauthorizedKnownJob(dir);
+    case "status-unauthorized-unknown-job":
+      return runStatusUnauthorizedUnknownJob(dir);
+    case "status-read-only-no-mutation":
+      return runStatusReadOnlyNoMutation(dir);
+    case "status-published-manifest-authority":
+      return runStatusPublishedManifestAuthority(dir);
+    case "status-failed-job-error-visible":
+      return runStatusFailedJobErrorVisible(dir);
+    case "status-last-notify-error-visible":
+      return runStatusLastNotifyErrorVisible(dir);
+    case "status-approval-summary-visible":
+      return runStatusApprovalSummaryVisible(dir);
     case "bot-command-wiring":
       return runBotCommandWiring(dir);
-    case "no-status-handler":
-      return runNoStatusHandler();
     case "boundary-static-check":
       return runBoundaryStaticCheck();
     case "dependency-boundary-check":
@@ -1950,6 +1995,415 @@ async function runApproveGitCommitFailureNonblocking(dir: string): Promise<strin
   }
 }
 
+function runStatusCommandParse(): string[] {
+  const parsed = parseStatusCommand("/status status-job");
+  assert(parsed.ok, "canonical status command did not parse");
+  assert(parsed.command.jobId === "status-job", "status job ID was not parsed");
+
+  const botMention = parseStatusCommand("/status@content_zoe_bot status-job");
+  assert(botMention.ok, "bot-mentioned status command did not parse");
+  assert(botMention.command.jobId === "status-job", "bot-mentioned status job ID drifted");
+
+  const extra = parseStatusCommand("/status status-job extra");
+  const bare = parseStatusCommand("/status");
+  const extraLong = parseStatusCommand("/status status-job extra more");
+  assert(!extra.ok && extra.jobId === "status-job", "extra-token status did not preserve job ID");
+  assert(!extraLong.ok && extraLong.jobId === "status-job", "multi-extra status did not preserve job ID");
+  assert(!bare.ok && bare.jobId === undefined, "bare status invented a job ID");
+
+  return [
+    "Canonical /status and bot-mentioned /status parsed a single job ID.",
+    "Extra-token malformed status preserved the parseable job ID while bare /status exposed no fake job ID.",
+  ];
+}
+
+async function runStatusMalformedJobIdPreserved(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    const replies: string[] = [];
+
+    await handleStatusCommand({
+      db,
+      text: "/status status-malformed extra",
+      chatId: 123,
+      operatorChatIds: [123],
+      now: () => 10_500_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(
+      replies[0] === formatStatusErrorReply("INVALID_COMMAND", "status-malformed"),
+      "malformed status with parseable job did not include job ID",
+    );
+    assert(eventCount(db) === 0, "malformed allowlisted status wrote an event");
+
+    return [
+      "Allowlisted malformed /status with a recoverable job token returned INVALID_COMMAND with that job ID.",
+      "Malformed allowlisted status wrote no unauthorized audit event.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runStatusBareInvalidNoFakeJobId(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    const replies: string[] = [];
+
+    await handleStatusCommand({
+      db,
+      text: "/status",
+      chatId: 123,
+      operatorChatIds: [123],
+      now: () => 10_500_000_001,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(
+      replies[0] === formatStatusErrorReply("INVALID_COMMAND"),
+      "bare status did not receive bare INVALID_COMMAND",
+    );
+    assert(!replies[0]?.includes(":"), "bare status invented a job ID");
+    assert(eventCount(db) === 0, "bare allowlisted status wrote an event");
+
+    return [
+      "Bare /status returned INVALID_COMMAND without a colon or invented job ID.",
+      "Bare allowlisted status wrote no unauthorized audit event.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runStatusKnownJobSummary(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "status-known", {
+      week_key: "2026-W60",
+      current_stage: "edit_en",
+      approval_summary: "Approval summary first sentence. More context follows.",
+      last_notify_error: null,
+      notified_at: null,
+    });
+    const replies: string[] = [];
+
+    const result = await handleStatusCommand({
+      db,
+      text: "/status status-known",
+      chatId: 123,
+      operatorChatIds: [123],
+      now: () => 10_600_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    const reply = replies[0] ?? "";
+    assert(result.status === "reported", "known status did not report");
+    assert(reply.includes("job_id=status-known"), "summary omitted job_id");
+    assert(reply.includes("status=awaiting_approval"), "summary omitted status");
+    assert(reply.includes("attempt_number=1"), "summary omitted attempt");
+    assert(reply.includes("current_stage=edit_en"), "summary omitted current_stage");
+    assert(reply.includes("week_key=2026-W60"), "summary omitted week_key");
+    assert(reply.includes("summary=Approval summary first sentence."), "summary excerpt missing");
+    assert(findEventsByJob(db, "status-known").length === 0, "allowlisted status wrote event");
+
+    return [
+      "Allowlisted known-job status returned deterministic DB-backed job, status, attempt, stage, week, and summary fields.",
+      "Known-job status wrote no events.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runStatusUnknownJobVisible(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    const replies: string[] = [];
+
+    const result = await handleStatusCommand({
+      db,
+      text: "/status missing-status",
+      chatId: 123,
+      operatorChatIds: [123],
+      now: () => 10_700_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(result.status === "error", "unknown status was not an error");
+    assert(replies[0] === "UNKNOWN_JOB: missing-status", "unknown status reply omitted job ID");
+    assert(eventCount(db) === 0, "unknown allowlisted status wrote event");
+
+    return [
+      "Allowlisted unknown-job status returned UNKNOWN_JOB with job ID and wrote no event.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runStatusUnauthorizedKnownJob(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "status-unauthorized", {
+      last_notify_error: "existing notify error",
+    });
+    const before = requireJob(db, "status-unauthorized");
+    const replies: string[] = [];
+
+    const result = await handleStatusCommand({
+      db,
+      text: "/status status-unauthorized",
+      chatId: 999,
+      operatorChatIds: [123],
+      now: () => 10_800_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    const after = requireJob(db, "status-unauthorized");
+    const unauthorizedEvents = findEventsByJob(db, "status-unauthorized", "unauthorized");
+    const payload = JSON.parse(unauthorizedEvents[0]?.payload ?? "{}") as {
+      command?: string;
+      chat_id?: number;
+    };
+    assert(result.status === "unauthorized_audited", "known unauthorized status was not audited");
+    assert(replies.length === 0, "unauthorized known status received reply");
+    assert(stableJobSnapshot(after) === stableJobSnapshot(before), "unauthorized status mutated job");
+    assert(unauthorizedEvents.length === 1, "known unauthorized status did not write one audit event");
+    assert(payload.command === "status", "unauthorized status payload omitted command");
+    assert(payload.chat_id === 999, "unauthorized status payload omitted chat ID");
+
+    return [
+      "Unauthorized parseable known-job status wrote one unauthorized event, sent no reply, and left the job row unchanged.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runStatusUnauthorizedUnknownJob(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    const replies: string[] = [];
+
+    const result = await handleStatusCommand({
+      db,
+      text: "/status missing-status",
+      chatId: 999,
+      operatorChatIds: [123],
+      now: () => 10_900_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(result.status === "unauthorized_ignored", "unknown unauthorized status was not ignored");
+    assert(replies.length === 0, "unknown unauthorized status received reply");
+    assert(eventCount(db) === 0, "unknown unauthorized status bypassed FK or wrote an event");
+
+    return [
+      "Unauthorized unknown-job status sent no reply and wrote no fake-job audit event.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runStatusReadOnlyNoMutation(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "status-readonly", {
+      week_key: "2026-W61",
+      current_stage: "translate_zh",
+      approval_summary: "summary",
+      notified_at: 123,
+      last_notify_error: "notify problem",
+      error: "prior error text",
+      artifact_dir: "reports/readonly",
+      run_dir: ".runs/status-readonly",
+      primary_report_path: ".runs/status-readonly/attempt-1/report.en.md",
+      translated_report_path: ".runs/status-readonly/attempt-1/report.zh.md",
+      sources_path: ".runs/status-readonly/attempt-1/sources.json",
+    });
+    const sentinel = resolve(dir, ".runs", "status-readonly", "attempt-1", "sentinel.txt");
+    mkdirSync(dirname(sentinel), { recursive: true });
+    writeFileSync(sentinel, "do not touch\n");
+    const before = stableJobSnapshot(requireJob(db, "status-readonly"));
+    const beforeEventCount = eventCount(db);
+    const replies: string[] = [];
+
+    await handleStatusCommand({
+      db,
+      text: "/status status-readonly",
+      chatId: 123,
+      operatorChatIds: [123],
+      now: () => 11_000_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(replies[0]?.includes("job_id=status-readonly"), "readonly status did not reply");
+    assert(stableJobSnapshot(requireJob(db, "status-readonly")) === before, "allowlisted status mutated job row");
+    assert(eventCount(db) === beforeEventCount, "allowlisted status inserted event");
+    assert(readFileSync(sentinel, "utf8") === "do not touch\n", "allowlisted status touched filesystem sentinel");
+
+    return [
+      "Allowlisted known-job status left the full job row, event count, and filesystem sentinel unchanged.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runStatusPublishedManifestAuthority(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "status-published", {
+      status: "published",
+      week_key: "2026-W62",
+      current_stage: "approval",
+      artifact_dir: "reports/2026-W62-ai-trends",
+    });
+    insertEvent(db, {
+      job_id: "status-published",
+      attempt_number: 1,
+      type: "promoted",
+      payload: JSON.stringify({
+        publish_manifest: {
+          artifact_dir: "reports/2026-W62-ai-trends",
+          job_id: "status-published",
+          attempt_number: 1,
+          files: ["report.en.md", "sources.json"],
+          sha256: {
+            "report.en.md": "a".repeat(64),
+            "sources.json": "b".repeat(64),
+          },
+          aggregate_sha256: "ABCDEF1234567890".padEnd(64, "0"),
+        },
+      }),
+      created_at: 11_100_000_000,
+    });
+    const commandSource = readSource("src/telegram/commands.ts");
+    const replies: string[] = [];
+
+    await handleStatusCommand({
+      db,
+      text: "/status status-published",
+      chatId: 123,
+      operatorChatIds: [123],
+      now: () => 11_100_000_001,
+      reply: (text) => replies.push(text),
+    });
+
+    const reply = replies[0] ?? "";
+    assert(reply.includes("artifact_dir=reports/2026-W62-ai-trends"), "published status omitted artifact_dir");
+    assert(reply.includes("publish_manifest=present"), "published status omitted manifest marker");
+    assert(reply.includes("files=2"), "published status omitted manifest file count");
+    assert(reply.includes("aggregate_sha256=abcdef123456"), "published status omitted first-12 lowercase aggregate");
+    const statusSource = statusCommandSurfaceSource();
+    assert(!/\.runs\//.test(statusSource), "status command source inspects .runs");
+    assert(!/promoteJob\(/.test(statusSource), "status command source calls promoteJob");
+
+    return [
+      "Published status summarized artifact_dir plus DB-event publish_manifest file count and first-12 aggregate digest.",
+      "Source assertions confirm status handling does not inspect .runs or call promoteJob.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runStatusFailedJobErrorVisible(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "status-failed", {
+      status: "failed",
+      current_stage: "draft_en",
+      error: "Stage failed because the generated report missed the manifest.",
+    });
+    const replies: string[] = [];
+
+    await handleStatusCommand({
+      db,
+      text: "/status status-failed",
+      chatId: 123,
+      operatorChatIds: [123],
+      now: () => 11_200_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(replies[0]?.includes("status=failed"), "failed status omitted failed state");
+    assert(replies[0]?.includes("error=Stage failed because"), "failed status omitted bounded error");
+
+    return [
+      "Failed-job status includes failed state and a bounded DB-backed error excerpt.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runStatusLastNotifyErrorVisible(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "status-notify-error", {
+      last_notify_error: "Telegram send failed with HTTP 500 after retries.",
+    });
+    const replies: string[] = [];
+
+    await handleStatusCommand({
+      db,
+      text: "/status status-notify-error",
+      chatId: 123,
+      operatorChatIds: [123],
+      now: () => 11_300_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(
+      replies[0]?.includes("last_notify_error=Telegram send failed with HTTP 500"),
+      "status omitted last_notify_error",
+    );
+
+    return [
+      "Status includes a bounded last_notify_error excerpt when the DB row carries one.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runStatusApprovalSummaryVisible(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "status-summary", {
+      approval_summary: [
+        "Intro line that should not win.",
+        "<!-- EVIDENCE_GRADE_WARN: source coverage is thin -->",
+        "Trailing detail.",
+      ].join("\n"),
+    });
+    const replies: string[] = [];
+
+    await handleStatusCommand({
+      db,
+      text: "/status status-summary",
+      chatId: 123,
+      operatorChatIds: [123],
+      now: () => 11_400_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(
+      replies[0]?.includes("summary=<!-- EVIDENCE_GRADE_WARN: source coverage is thin -->"),
+      "status did not prefer Evidence Grade warning line",
+    );
+
+    return [
+      "Awaiting-approval status prefers the first Evidence Grade warning line as the bounded summary excerpt.",
+    ];
+  } finally {
+    close();
+  }
+}
+
 async function runBotCommandWiring(dir: string): Promise<string[]> {
   const dbPath = resolve(dir, "content.db");
   const db = openDb(dbPath);
@@ -1958,6 +2412,10 @@ async function runBotCommandWiring(dir: string): Promise<string[]> {
     run_dir: ".runs/approve-wire",
   });
   seedAwaitingJob(db, "reject-wire");
+  seedAwaitingJob(db, "status-wire", {
+    current_stage: "edit_en",
+    week_key: "2026-W63",
+  });
   db.close();
   writeAttemptBundle(dir, "approve-wire", 1);
 
@@ -1998,6 +2456,11 @@ async function runBotCommandWiring(dir: string): Promise<string[]> {
     "/reject reject-wire 1 bundle:other operator decision",
     123,
   );
+  const statusReplies = await commandTransport.dispatch(
+    "status",
+    "/status status-wire",
+    123,
+  );
   runtime.stop();
 
   const checkDb = openDb(dbPath);
@@ -2012,41 +2475,27 @@ async function runBotCommandWiring(dir: string): Promise<string[]> {
     assert(outgoingSends.length === 0, "command reply used outgoing notifier transport");
     assert(commandTransport.handlers.has("approve"), "approve command handler was not registered");
     assert(commandTransport.handlers.has("reject"), "reject command handler was not registered");
-    assert(!commandTransport.handlers.has("status" as TelegramCommandName), "status command was registered");
+    assert(commandTransport.handlers.has("status"), "status command handler was not registered");
     assert(approveReplies.length === 1, "approve handler did not reply through command seam");
     assert(approveReplies[0]?.startsWith("Approved attempt 1."), "approve seam reply did not succeed");
     assert(replies.length === 1, "command handler did not reply through command seam");
     assert(replies[0]?.startsWith("Rejected attempt 1."), "command seam reply did not succeed");
+    assert(statusReplies.length === 1, "status handler did not reply through command seam");
+    assert(statusReplies[0]?.includes("job_id=status-wire"), "status seam reply did not summarize job");
     assert(approvedJob.status === "published", "wired approve did not mutate configured DB");
     assert(findEventsByJob(checkDb, "approve-wire", "promoted").length === 1, "wired approve did not write promoted event");
     assert(job.status === "queued", "wired command did not mutate configured DB");
     assert(job.attempt_number === 2, "wired command did not increment attempt");
     assert(findEventsByJob(checkDb, "reject-wire", "rejected").length === 1, "wired command did not write reject event");
+    assert(findEventsByJob(checkDb, "status-wire").length === 0, "wired status wrote an event");
 
     return [
-      "startBotRuntime registered /approve and /reject on a fake command transport, opened the configured DB path per command, replied through the command seam, and left notifier tick orchestration separate.",
-      "/status remained unregistered and command dispatch did not call notifyPendingApprovals.",
+      "startBotRuntime registered /approve, /reject, and /status on a fake command transport, opened the configured DB path per command, replied through the command seam, and left notifier tick orchestration separate.",
+      "/status summarized a configured DB job without writing events or calling notifyPendingApprovals.",
     ];
   } finally {
     checkDb.close();
   }
-}
-
-function runNoStatusHandler(): string[] {
-  const combined = `${readSource("src/telegram/bot.ts")}\n${readSource("src/telegram/commands.ts")}`;
-  const forbiddenPatterns = [
-    [/\/status/, "/status command literal"],
-    [/onCommand\(\s*["']status["']/, "status command registration"],
-    [/TODO.*status|placeholder.*status/i, "inert status placeholder"],
-  ] as const satisfies readonly ForbiddenPattern[];
-
-  assertNoForbiddenPatterns(combined, forbiddenPatterns, "bot command surfaces");
-  assert(/onCommand\(\s*["']approve["']/.test(combined), "approve command is not registered");
-  assert(/onCommand\(\s*["']reject["']/.test(combined), "reject command is not registered");
-
-  return [
-    "Changed command surfaces register /approve and /reject while containing no /status handler or placeholder.",
-  ];
 }
 
 function runBoundaryStaticCheck(): string[] {
@@ -2059,8 +2508,10 @@ function runBoundaryStaticCheck(): string[] {
     "src/lib/report-loop.ts",
     "src/lib/report-run-fake-provider.ts",
     "src/lib/runtime-config.ts",
+    "src/promote.ts",
     "src/db.ts",
     "src/preflight.ts",
+    "scripts/lib/static-guardrails.ts",
   ]);
   assertNoChangedDirectories(changed, [
     "src/pipeline/",
@@ -2072,8 +2523,7 @@ function runBoundaryStaticCheck(): string[] {
   const changedSources = changed
     .filter((file) =>
       file === "src/telegram/bot.ts" ||
-      file === "src/telegram/commands.ts" ||
-      file === "src/promote.ts"
+      file === "src/telegram/commands.ts"
     )
     .map((file) => [file, readChangedSource(file)] as const);
   const forbiddenRuntimePatterns: readonly ForbiddenPattern[] = [
@@ -2088,18 +2538,17 @@ function runBoundaryStaticCheck(): string[] {
 
   const commandsSource = readSource("src/telegram/commands.ts");
   assert(!/notifyPendingApprovals|from\s+["']\.\/notifier\.ts["']/.test(commandsSource), "commands.ts duplicated notifier orchestration");
+  const statusSource = statusCommandSurfaceSource();
+  assert(!/promoteJob\(/.test(statusSource), "status command surface calls promoteJob");
+  assert(!/\.runs\//.test(statusSource), "status command surface inspects .runs");
 
   const smokeSource = readSource("scripts/bot-smoke.ts");
   assert(!/fetch\s*\(|api\.telegram\.org|https:\/\/api\.telegram\.org/.test(smokeSource), "smoke can call Telegram");
-  assert(
-    GIT_POST_STEP_PATTERNS.some(([pattern]) => pattern.test(readSource("src/promote.ts"))),
-    "git post-step concept-class helper did not recognize promote.ts",
-  );
 
   return [
     `Stable base/status scope check saw only declared files: ${changed.join(", ") || "<none>"}.`,
     "Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.",
-    "Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and git post-step concept-class coverage is active.",
+    "Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and status handling does not call promoteJob or inspect .runs.",
   ];
 }
 
@@ -2118,6 +2567,7 @@ function runDependencyBoundaryCheck(): string[] {
   assertNoForbiddenPatterns(commandsSource, TELEGRAM_SDK_IMPORT_PATTERNS, "commands.ts");
   assertNoForbiddenPatterns(commandsSource, TELEGRAM_SDK_NETWORK_PATTERNS, "commands.ts Telegram network surface");
   assertNoForbiddenPatterns(promoteSource, TELEGRAM_SDK_NETWORK_PATTERNS, "promote.ts Telegram network surface");
+  assert(!/promoteJob\(/.test(statusCommandSurfaceSource()), "status command surface calls promoteJob");
   const declaredTelegramDeps = ["grammy", "telegraf"].filter(
     (name) => packageJson.dependencies?.[name] || packageJson.devDependencies?.[name],
   );
@@ -2143,7 +2593,7 @@ function runDependencyBoundaryCheck(): string[] {
 
   return [
     "Telegram SDK/network concept-class checks are shared and absent from notifier.ts, commands.ts, and promote.ts.",
-    "package.json exposes only the expected bot runtime and bot-smoke command surfaces for this slice.",
+    "commands.ts does not add Telegram network or new publish/process surfaces for /status, and package.json exposes only the expected bot runtime and bot-smoke command surfaces.",
   ];
 }
 
@@ -2173,8 +2623,7 @@ function runNoPreflightCodexSurvivability(): string[] {
   const botSource = readSource("src/telegram/bot.ts");
   const allowlistSource = readSource("src/telegram/allowlist.ts");
   const commandsSource = readChangedSource("src/telegram/commands.ts");
-  const promoteSource = readSource("src/promote.ts");
-  const combined = `${botSource}\n${allowlistSource}\n${commandsSource}\n${promoteSource}`;
+  const combined = `${botSource}\n${allowlistSource}\n${commandsSource}`;
   const forbiddenPatterns: readonly ForbiddenPattern[] = [
     [/preflight\.ts|assertCodexAvailable/, "preflight dependency"],
     [/codex-smoke/, "codex smoke dependency"],
@@ -2186,7 +2635,7 @@ function runNoPreflightCodexSurvivability(): string[] {
   assertNoForbiddenPatterns(combined, forbiddenPatterns, "bot command surfaces");
 
   return [
-    "Bot, allowlist, and command surfaces have no preflight, Codex smoke, LLM, prompt, process-spawn, or report-run execution dependency.",
+    "Changed bot, allowlist, and command surfaces have no preflight, Codex smoke, LLM, prompt, process-spawn, or report-run execution dependency.",
   ];
 }
 
@@ -2310,6 +2759,10 @@ function requireJob(db: DbClient, id: string): Job {
   return job;
 }
 
+function stableJobSnapshot(job: Job): string {
+  return JSON.stringify(job);
+}
+
 function eventCount(db: DbClient): number {
   return db
     .query<{ count: number }, []>("SELECT COUNT(*) AS count FROM events")
@@ -2329,6 +2782,35 @@ function readChangedSource(relativePath: string): string {
   return relativePath === "src/telegram/commands.ts"
     ? stripAllowedReportRunGuidance(source)
     : source;
+}
+
+function statusCommandSurfaceSource(): string {
+  const source = readSource("src/telegram/commands.ts");
+  return [
+    sourceSlice(
+      source,
+      "export async function handleStatusCommand",
+      "export function isValidRejectScopeType",
+    ),
+    sourceSlice(
+      source,
+      "export function formatStatusReply",
+      "export function approveSuccessReply",
+    ),
+    sourceSlice(
+      source,
+      "function publishedManifestStatusLine",
+      "function approvalSummaryExcerpt",
+    ),
+  ].join("\n");
+}
+
+function sourceSlice(source: string, startNeedle: string, endNeedle: string): string {
+  const start = source.indexOf(startNeedle);
+  assert(start >= 0, `missing source anchor: ${startNeedle}`);
+  const end = source.indexOf(endNeedle, start);
+  assert(end > start, `missing source end anchor: ${endNeedle}`);
+  return source.slice(start, end);
 }
 
 function stripAllowedReportRunGuidance(source: string): string {
@@ -2351,7 +2833,7 @@ function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {
     "",
     "## Evidence Ceiling",
     "",
-    "This smoke exercises deterministic allowlist parsing, injected bot runtime seams, reject command product-row authority, static source boundaries, shared static guardrails, and fake Telegram transports only. It does not call Telegram, launch browser checks, or run operator-only Codex-backed report execution.",
+    "This smoke exercises deterministic allowlist parsing, injected bot runtime seams, Telegram command handlers, static source boundaries, shared static guardrails, and fake Telegram transports only. It does not call Telegram, launch browser checks, or run operator-only Codex-backed report execution.",
     "",
     "## Scenario Results",
     "",

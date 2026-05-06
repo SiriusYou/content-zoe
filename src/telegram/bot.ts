@@ -8,7 +8,11 @@ import {
   type NotifyPendingApprovalsResult,
 } from "./notifier.ts";
 import { parseOperatorChatIds } from "./allowlist.ts";
-import { handleApproveCommand, handleRejectCommand } from "./commands.ts";
+import {
+  handleApproveCommand,
+  handleRejectCommand,
+  handleStatusCommand,
+} from "./commands.ts";
 import type { GitCommitter, PromoteJobHooks } from "../promote.ts";
 
 export const TELEGRAM_BOT_TOKEN_ENV = "TELEGRAM_BOT_TOKEN";
@@ -53,7 +57,7 @@ export interface TelegramHttpTransportOptions {
   readonly apiRoot?: string;
 }
 
-export type TelegramCommandName = "approve" | "reject";
+export type TelegramCommandName = "approve" | "reject" | "status";
 
 export interface TelegramCommandContext {
   readonly chatId: number;
@@ -334,6 +338,13 @@ export interface RegisterApproveCommandOptions {
   readonly publishHooks?: PromoteJobHooks;
 }
 
+export interface RegisterStatusCommandOptions {
+  readonly dbPath: string;
+  readonly operatorChatIds: readonly number[];
+  readonly openDb: (dbPath: string) => DbClient;
+  readonly now: () => number;
+}
+
 export function registerApproveCommand(
   commandTransport: TelegramCommandTransport,
   options: RegisterApproveCommandOptions,
@@ -350,6 +361,27 @@ export function registerApproveCommand(
         now: options.now,
         committer: options.committer,
         publishHooks: options.publishHooks,
+        reply: (text) => context.reply(text),
+      });
+    } finally {
+      db.close();
+    }
+  });
+}
+
+export function registerStatusCommand(
+  commandTransport: TelegramCommandTransport,
+  options: RegisterStatusCommandOptions,
+): void {
+  commandTransport.onCommand("status", async (context) => {
+    const db = options.openDb(options.dbPath);
+    try {
+      await handleStatusCommand({
+        db,
+        text: context.text,
+        chatId: context.chatId,
+        operatorChatIds: options.operatorChatIds,
+        now: options.now,
         reply: (text) => context.reply(text),
       });
     } finally {
@@ -468,6 +500,12 @@ export function startBotRuntime(options: StartBotRuntimeOptions = {}): BotRuntim
     openDb,
     now,
   });
+  registerStatusCommand(commandTransport, {
+    dbPath: config.dbPath,
+    operatorChatIds: config.operatorChatIds,
+    openDb,
+    now,
+  });
   const handle = timer.setInterval(() => {
     void tickController.tick().catch(onTickError);
   }, config.tickIntervalMs);
@@ -500,6 +538,9 @@ function commandNameFromText(text: string): TelegramCommandName | null {
   }
   if (/^\/reject(?:@\w+)?(?:\s|$)/.test(trimmed)) {
     return "reject";
+  }
+  if (/^\/status(?:@\w+)?(?:\s|$)/.test(trimmed)) {
+    return "status";
   }
   return null;
 }

@@ -1,14 +1,14 @@
 # Bot Smoke Evidence
 
 - Command: `bun run bot-smoke`
-- Started: 2026-05-06T05:27:04.322Z
-- Finished: 2026-05-06T05:27:04.551Z
-- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T05-27-04.320Z (removed by finally-cleanup)
-- Result: 44/44 PASS
+- Started: 2026-05-06T11:23:25.894Z
+- Finished: 2026-05-06T11:23:26.103Z
+- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T11-23-25.894Z (removed by finally-cleanup)
+- Result: 55/55 PASS
 
 ## Evidence Ceiling
 
-This smoke exercises deterministic allowlist parsing, injected bot runtime seams, reject command product-row authority, static source boundaries, shared static guardrails, and fake Telegram transports only. It does not call Telegram, launch browser checks, or run operator-only Codex-backed report execution.
+This smoke exercises deterministic allowlist parsing, injected bot runtime seams, Telegram command handlers, static source boundaries, shared static guardrails, and fake Telegram transports only. It does not call Telegram, launch browser checks, or run operator-only Codex-backed report execution.
 
 ## Scenario Results
 
@@ -52,9 +52,20 @@ This smoke exercises deterministic allowlist parsing, injected bot runtime seams
 | approve-runs-cleanup | PASS | Successful approve deleted only the current approved attempt directory and preserved another attempt.<br>A failed approve preserved its source attempt for forensics. |
 | approve-cleanup-failure-visible | PASS | Injected source cleanup failure was non-blocking: job stayed published and promoted event remained authoritative.<br>The approve reply and cleanup_failed event both exposed cleanup diagnostics. |
 | approve-git-commit-failure-nonblocking | PASS | Fake git committer failure was non-blocking: job stayed published and promoted event remained authoritative.<br>A git_commit_failed event captured diagnostics and fake plan assertions proved path-bounded argv semantics. |
-| bot-command-wiring | PASS | startBotRuntime registered /approve and /reject on a fake command transport, opened the configured DB path per command, replied through the command seam, and left notifier tick orchestration separate.<br>/status remained unregistered and command dispatch did not call notifyPendingApprovals. |
-| no-status-handler | PASS | Changed command surfaces register /approve and /reject while containing no /status handler or placeholder. |
-| boundary-static-check | PASS | Stable base/status scope check saw only declared files: docs/preflight/bot-smoke.md, scripts/bot-smoke.ts, scripts/lib/static-guardrails.ts, src/promote.ts, src/telegram/bot.ts, src/telegram/commands.ts.<br>Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.<br>Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and git post-step concept-class coverage is active. |
-| dependency-boundary-check | PASS | Telegram SDK/network concept-class checks are shared and absent from notifier.ts, commands.ts, and promote.ts.<br>package.json exposes only the expected bot runtime and bot-smoke command surfaces for this slice. |
-| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T05-27-04.320Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
-| no-preflight-codex-survivability | PASS | Bot, allowlist, and command surfaces have no preflight, Codex smoke, LLM, prompt, process-spawn, or report-run execution dependency. |
+| status-command-parse | PASS | Canonical /status and bot-mentioned /status parsed a single job ID.<br>Extra-token malformed status preserved the parseable job ID while bare /status exposed no fake job ID. |
+| status-malformed-jobid-preserved | PASS | Allowlisted malformed /status with a recoverable job token returned INVALID_COMMAND with that job ID.<br>Malformed allowlisted status wrote no unauthorized audit event. |
+| status-bare-invalid-no-fake-jobid | PASS | Bare /status returned INVALID_COMMAND without a colon or invented job ID.<br>Bare allowlisted status wrote no unauthorized audit event. |
+| status-known-job-summary | PASS | Allowlisted known-job status returned deterministic DB-backed job, status, attempt, stage, week, and summary fields.<br>Known-job status wrote no events. |
+| status-unknown-job-visible | PASS | Allowlisted unknown-job status returned UNKNOWN_JOB with job ID and wrote no event. |
+| status-unauthorized-known-job | PASS | Unauthorized parseable known-job status wrote one unauthorized event, sent no reply, and left the job row unchanged. |
+| status-unauthorized-unknown-job | PASS | Unauthorized unknown-job status sent no reply and wrote no fake-job audit event. |
+| status-read-only-no-mutation | PASS | Allowlisted known-job status left the full job row, event count, and filesystem sentinel unchanged. |
+| status-published-manifest-authority | PASS | Published status summarized artifact_dir plus DB-event publish_manifest file count and first-12 aggregate digest.<br>Source assertions confirm status handling does not inspect .runs or call promoteJob. |
+| status-failed-job-error-visible | PASS | Failed-job status includes failed state and a bounded DB-backed error excerpt. |
+| status-last-notify-error-visible | PASS | Status includes a bounded last_notify_error excerpt when the DB row carries one. |
+| status-approval-summary-visible | PASS | Awaiting-approval status prefers the first Evidence Grade warning line as the bounded summary excerpt. |
+| bot-command-wiring | PASS | startBotRuntime registered /approve, /reject, and /status on a fake command transport, opened the configured DB path per command, replied through the command seam, and left notifier tick orchestration separate.<br>/status summarized a configured DB job without writing events or calling notifyPendingApprovals. |
+| boundary-static-check | PASS | Stable base/status scope check saw only declared files: docs/preflight/bot-smoke.md, scripts/bot-smoke.ts, src/telegram/bot.ts, src/telegram/commands.ts.<br>Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.<br>Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and status handling does not call promoteJob or inspect .runs. |
+| dependency-boundary-check | PASS | Telegram SDK/network concept-class checks are shared and absent from notifier.ts, commands.ts, and promote.ts.<br>commands.ts does not add Telegram network or new publish/process surfaces for /status, and package.json exposes only the expected bot runtime and bot-smoke command surfaces. |
+| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T11-23-25.894Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
+| no-preflight-codex-survivability | PASS | Changed bot, allowlist, and command surfaces have no preflight, Codex smoke, LLM, prompt, process-spawn, or report-run execution dependency. |

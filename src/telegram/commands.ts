@@ -1,5 +1,6 @@
 import {
   casUpdateJob,
+  findEventsByJob,
   findJobById,
   insertEvent,
   type DbClient,
@@ -15,6 +16,7 @@ import {
 
 export const APPROVE_COMMAND = "approve";
 export const REJECT_COMMAND = "reject";
+export const STATUS_COMMAND = "status";
 export const REJECT_REASON_MAX_CHARS = 500;
 
 export type RejectScope = "en" | "zh" | "bundle";
@@ -44,6 +46,8 @@ export type ApproveCommandErrorCode =
   | "PUBLISH_ARTIFACT_DIVERGED"
   | "APPROVE_RACE_LOST"
   | "PUBLISH_FAILED";
+
+export type StatusCommandErrorCode = "INVALID_COMMAND" | "UNKNOWN_JOB";
 
 export interface ParsedApproveCommand {
   readonly jobId: string;
@@ -91,6 +95,25 @@ export type ParseRejectCommandResult =
   | ParseRejectCommandSuccess
   | ParseRejectCommandFailure;
 
+export interface ParsedStatusCommand {
+  readonly jobId: string;
+}
+
+export interface ParseStatusCommandSuccess {
+  readonly ok: true;
+  readonly command: ParsedStatusCommand;
+}
+
+export interface ParseStatusCommandFailure {
+  readonly ok: false;
+  readonly code: Extract<StatusCommandErrorCode, "INVALID_COMMAND">;
+  readonly jobId?: string;
+}
+
+export type ParseStatusCommandResult =
+  | ParseStatusCommandSuccess
+  | ParseStatusCommandFailure;
+
 export interface RejectCommandDependencies {
   readonly db: DbClient;
   readonly text: string;
@@ -111,6 +134,15 @@ export interface ApproveCommandDependencies {
   readonly reply: (text: string) => Promise<void> | void;
   readonly committer?: GitCommitter;
   readonly publishHooks?: PromoteJobHooks;
+}
+
+export interface StatusCommandDependencies {
+  readonly db: DbClient;
+  readonly text: string;
+  readonly chatId: number;
+  readonly operatorChatIds: readonly number[];
+  readonly now: () => number;
+  readonly reply: (text: string) => Promise<void> | void;
 }
 
 export interface RejectCommandResult {
@@ -135,12 +167,23 @@ export interface ApproveCommandResult {
   readonly publishResult?: PromoteJobResult;
 }
 
+export interface StatusCommandResult {
+  readonly status:
+    | "reported"
+    | "error"
+    | "unauthorized_audited"
+    | "unauthorized_ignored";
+  readonly code?: StatusCommandErrorCode;
+  readonly replyText?: string;
+}
+
 const awaitingApprovalStatus = "awaiting_approval";
 const queuedStatus = "queued";
 const rejectedEventType = "rejected";
 const unauthorizedEventType = "unauthorized";
 const approveCommandPattern = /^\/approve(?:@\w+)?(?:\s+(\S+))?(?:\s+(\S+))?(?:\s+(\S+))?$/;
 const rejectCommandPattern = /^\/reject(?:@\w+)?(?:\s+(\S+))?(?:\s+(\S+))?(?:\s+(\S+))?(?:\s+([\s\S]*))?$/;
+const statusCommandPattern = /^\/status(?:@\w+)?(?:\s+(\S+))?(?:\s+(\S+))?$/;
 const positiveIntegerPattern = /^\d+$/;
 const rejectScopes = ["en", "zh", "bundle"] as const;
 const rejectTypes = [
@@ -252,6 +295,27 @@ export function parseRejectCommand(text: string): ParseRejectCommandResult {
   };
 }
 
+export function parseStatusCommand(text: string): ParseStatusCommandResult {
+  const match = statusCommandPattern.exec(text.trim());
+  if (!match) {
+    return parseStatusRecoverableJobId(text);
+  }
+
+  const [, jobId, extraToken] = match;
+  if (jobId === undefined) {
+    return { ok: false, code: "INVALID_COMMAND" };
+  }
+
+  if (extraToken !== undefined) {
+    return { ok: false, code: "INVALID_COMMAND", jobId };
+  }
+
+  return {
+    ok: true,
+    command: { jobId },
+  };
+}
+
 export async function handleApproveCommand(
   dependencies: ApproveCommandDependencies,
 ): Promise<ApproveCommandResult> {
@@ -310,6 +374,51 @@ export async function handleApproveCommand(
     }
     throw err;
   }
+}
+
+export async function handleStatusCommand(
+  dependencies: StatusCommandDependencies,
+): Promise<StatusCommandResult> {
+  const parsed = parseStatusCommand(dependencies.text);
+  const authorized = isAllowedChatId(
+    dependencies.operatorChatIds,
+    dependencies.chatId,
+  );
+
+  if (!parsed.ok) {
+    if (authorized) {
+      return replyWithStatusError(dependencies, parsed.code, parsed.jobId);
+    }
+    return { status: "unauthorized_ignored" };
+  }
+
+  const job = findJobById(dependencies.db, parsed.command.jobId);
+
+  if (!authorized) {
+    if (job === null) {
+      return { status: "unauthorized_ignored" };
+    }
+
+    insertEvent(dependencies.db, {
+      job_id: job.id,
+      attempt_number: job.attempt_number,
+      type: unauthorizedEventType,
+      payload: JSON.stringify({
+        command: STATUS_COMMAND,
+        chat_id: dependencies.chatId,
+      }),
+      created_at: dependencies.now(),
+    });
+    return { status: "unauthorized_audited" };
+  }
+
+  if (job === null) {
+    return replyWithStatusError(dependencies, "UNKNOWN_JOB", parsed.command.jobId);
+  }
+
+  const replyText = formatStatusReply(dependencies.db, job);
+  await dependencies.reply(replyText);
+  return { status: "reported", replyText };
 }
 
 export function isValidRejectScopeType(
@@ -487,6 +596,16 @@ async function replyWithApproveError(
   return { status: "error", code, replyText };
 }
 
+async function replyWithStatusError(
+  dependencies: StatusCommandDependencies,
+  code: StatusCommandErrorCode,
+  jobId?: string,
+): Promise<StatusCommandResult> {
+  const replyText = formatStatusErrorReply(code, jobId);
+  await dependencies.reply(replyText);
+  return { status: "error", code, replyText };
+}
+
 export function formatApproveErrorReply(
   code: ApproveCommandErrorCode,
   jobId?: string,
@@ -501,8 +620,44 @@ export function formatRejectErrorReply(
   return jobId === undefined ? code : `${code}: ${jobId}`;
 }
 
+export function formatStatusErrorReply(
+  code: StatusCommandErrorCode,
+  jobId?: string,
+): string {
+  return jobId === undefined ? code : `${code}: ${jobId}`;
+}
+
 export function rejectSuccessReply(command: ParsedRejectCommand): string {
   return `Rejected attempt ${command.attemptNumber}. Run \`bun run report:run ${command.jobId}\` to start attempt ${command.attemptNumber + 1} from ${rewindStageForScope(command.scope)}.`;
+}
+
+export function formatStatusReply(db: DbClient, job: Job): string {
+  const lines = [
+    `STATUS job_id=${job.id} status=${job.status} attempt_number=${job.attempt_number} current_stage=${job.current_stage} week_key=${job.week_key}`,
+  ];
+
+  if (job.artifact_dir !== null) {
+    lines.push(`artifact_dir=${job.artifact_dir}`);
+  }
+
+  const manifestLine = publishedManifestStatusLine(db, job);
+  if (manifestLine !== null) {
+    lines.push(manifestLine);
+  }
+
+  if (job.status === awaitingApprovalStatus && job.approval_summary !== null) {
+    lines.push(`summary=${approvalSummaryExcerpt(job.approval_summary)}`);
+  }
+
+  if (job.last_notify_error !== null) {
+    lines.push(`last_notify_error=${boundedExcerpt(job.last_notify_error)}`);
+  }
+
+  if (job.error !== null) {
+    lines.push(`error=${boundedExcerpt(job.error)}`);
+  }
+
+  return lines.join("\n");
 }
 
 export function approveSuccessReply(result: PromoteJobResult): string {
@@ -537,6 +692,80 @@ function parseApproveRecoverableJobId(text: string): ParseApproveCommandFailure 
   return jobId === undefined
     ? { ok: false, code: "INVALID_COMMAND" }
     : { ok: false, code: "INVALID_COMMAND", jobId };
+}
+
+function parseStatusRecoverableJobId(text: string): ParseStatusCommandFailure {
+  const tokens = text.trim().split(/\s+/).filter(Boolean);
+  const commandToken = tokens[0];
+  if (commandToken === undefined || !/^\/status(?:@\w+)?$/.test(commandToken)) {
+    return { ok: false, code: "INVALID_COMMAND" };
+  }
+  const jobId = tokens[1];
+  return jobId === undefined
+    ? { ok: false, code: "INVALID_COMMAND" }
+    : { ok: false, code: "INVALID_COMMAND", jobId };
+}
+
+function publishedManifestStatusLine(db: DbClient, job: Job): string | null {
+  if (job.status !== "published") {
+    return null;
+  }
+
+  const events = findEventsByJob(db, job.id, "promoted");
+  const latest = events.at(-1);
+  if (latest === undefined || latest.payload === null) {
+    return "publish_manifest=missing";
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(latest.payload);
+  } catch {
+    return "publish_manifest=unparseable";
+  }
+
+  const manifest = readObject(payload)?.publish_manifest;
+  const manifestObject = readObject(manifest);
+  if (manifestObject === null) {
+    return "publish_manifest=missing";
+  }
+
+  const files = manifestObject.files;
+  const aggregateSha = manifestObject.aggregate_sha256;
+  if (
+    !Array.isArray(files) ||
+    typeof aggregateSha !== "string" ||
+    !/^[a-fA-F0-9]{12,}$/.test(aggregateSha)
+  ) {
+    return "publish_manifest=unparseable";
+  }
+
+  return `publish_manifest=present files=${files.length} aggregate_sha256=${aggregateSha.slice(0, 12).toLowerCase()}`;
+}
+
+function approvalSummaryExcerpt(value: string): string {
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => collapseWhitespace(line))
+    .filter((line) => line.length > 0);
+  const evidenceLine = lines.find((line) =>
+    /EVIDENCE_GRADE|Evidence Grade/.test(line),
+  );
+  return boundedExcerpt(evidenceLine ?? value);
+}
+
+function boundedExcerpt(value: string): string {
+  return collapseWhitespace(value).slice(0, 160);
+}
+
+function collapseWhitespace(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function readObject(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null
+    ? value as Record<string, unknown>
+    : null;
 }
 
 function isRejectScope(value: string): value is RejectScope {
