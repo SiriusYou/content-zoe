@@ -34,10 +34,13 @@ import {
 } from "../src/db.ts";
 import { parseOperatorChatIds } from "../src/telegram/allowlist.ts";
 import {
+  DEFAULT_COMMAND_POLL_INTERVAL_MS,
+  DEFAULT_COMMAND_LONG_POLL_TIMEOUT_SECONDS,
   DEFAULT_TICK_INTERVAL_MS,
   defaultBotDbPath,
   loadBotConfig,
   createBotTick,
+  createTelegramHttpCommandTransport,
   createTelegramSender,
   startBotRuntime,
   type TelegramCommandHandler,
@@ -124,6 +127,11 @@ type ScenarioName =
   | "status-failed-job-error-visible"
   | "status-last-notify-error-visible"
   | "status-approval-summary-visible"
+  | "command-long-poll-timeout"
+  | "command-long-poll-offset"
+  | "command-long-poll-malformed-onerror"
+  | "command-long-poll-overlap-guard"
+  | "command-long-poll-stop-clears-future-polls"
   | "bot-command-wiring"
   | "boundary-static-check"
   | "dependency-boundary-check"
@@ -189,6 +197,11 @@ const SCENARIOS: readonly ScenarioName[] = [
   "status-failed-job-error-visible",
   "status-last-notify-error-visible",
   "status-approval-summary-visible",
+  "command-long-poll-timeout",
+  "command-long-poll-offset",
+  "command-long-poll-malformed-onerror",
+  "command-long-poll-overlap-guard",
+  "command-long-poll-stop-clears-future-polls",
   "bot-command-wiring",
   "boundary-static-check",
   "dependency-boundary-check",
@@ -202,9 +215,8 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
-const targetBase = "414554e2e5aeeb3aabab67e53c3cc896caea853e";
+const targetBase = "3ca8a27e9789ae93ec7c22d70d898bcc0a17e3a4";
 const declaredScope = new Set([
-  "src/telegram/commands.ts",
   "src/telegram/bot.ts",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
@@ -375,6 +387,16 @@ async function scenarioImpl(
       return runStatusLastNotifyErrorVisible(dir);
     case "status-approval-summary-visible":
       return runStatusApprovalSummaryVisible(dir);
+    case "command-long-poll-timeout":
+      return runCommandLongPollTimeout();
+    case "command-long-poll-offset":
+      return runCommandLongPollOffset();
+    case "command-long-poll-malformed-onerror":
+      return runCommandLongPollMalformedOnError();
+    case "command-long-poll-overlap-guard":
+      return runCommandLongPollOverlapGuard();
+    case "command-long-poll-stop-clears-future-polls":
+      return runCommandLongPollStopClearsFuturePolls();
     case "bot-command-wiring":
       return runBotCommandWiring(dir);
     case "boundary-static-check":
@@ -2404,6 +2426,191 @@ async function runStatusApprovalSummaryVisible(dir: string): Promise<string[]> {
   }
 }
 
+async function runCommandLongPollTimeout(): Promise<string[]> {
+  const requests: URL[] = [];
+  const timer = new FakeTimer();
+  const transport = createTelegramHttpCommandTransport({
+    token: "token",
+    timer,
+    fetchImpl: async (input) => {
+      requests.push(toUrl(input));
+      return telegramResponse([]);
+    },
+  });
+
+  transport.start();
+  await settlePromises();
+  transport.stop();
+
+  assert(requests.length === 1, "start did not issue exactly one immediate getUpdates request");
+  assert(
+    requests[0]?.searchParams.get("timeout") === String(DEFAULT_COMMAND_LONG_POLL_TIMEOUT_SECONDS),
+    "default getUpdates request omitted timeout=30",
+  );
+  assert(requests[0]?.searchParams.get("offset") === null, "initial request included offset");
+  assert(
+    DEFAULT_COMMAND_LONG_POLL_TIMEOUT_SECONDS === 30,
+    "long-poll timeout constant drifted from 30 seconds",
+  );
+  assert(
+    timer.delays[0] === DEFAULT_COMMAND_POLL_INTERVAL_MS,
+    "local command poll interval was repurposed",
+  );
+  assert(
+    DEFAULT_TICK_INTERVAL_MS === 10_000,
+    "notifier tick interval drifted",
+  );
+
+  return [
+    "Default command polling issued getUpdates with timeout=30 and no offset on the immediate request.",
+    "Telegram request timeout remains distinct from the local command poll interval and notifier tick interval.",
+  ];
+}
+
+async function runCommandLongPollOffset(): Promise<string[]> {
+  const requests: URL[] = [];
+  const timer = new FakeTimer();
+  const transport = createTelegramHttpCommandTransport({
+    token: "token",
+    timer,
+    fetchImpl: async (input) => {
+      requests.push(toUrl(input));
+      if (requests.length === 1) {
+        return telegramResponse([
+          {
+            update_id: 41,
+            message: { chat: { id: 123 }, text: "/noop" },
+          },
+        ]);
+      }
+      return telegramResponse([]);
+    },
+  });
+
+  transport.start();
+  await settlePromises();
+  timer.triggerAll();
+  await settlePromises();
+  transport.stop();
+
+  assert(requests.length === 2, "offset smoke did not issue second poll");
+  assert(requests[0]?.searchParams.get("offset") === null, "initial request included offset");
+  assert(requests[1]?.searchParams.get("offset") === "42", "second request omitted offset=N+1");
+  assert(
+    requests[1]?.searchParams.get("timeout") === String(DEFAULT_COMMAND_LONG_POLL_TIMEOUT_SECONDS),
+    "offset request omitted long-poll timeout",
+  );
+
+  return [
+    "After update_id=41, the next getUpdates request used offset=42.",
+    "The long-poll timeout stayed present on the offset request.",
+  ];
+}
+
+async function runCommandLongPollMalformedOnError(): Promise<string[]> {
+  const errors: unknown[] = [];
+  const transport = createTelegramHttpCommandTransport({
+    token: "token",
+    timer: new FakeTimer(),
+    onError: (err) => errors.push(err),
+    fetchImpl: async () =>
+      new Response(JSON.stringify({ ok: false, result: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+  });
+
+  transport.start();
+  await settlePromises();
+  transport.stop();
+
+  assert(errors.length === 1, "malformed response did not call onError exactly once");
+  assert(errors[0] instanceof Error, "malformed response error was not an Error");
+  assert(
+    String((errors[0] as Error).message).includes("malformed payload"),
+    "malformed response error message drifted",
+  );
+
+  return [
+    "Malformed Telegram getUpdates payload surfaced through the injected onError seam.",
+  ];
+}
+
+async function runCommandLongPollOverlapGuard(): Promise<string[]> {
+  const requests: URL[] = [];
+  const errors: unknown[] = [];
+  const timer = new FakeTimer();
+  const firstResponse = deferred<Response>();
+  const transport = createTelegramHttpCommandTransport({
+    token: "token",
+    timer,
+    onError: (err) => errors.push(err),
+    fetchImpl: async (input) => {
+      requests.push(toUrl(input));
+      if (requests.length === 1) {
+        return firstResponse.promise;
+      }
+      return telegramResponse([]);
+    },
+  });
+
+  transport.start();
+  await settlePromises();
+  timer.triggerAll();
+  await settlePromises();
+  assert(requests.length === 1, "overlap guard allowed concurrent getUpdates fetch");
+
+  firstResponse.resolve(telegramResponse([]));
+  await settlePromises();
+  timer.triggerAll();
+  await settlePromises();
+  transport.stop();
+
+  assert(requests.length === 2, "poll did not resume after pending long poll settled");
+  assert(errors.length === 0, "overlap guard produced unexpected errors");
+
+  return [
+    "A scheduled callback during an in-flight long poll did not issue a second getUpdates request.",
+    "After the pending long poll settled, a later scheduled callback issued the next request normally.",
+  ];
+}
+
+async function runCommandLongPollStopClearsFuturePolls(): Promise<string[]> {
+  const requests: URL[] = [];
+  const timer = new FakeTimer();
+  const transport = createTelegramHttpCommandTransport({
+    token: "token",
+    timer,
+    fetchImpl: async (input) => {
+      requests.push(toUrl(input));
+      return telegramResponse([]);
+    },
+  });
+
+  const neverStarted = createTelegramHttpCommandTransport({
+    token: "token",
+    timer: new FakeTimer(),
+    fetchImpl: async () => telegramResponse([]),
+  });
+  neverStarted.stop();
+
+  transport.start();
+  await settlePromises();
+  transport.stop();
+  timer.triggerAll();
+  await settlePromises();
+  transport.stop();
+
+  assert(requests.length === 1, "stop did not prevent future scheduled polls");
+  assert(timer.clears === 1, "stop did not clear one interval exactly once");
+  assert(timer.callbacks.size === 0, "cleared interval callback remained registered");
+
+  return [
+    "stop() cleared the local command poll interval and prevented later fake-timer triggers from polling.",
+    "Calling stop() before start or after an already-stopped transport remained safe.",
+  ];
+}
+
 async function runBotCommandWiring(dir: string): Promise<string[]> {
   const dbPath = resolve(dir, "content.db");
   const db = openDb(dbPath);
@@ -2502,6 +2709,10 @@ function runBoundaryStaticCheck(): string[] {
   const changed = changedFilesAgainstBase();
   assertChangedFilesWithinScope(changed, declaredScope);
   assertNoChangedFiles(changed, [
+    "package.json",
+    "bun.lock",
+    "bun.lockb",
+    "src/telegram/commands.ts",
     "src/telegram/notifier.ts",
     "src/telegram/allowlist.ts",
     "src/bin/report-run.ts",
@@ -2522,8 +2733,7 @@ function runBoundaryStaticCheck(): string[] {
 
   const changedSources = changed
     .filter((file) =>
-      file === "src/telegram/bot.ts" ||
-      file === "src/telegram/commands.ts"
+      file === "src/telegram/bot.ts"
     )
     .map((file) => [file, readChangedSource(file)] as const);
   const forbiddenRuntimePatterns: readonly ForbiddenPattern[] = [
@@ -2538,6 +2748,8 @@ function runBoundaryStaticCheck(): string[] {
 
   const commandsSource = readSource("src/telegram/commands.ts");
   assert(!/notifyPendingApprovals|from\s+["']\.\/notifier\.ts["']/.test(commandsSource), "commands.ts duplicated notifier orchestration");
+  const botSource = readSource("src/telegram/bot.ts");
+  assert(!/AbortController|AbortSignal|\bsignal\s*:/.test(botSource), "bot.ts added abort plumbing outside Slice 4.11 scope");
   const statusSource = statusCommandSurfaceSource();
   assert(!/promoteJob\(/.test(statusSource), "status command surface calls promoteJob");
   assert(!/\.runs\//.test(statusSource), "status command surface inspects .runs");
@@ -2548,6 +2760,7 @@ function runBoundaryStaticCheck(): string[] {
   return [
     `Stable base/status scope check saw only declared files: ${changed.join(", ") || "<none>"}.`,
     "Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.",
+    "commands.ts and product support surfaces stayed out of scope; bot.ts contains no abort plumbing.",
     "Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and status handling does not call promoteJob or inspect .runs.",
   ];
 }
@@ -2889,15 +3102,58 @@ class FakeCommandTransport implements TelegramCommandTransport {
 class FakeTimer {
   intervals = 0;
   clears = 0;
+  delays: number[] = [];
+  callbacks = new Map<unknown, () => void>();
 
-  setInterval(): unknown {
+  setInterval(callback: () => void, delayMs: number): unknown {
     this.intervals += 1;
-    return this.intervals;
+    const handle = this.intervals;
+    this.delays.push(delayMs);
+    this.callbacks.set(handle, callback);
+    return handle;
   }
 
-  clearInterval(): void {
+  clearInterval(handle: unknown): void {
     this.clears += 1;
+    this.callbacks.delete(handle);
   }
+
+  triggerAll(): void {
+    for (const callback of [...this.callbacks.values()]) {
+      callback();
+    }
+  }
+}
+
+function telegramResponse(result: readonly unknown[]): Response {
+  return new Response(JSON.stringify({ ok: true, result }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function toUrl(input: Parameters<typeof fetch>[0]): URL {
+  return input instanceof URL ? input : new URL(String(input));
+}
+
+function deferred<T>(): {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+  readonly reject: (err: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (err: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
+async function settlePromises(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
 }
 
 function notificationWithText(text: string): ApprovalNotification {

@@ -19,6 +19,7 @@ export const TELEGRAM_BOT_TOKEN_ENV = "TELEGRAM_BOT_TOKEN";
 export const OPERATOR_CHAT_IDS_ENV = "OPERATOR_CHAT_IDS";
 export const DEFAULT_TICK_INTERVAL_MS = 10_000;
 export const DEFAULT_COMMAND_POLL_INTERVAL_MS = 2_000;
+export const DEFAULT_COMMAND_LONG_POLL_TIMEOUT_SECONDS = 30;
 
 export interface BotConfig {
   readonly token: string;
@@ -251,7 +252,10 @@ export function createTelegramHttpCommandTransport(
     running = true;
     try {
       const url = new URL(`${apiRoot}/bot${options.token}/getUpdates`);
-      url.searchParams.set("timeout", "0");
+      url.searchParams.set(
+        "timeout",
+        String(DEFAULT_COMMAND_LONG_POLL_TIMEOUT_SECONDS),
+      );
       if (offset > 0) {
         url.searchParams.set("offset", String(offset));
       }

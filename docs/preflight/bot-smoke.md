@@ -1,10 +1,10 @@
 # Bot Smoke Evidence
 
 - Command: `bun run bot-smoke`
-- Started: 2026-05-06T11:23:25.894Z
-- Finished: 2026-05-06T11:23:26.103Z
-- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T11-23-25.894Z (removed by finally-cleanup)
-- Result: 55/55 PASS
+- Started: 2026-05-07T03:25:05.939Z
+- Finished: 2026-05-07T03:25:06.181Z
+- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-07T03-25-05.938Z (removed by finally-cleanup)
+- Result: 60/60 PASS
 
 ## Evidence Ceiling
 
@@ -64,8 +64,13 @@ This smoke exercises deterministic allowlist parsing, injected bot runtime seams
 | status-failed-job-error-visible | PASS | Failed-job status includes failed state and a bounded DB-backed error excerpt. |
 | status-last-notify-error-visible | PASS | Status includes a bounded last_notify_error excerpt when the DB row carries one. |
 | status-approval-summary-visible | PASS | Awaiting-approval status prefers the first Evidence Grade warning line as the bounded summary excerpt. |
+| command-long-poll-timeout | PASS | Default command polling issued getUpdates with timeout=30 and no offset on the immediate request.<br>Telegram request timeout remains distinct from the local command poll interval and notifier tick interval. |
+| command-long-poll-offset | PASS | After update_id=41, the next getUpdates request used offset=42.<br>The long-poll timeout stayed present on the offset request. |
+| command-long-poll-malformed-onerror | PASS | Malformed Telegram getUpdates payload surfaced through the injected onError seam. |
+| command-long-poll-overlap-guard | PASS | A scheduled callback during an in-flight long poll did not issue a second getUpdates request.<br>After the pending long poll settled, a later scheduled callback issued the next request normally. |
+| command-long-poll-stop-clears-future-polls | PASS | stop() cleared the local command poll interval and prevented later fake-timer triggers from polling.<br>Calling stop() before start or after an already-stopped transport remained safe. |
 | bot-command-wiring | PASS | startBotRuntime registered /approve, /reject, and /status on a fake command transport, opened the configured DB path per command, replied through the command seam, and left notifier tick orchestration separate.<br>/status summarized a configured DB job without writing events or calling notifyPendingApprovals. |
-| boundary-static-check | PASS | Stable base/status scope check saw only declared files: docs/preflight/bot-smoke.md, scripts/bot-smoke.ts, src/telegram/bot.ts, src/telegram/commands.ts.<br>Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.<br>Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and status handling does not call promoteJob or inspect .runs. |
+| boundary-static-check | PASS | Stable base/status scope check saw only declared files: scripts/bot-smoke.ts, src/telegram/bot.ts.<br>Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.<br>commands.ts and product support surfaces stayed out of scope; bot.ts contains no abort plumbing.<br>Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and status handling does not call promoteJob or inspect .runs. |
 | dependency-boundary-check | PASS | Telegram SDK/network concept-class checks are shared and absent from notifier.ts, commands.ts, and promote.ts.<br>commands.ts does not add Telegram network or new publish/process surfaces for /status, and package.json exposes only the expected bot runtime and bot-smoke command surfaces. |
-| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-06T11-23-25.894Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
+| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-07T03-25-05.938Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
 | no-preflight-codex-survivability | PASS | Changed bot, allowlist, and command surfaces have no preflight, Codex smoke, LLM, prompt, process-spawn, or report-run execution dependency. |
