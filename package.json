@@ -17,6 +17,8 @@
     "draft-en-stage-smoke": "bun scripts/draft-en-stage-smoke.ts",
     "edit-en-stage-smoke": "bun scripts/edit-en-stage-smoke.ts",
     "translate-zh-stage-smoke": "bun scripts/translate-zh-stage-smoke.ts",
+    "report:create": "bun src/bin/report-create.ts",
+    "report-create-smoke": "bun scripts/report-create-smoke.ts",
     "report:run": "bun src/bin/report-run.ts",
     "approval-summary-smoke": "bun scripts/approval-summary-smoke.ts",
     "report-run-smoke": "bun scripts/report-run-smoke.ts",

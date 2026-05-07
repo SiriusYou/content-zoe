@@ -1,0 +1,22 @@
+# report-create smoke evidence
+
+- Command: `bun run report-create-smoke`
+- Started: 2026-05-07T07:05:41.744Z
+- Finished: 2026-05-07T07:05:41.794Z
+- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-report-create-smoke-2026-05-07T07-05-41.744Z (removed by finally-cleanup)
+- Result: 10/10 PASS
+
+This smoke exercises the report:create CLI seed surface only. It does not run operator-only `bun run report:run`, real Codex report generation, real Telegram network, real git/process execution, report generation, notifier sending, or publish/promote behavior.
+
+| Scenario | Status | Evidence |
+|---|---:|---|
+| report-create-parse-success | PASS | Space-separated CLI grammar parsed --week and --topic with default locales.<br>CLI stdout was exactly the deterministic job ID.<br>DB row stored queued/research attempt-1 with run_dir as a future path string. |
+| report-create-default-locales | PASS | Omitting --locales created the job with locales=en,zh. |
+| report-create-en-only-locales | PASS | --locales en created an en-only job.<br>Invalid locales failed with INVALID_LOCALES and no stdout. |
+| report-create-week-validation | PASS | YYYY-W01/W17/W53 were accepted and W00/W54/lowercase/short forms were rejected.<br>Equals-form flags are rejected as UNKNOWN_FLAG per v1.1 F1. |
+| report-create-topic-sanitization | PASS | sanitizeTopic applied the ordered control, delimiter, shell-byte, phrase, and whitespace pipeline.<br>CLI stored the sanitized topic, not the raw operator input. |
+| report-create-invalid-topic | PASS | Empty-after-sanitization and over-160-character topics fail with INVALID_TOPIC.<br>Invalid topics fail before DB creation. |
+| report-create-duplicate-week | PASS | Duplicate week failed with exact WEEK_ALREADY_EXISTS stderr including existing job ID and status.<br>Duplicate week left the existing row unchanged and wrote no events or .runs directory. |
+| report-create-force-rejected | PASS | --force is recognized but rejected with UNSUPPORTED_FORCE before DB mutation. |
+| report-create-no-filesystem-touch | PASS | Successful create only created the cwd-owned SQLite DB.<br>No .runs, attempt directory, reports directory, or artifact output was created. |
+| report-create-boundary-static-check | PASS | Stable base scope check saw only declared files: docs/preflight/report-create-smoke.md, package.json, scripts/report-create-smoke.ts, src/bin/report-create.ts, src/security/sanitize.ts<br>package.json change is limited to report:create and report-create-smoke scripts with dependency sets unchanged.<br>report-create.ts and sanitize.ts avoid report-run, Telegram, promote, pipeline, LLM, prompt, preflight, process, and network surfaces. |
