@@ -4,6 +4,18 @@ import { resolve } from "node:path";
 
 export type ForbiddenPattern = readonly [pattern: RegExp, label: string];
 
+export type CycleScopeMode = "active-slice" | "inherited-surface";
+
+export interface CycleScopePolicy {
+  changed: readonly string[];
+  activeTriggerFiles: ReadonlySet<string>;
+  activeScope: ReadonlySet<string>;
+  activeFrozenFiles?: readonly string[];
+  activeFrozenDirectories?: readonly string[];
+  inheritedFrozenFiles?: readonly string[];
+  inheritedFrozenDirectories?: readonly string[];
+}
+
 export const PROMPT_PRODUCING_SURFACE_PATTERNS: readonly ForbiddenPattern[] = [
   [/src\/prompts|from\s+["'][^"']*\/prompts\//, "prompt import"],
   [/runPrompt|\.runPrompt\s*\(|StageDef\.buildPrompt|<<<|buildPrompt/, "prompt-producing surface"],
@@ -70,6 +82,14 @@ export function changedFilesAgainstBase(
   return [...new Set([...splitLines(committed), ...working])].sort();
 }
 
+export function changedFilesForCurrentCycle(repoRoot: string): string[] {
+  const working = workingTreeChangedFiles(repoRoot);
+  if (working.length > 0) return working;
+
+  const base = execGit(repoRoot, ["rev-parse", "HEAD^"]).trim();
+  return splitLines(execGit(repoRoot, ["diff", "--name-only", `${base}..HEAD`])).sort();
+}
+
 export function assertChangedFilesWithinScope(
   changed: readonly string[],
   declaredScope: ReadonlySet<string>,
@@ -78,6 +98,25 @@ export function assertChangedFilesWithinScope(
   if (outOfScope.length > 0) {
     throw new Error(`changed files outside declared scope: ${outOfScope.join(", ")}`);
   }
+}
+
+export function assertCycleScopePolicy(policy: CycleScopePolicy): CycleScopeMode {
+  const mode: CycleScopeMode = policy.changed.some((file) =>
+    policy.activeTriggerFiles.has(file),
+  )
+    ? "active-slice"
+    : "inherited-surface";
+
+  if (mode === "active-slice") {
+    assertChangedFilesWithinScope(policy.changed, policy.activeScope);
+    assertNoChangedFiles(policy.changed, policy.activeFrozenFiles ?? []);
+    assertNoChangedDirectories(policy.changed, policy.activeFrozenDirectories ?? []);
+    return mode;
+  }
+
+  assertNoChangedFiles(policy.changed, policy.inheritedFrozenFiles ?? []);
+  assertNoChangedDirectories(policy.changed, policy.inheritedFrozenDirectories ?? []);
+  return mode;
 }
 
 export function assertNoChangedFiles(
@@ -103,11 +142,29 @@ export function assertNoChangedDirectories(
   }
 }
 
+export function stripAllowedStaticCheckStrings(
+  source: string,
+  allowedStrings: readonly string[],
+): string {
+  return allowedStrings.reduce(
+    (current, token) => current.replaceAll(token, "STATIC_CHECK_TOKEN"),
+    source,
+  );
+}
+
 function execGit(repoRoot: string, args: readonly string[]): string {
   return execFileSync("git", [...args], {
     cwd: repoRoot,
     encoding: "utf8",
   });
+}
+
+function workingTreeChangedFiles(repoRoot: string): string[] {
+  return execGit(repoRoot, ["status", "--short", "--untracked-files=all"])
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => line.slice(3).trim())
+    .map((line) => line.replace(/^.* -> /, ""));
 }
 
 function splitLines(value: string): string[] {

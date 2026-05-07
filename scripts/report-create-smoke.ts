@@ -21,14 +21,13 @@ import {
 } from "../src/bin/report-create.ts";
 import { sanitizeTopic } from "../src/security/sanitize.ts";
 import {
-  assertChangedFilesWithinScope,
-  assertNoChangedDirectories,
-  assertNoChangedFiles,
+  assertCycleScopePolicy,
   assertNoForbiddenPatterns,
-  changedFilesAgainstBase,
+  changedFilesForCurrentCycle,
   PROCESS_SPAWN_PATTERNS,
   TELEGRAM_SDK_NETWORK_PATTERNS,
   readRepoSource,
+  stripAllowedStaticCheckStrings,
 } from "./lib/static-guardrails.ts";
 
 type ScenarioName =
@@ -71,10 +70,58 @@ const SCENARIOS: ScenarioName[] = [
 ];
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const targetBase = "a3d62a207b98d330fc2075fc0e305d94d39ede5d";
 const isoStamp = new Date().toISOString().replaceAll(":", "-");
 const smokeRoot = resolve(tmpdir(), `cz-report-create-smoke-${isoStamp}`);
 const docPath = resolve(repoRoot, "docs", "preflight", "report-create-smoke.md");
+const phase421Scope = new Set([
+  "scripts/lib/static-guardrails.ts",
+  "scripts/bot-smoke.ts",
+  "docs/preflight/bot-smoke.md",
+  "scripts/report-create-smoke.ts",
+  "docs/preflight/report-create-smoke.md",
+]);
+const reportCreateActiveTriggers = new Set([
+  "src/bin/report-create.ts",
+  "src/security/sanitize.ts",
+  "scripts/lib/static-guardrails.ts",
+  "scripts/report-create-smoke.ts",
+  "docs/preflight/report-create-smoke.md",
+  "package.json",
+]);
+const reportCreateActiveFrozenFiles = [
+  "package.json",
+  "bun.lock",
+  "bun.lockb",
+  "src/bin/report-create.ts",
+  "src/bin/report-run.ts",
+  "src/bin/report-status.ts",
+  "src/bin/report-remind.ts",
+  "src/security/sanitize.ts",
+  "src/promote.ts",
+  "src/db.ts",
+  "src/preflight.ts",
+];
+const reportCreateActiveFrozenDirectories = [
+  "src/telegram/",
+  "src/migrations/",
+  "src/lib/",
+  "src/pipeline/",
+  "src/llm/",
+  "src/prompts/",
+];
+const reportCreateInheritedFrozenFiles = [
+  "src/bin/report-create.ts",
+  "src/security/sanitize.ts",
+];
+const reportCreateStaticCheckTokens = [
+  "child_process",
+  "Bun.spawn",
+  "fetch",
+  "notifyPendingApprovals",
+  "promoteJob",
+  "CodexCliProvider",
+  "https://api.telegram.org",
+];
 
 async function main(): Promise<number> {
   mkdirSync(smokeRoot, { recursive: true });
@@ -391,34 +438,29 @@ async function runNoFilesystemTouch(dir: string): Promise<string[]> {
 }
 
 function runBoundaryStaticCheck(): string[] {
-  const declaredScope = new Set([
-    "src/bin/report-create.ts",
-    "src/security/sanitize.ts",
-    "scripts/report-create-smoke.ts",
-    "docs/preflight/report-create-smoke.md",
-    "package.json",
-  ]);
-  const changed = changedFilesAgainstBase(repoRoot, targetBase);
-  assertChangedFilesWithinScope(changed, declaredScope);
-  assertNoChangedFiles(changed, [
-    "src/bin/report-run.ts",
-    "src/bin/report-status.ts",
-    "src/bin/report-remind.ts",
-    "src/promote.ts",
-    "src/db.ts",
-    "src/preflight.ts",
-    "scripts/lib/static-guardrails.ts",
-    "bun.lock",
-    "bun.lockb",
-  ]);
-  assertNoChangedDirectories(changed, [
-    "src/telegram/",
-    "src/migrations/",
-    "src/lib/",
-    "src/pipeline/",
-    "src/llm/",
-    "src/prompts/",
-  ]);
+  const changed = changedFilesForCurrentCycle(repoRoot);
+  const scopeMode = assertCycleScopePolicy({
+    changed,
+    activeTriggerFiles: reportCreateActiveTriggers,
+    activeScope: phase421Scope,
+    activeFrozenFiles: reportCreateActiveFrozenFiles,
+    activeFrozenDirectories: reportCreateActiveFrozenDirectories,
+    inheritedFrozenFiles: reportCreateInheritedFrozenFiles,
+  });
+  let activeScopeRejectedOutOfScope = false;
+  try {
+    assertCycleScopePolicy({
+      changed: ["scripts/report-create-smoke.ts", "src/telegram/bot.ts"],
+      activeTriggerFiles: reportCreateActiveTriggers,
+      activeScope: phase421Scope,
+      activeFrozenFiles: reportCreateActiveFrozenFiles,
+      activeFrozenDirectories: reportCreateActiveFrozenDirectories,
+      inheritedFrozenFiles: reportCreateInheritedFrozenFiles,
+    });
+  } catch (err) {
+    activeScopeRejectedOutOfScope = String(err).includes("changed files outside declared scope");
+  }
+  assert(activeScopeRejectedOutOfScope, "active-slice scope check did not reject out-of-scope files");
 
   const packageJson = JSON.parse(readRepoSource(repoRoot, "package.json")) as {
     scripts?: Record<string, string>;
@@ -455,13 +497,14 @@ function runBoundaryStaticCheck(): string[] {
   ], "src/security/sanitize.ts");
 
   const createAndSmokeSource = `${createSource}\n${readRepoSource(repoRoot, "scripts/report-create-smoke.ts")}`;
-  assertNoForbiddenPatterns(stripAllowedStaticCheckStrings(createAndSmokeSource), [
+  assertNoForbiddenPatterns(stripAllowedStaticCheckStrings(createAndSmokeSource, reportCreateStaticCheckTokens), [
     [/child_process|Bun\.spawn|\bfetch\s*\(|notifyPendingApprovals|promoteJob|CodexCliProvider/, "forbidden execution surface"],
     [/https:\/\/api\.telegram\.org/, "Telegram API URL"],
   ], "report-create source/smoke outside static-check pattern strings");
 
   return [
-    `Stable base scope check saw only declared files: ${changed.join(", ")}`,
+    `Cycle-scope boundary check ran in ${scopeMode} mode and saw changed files: ${changed.join(", ") || "<none>"}`,
+    "Synthetic active-slice scope check rejects out-of-scope Telegram product files.",
     "package.json change is limited to report:create and report-create-smoke scripts with dependency sets unchanged.",
     "report-create.ts and sanitize.ts avoid report-run, Telegram, promote, pipeline, LLM, prompt, preflight, process, and network surfaces.",
   ];
@@ -495,17 +538,6 @@ function requireJob(cwd: string, jobId: string): Job {
   } finally {
     db.close();
   }
-}
-
-function stripAllowedStaticCheckStrings(source: string): string {
-  return source
-    .replaceAll("child_process", "STATIC_CHECK_TOKEN")
-    .replaceAll("Bun.spawn", "STATIC_CHECK_TOKEN")
-    .replaceAll("fetch", "STATIC_CHECK_TOKEN")
-    .replaceAll("notifyPendingApprovals", "STATIC_CHECK_TOKEN")
-    .replaceAll("promoteJob", "STATIC_CHECK_TOKEN")
-    .replaceAll("CodexCliProvider", "STATIC_CHECK_TOKEN")
-    .replaceAll("https://api.telegram.org", "STATIC_CHECK_TOKEN");
 }
 
 function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {

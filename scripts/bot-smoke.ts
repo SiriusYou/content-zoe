@@ -10,11 +10,9 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  assertChangedFilesWithinScope,
-  assertNoChangedDirectories,
-  assertNoChangedFiles,
+  assertCycleScopePolicy,
   assertNoForbiddenPatterns,
-  changedFilesAgainstBase as getChangedFilesAgainstBase,
+  changedFilesForCurrentCycle,
   PROCESS_SPAWN_PATTERNS,
   PROMPT_SURFACE_PATTERNS,
   TELEGRAM_SDK_IMPORT_PATTERNS,
@@ -215,12 +213,64 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
-const targetBase = "3ca8a27e9789ae93ec7c22d70d898bcc0a17e3a4";
-const declaredScope = new Set([
+const phase421Scope = new Set([
+  "scripts/lib/static-guardrails.ts",
+  "scripts/bot-smoke.ts",
+  "docs/preflight/bot-smoke.md",
+  "scripts/report-create-smoke.ts",
+  "docs/preflight/report-create-smoke.md",
+]);
+const botSmokeActiveTriggers = new Set([
   "src/telegram/bot.ts",
+  "src/telegram/commands.ts",
+  "src/telegram/notifier.ts",
+  "src/telegram/allowlist.ts",
+  "src/promote.ts",
+  "scripts/lib/static-guardrails.ts",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
 ]);
+const botSmokeActiveFrozenFiles = [
+  "package.json",
+  "bun.lock",
+  "bun.lockb",
+  "src/telegram/bot.ts",
+  "src/telegram/commands.ts",
+  "src/telegram/notifier.ts",
+  "src/telegram/allowlist.ts",
+  "src/bin/report-run.ts",
+  "src/lib/report-loop.ts",
+  "src/lib/report-run-fake-provider.ts",
+  "src/lib/runtime-config.ts",
+  "src/promote.ts",
+  "src/db.ts",
+  "src/preflight.ts",
+];
+const botSmokeActiveFrozenDirectories = [
+  "src/pipeline/",
+  "src/migrations/",
+  "src/llm/",
+  "src/prompts/",
+];
+const botSmokeInheritedFrozenFiles = [
+  "src/telegram/bot.ts",
+  "src/telegram/commands.ts",
+  "src/telegram/notifier.ts",
+  "src/telegram/allowlist.ts",
+  "src/promote.ts",
+];
+const botSmokeInheritedFrozenDirectories = [
+  "src/migrations/",
+  "src/llm/",
+  "src/prompts/",
+];
+const slice412ReportCreateFiles = [
+  "docs/preflight/report-create-smoke.md",
+  "package.json",
+  "scripts/report-create-smoke.ts",
+  "src/bin/report-create.ts",
+  "src/security/sanitize.ts",
+];
 
 const rejectScopes = ["en", "zh", "bundle"] as const satisfies readonly RejectScope[];
 const rejectTypes = [
@@ -2707,29 +2757,23 @@ async function runBotCommandWiring(dir: string): Promise<string[]> {
 
 function runBoundaryStaticCheck(): string[] {
   const changed = changedFilesAgainstBase();
-  assertChangedFilesWithinScope(changed, declaredScope);
-  assertNoChangedFiles(changed, [
-    "package.json",
-    "bun.lock",
-    "bun.lockb",
-    "src/telegram/commands.ts",
-    "src/telegram/notifier.ts",
-    "src/telegram/allowlist.ts",
-    "src/bin/report-run.ts",
-    "src/lib/report-loop.ts",
-    "src/lib/report-run-fake-provider.ts",
-    "src/lib/runtime-config.ts",
-    "src/promote.ts",
-    "src/db.ts",
-    "src/preflight.ts",
-    "scripts/lib/static-guardrails.ts",
-  ]);
-  assertNoChangedDirectories(changed, [
-    "src/pipeline/",
-    "src/migrations/",
-    "src/llm/",
-    "src/prompts/",
-  ]);
+  const scopeMode = assertCycleScopePolicy({
+    changed,
+    activeTriggerFiles: botSmokeActiveTriggers,
+    activeScope: phase421Scope,
+    activeFrozenFiles: botSmokeActiveFrozenFiles,
+    activeFrozenDirectories: botSmokeActiveFrozenDirectories,
+    inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
+    inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
+  });
+  const slice412Mode = assertCycleScopePolicy({
+    changed: slice412ReportCreateFiles,
+    activeTriggerFiles: botSmokeActiveTriggers,
+    activeScope: phase421Scope,
+    inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
+    inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
+  });
+  assert(slice412Mode === "inherited-surface", "Slice 4.12 report:create files should be inherited for bot-smoke");
 
   const changedSources = changed
     .filter((file) =>
@@ -2758,7 +2802,8 @@ function runBoundaryStaticCheck(): string[] {
   assert(!/fetch\s*\(|api\.telegram\.org|https:\/\/api\.telegram\.org/.test(smokeSource), "smoke can call Telegram");
 
   return [
-    `Stable base/status scope check saw only declared files: ${changed.join(", ") || "<none>"}.`,
+    `Cycle-scope boundary check ran in ${scopeMode} mode and saw changed files: ${changed.join(", ") || "<none>"}.`,
+    "Synthetic Slice 4.12 report:create files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.",
     "commands.ts and product support surfaces stayed out of scope; bot.ts contains no abort plumbing.",
     "Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and status handling does not call promoteJob or inspect .runs.",
@@ -2983,7 +3028,7 @@ function eventCount(db: DbClient): number {
 }
 
 function changedFilesAgainstBase(): string[] {
-  return getChangedFilesAgainstBase(repoRoot, targetBase);
+  return changedFilesForCurrentCycle(repoRoot);
 }
 
 function readSource(relativePath: string): string {
