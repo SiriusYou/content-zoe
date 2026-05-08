@@ -21,6 +21,8 @@
     "report-create-smoke": "bun scripts/report-create-smoke.ts",
     "report:remind": "bun src/bin/report-remind.ts",
     "report-remind-smoke": "bun scripts/report-remind-smoke.ts",
+    "report:status": "bun src/bin/report-status.ts",
+    "report-status-smoke": "bun scripts/report-status-smoke.ts",
     "report:run": "bun src/bin/report-run.ts",
     "approval-summary-smoke": "bun scripts/approval-summary-smoke.ts",
     "report-run-smoke": "bun scripts/report-run-smoke.ts",

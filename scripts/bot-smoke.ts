@@ -213,11 +213,14 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
-const slice413Scope = new Set([
+const slice414Scope = new Set([
+  "src/bin/report-status.ts",
+  "scripts/report-status-smoke.ts",
+  "docs/preflight/report-status-smoke.md",
+  "package.json",
   "src/bin/report-remind.ts",
   "scripts/report-remind-smoke.ts",
   "docs/preflight/report-remind-smoke.md",
-  "package.json",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
   "scripts/report-create-smoke.ts",
@@ -278,6 +281,12 @@ const slice413ReportRemindFiles = [
   "package.json",
   "scripts/report-remind-smoke.ts",
   "src/bin/report-remind.ts",
+];
+const slice414ReportStatusFiles = [
+  "docs/preflight/report-status-smoke.md",
+  "package.json",
+  "scripts/report-status-smoke.ts",
+  "src/bin/report-status.ts",
 ];
 
 const rejectScopes = ["en", "zh", "bundle"] as const satisfies readonly RejectScope[];
@@ -2768,7 +2777,7 @@ function runBoundaryStaticCheck(): string[] {
   const scopeMode = assertCycleScopePolicy({
     changed,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice413Scope,
+    activeScope: slice414Scope,
     activeFrozenFiles: botSmokeActiveFrozenFiles,
     activeFrozenDirectories: botSmokeActiveFrozenDirectories,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
@@ -2777,7 +2786,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice412Mode = assertCycleScopePolicy({
     changed: slice412ReportCreateFiles,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice413Scope,
+    activeScope: slice414Scope,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
     inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
   });
@@ -2785,17 +2794,25 @@ function runBoundaryStaticCheck(): string[] {
   const slice413Mode = assertCycleScopePolicy({
     changed: slice413ReportRemindFiles,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice413Scope,
+    activeScope: slice414Scope,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
     inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
   });
   assert(slice413Mode === "inherited-surface", "Slice 4.13 report:remind files should be inherited for bot-smoke");
+  const slice414Mode = assertCycleScopePolicy({
+    changed: slice414ReportStatusFiles,
+    activeTriggerFiles: botSmokeActiveTriggers,
+    activeScope: slice414Scope,
+    inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
+    inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
+  });
+  assert(slice414Mode === "inherited-surface", "Slice 4.14 report:status files should be inherited for bot-smoke");
   let activeScopeRejectedOutOfScope = false;
   try {
     assertCycleScopePolicy({
       changed: ["scripts/bot-smoke.ts", "src/prompts/bot.md"],
       activeTriggerFiles: botSmokeActiveTriggers,
-      activeScope: slice413Scope,
+      activeScope: slice414Scope,
       activeFrozenFiles: botSmokeActiveFrozenFiles,
       activeFrozenDirectories: botSmokeActiveFrozenDirectories,
       inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
@@ -2836,6 +2853,7 @@ function runBoundaryStaticCheck(): string[] {
     `Cycle-scope boundary check ran in ${scopeMode} mode and saw changed files: ${changed.join(", ") || "<none>"}.`,
     "Synthetic Slice 4.12 report:create files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic Slice 4.13 report:remind files resolve to inherited-surface mode without a bot-smoke exemption.",
+    "Synthetic Slice 4.14 report:status files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic active-slice scope check rejects out-of-scope prompt product files.",
     "Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.",
     "commands.ts and product support surfaces stayed out of scope; bot.ts contains no abort plumbing.",

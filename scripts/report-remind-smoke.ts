@@ -77,11 +77,14 @@ const smokeRoot = path.join(
   `cz-report-remind-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "report-remind-smoke.md");
-const slice413Scope = new Set([
+const slice414Scope = new Set([
+  "src/bin/report-status.ts",
+  "scripts/report-status-smoke.ts",
+  "docs/preflight/report-status-smoke.md",
+  "package.json",
   "src/bin/report-remind.ts",
   "scripts/report-remind-smoke.ts",
   "docs/preflight/report-remind-smoke.md",
-  "package.json",
   "scripts/report-create-smoke.ts",
   "docs/preflight/report-create-smoke.md",
   "scripts/bot-smoke.ts",
@@ -97,7 +100,6 @@ const reportRemindActiveFrozenFiles = [
   "bun.lockb",
   "src/bin/report-create.ts",
   "src/bin/report-run.ts",
-  "src/bin/report-status.ts",
   "src/security/sanitize.ts",
   "src/promote.ts",
   "src/db.ts",
@@ -458,20 +460,20 @@ function runBoundaryStaticCheck(): string[] {
   const scopeMode = assertCycleScopePolicy({
     changed,
     activeTriggerFiles: reportRemindActiveTriggers,
-    activeScope: slice413Scope,
+    activeScope: slice414Scope,
     activeFrozenFiles: reportRemindActiveFrozenFiles,
     activeFrozenDirectories: reportRemindActiveFrozenDirectories,
     inheritedFrozenFiles: reportRemindInheritedFrozenFiles,
     inheritedFrozenDirectories: reportRemindInheritedFrozenDirectories,
   });
-  assert(scopeMode === "active-slice", "report-remind smoke should run in active-slice mode for Slice 4.13");
+  assert(scopeMode === "active-slice", "report-remind smoke should run in active-slice mode for Slice 4.14");
 
   let activeScopeRejectedOutOfScope = false;
   try {
     assertCycleScopePolicy({
       changed: ["scripts/report-remind-smoke.ts", "src/telegram/bot.ts"],
       activeTriggerFiles: reportRemindActiveTriggers,
-      activeScope: slice413Scope,
+      activeScope: slice414Scope,
       activeFrozenFiles: reportRemindActiveFrozenFiles,
       activeFrozenDirectories: reportRemindActiveFrozenDirectories,
       inheritedFrozenFiles: reportRemindInheritedFrozenFiles,
@@ -492,11 +494,26 @@ function runBoundaryStaticCheck(): string[] {
   const reportCreateMode = assertCycleScopePolicy({
     changed: reportCreateFiles,
     activeTriggerFiles: reportRemindActiveTriggers,
-    activeScope: slice413Scope,
+    activeScope: slice414Scope,
     inheritedFrozenFiles: reportRemindInheritedFrozenFiles,
     inheritedFrozenDirectories: reportRemindInheritedFrozenDirectories,
   });
   assert(reportCreateMode === "inherited-surface", "report-create files should be inherited for report-remind-smoke");
+
+  const reportStatusFiles = [
+    "docs/preflight/report-status-smoke.md",
+    "package.json",
+    "scripts/report-status-smoke.ts",
+    "src/bin/report-status.ts",
+  ];
+  const reportStatusMode = assertCycleScopePolicy({
+    changed: reportStatusFiles,
+    activeTriggerFiles: reportRemindActiveTriggers,
+    activeScope: slice414Scope,
+    inheritedFrozenFiles: reportRemindInheritedFrozenFiles,
+    inheritedFrozenDirectories: reportRemindInheritedFrozenDirectories,
+  });
+  assert(reportStatusMode === "inherited-surface", "Slice 4.14 report:status files should be inherited for report-remind-smoke");
 
   const packageJson = JSON.parse(readRepoSource(repoRoot, "package.json")) as {
     scripts?: Record<string, string>;
@@ -505,6 +522,8 @@ function runBoundaryStaticCheck(): string[] {
   };
   assert(packageJson.scripts?.["report:remind"] === "bun src/bin/report-remind.ts", "missing report:remind script");
   assert(packageJson.scripts?.["report-remind-smoke"] === "bun scripts/report-remind-smoke.ts", "missing report-remind-smoke script");
+  assert(packageJson.scripts?.["report:status"] === "bun src/bin/report-status.ts", "missing report:status script");
+  assert(packageJson.scripts?.["report-status-smoke"] === "bun scripts/report-status-smoke.ts", "missing report-status-smoke script");
   assert(packageJson.scripts?.["report:create"] === "bun src/bin/report-create.ts", "report:create script drifted");
   assert(packageJson.dependencies === undefined, "package.json gained dependencies");
   assert(packageJson.devDependencies?.typescript === "^5.6.3", "typescript devDependency drifted");
@@ -533,7 +552,8 @@ function runBoundaryStaticCheck(): string[] {
     `Cycle-scope boundary check ran in ${scopeMode} mode and saw changed files: ${changed.join(", ") || "<none>"}.`,
     "Synthetic active-slice scope check rejects out-of-scope Telegram product files.",
     "Synthetic report-create changed-set resolves to inherited-surface mode for report-remind-smoke.",
-    "package.json change is limited to report:remind and report-remind-smoke scripts with dependency sets unchanged.",
+    "Synthetic Slice 4.14 report:status changed-set resolves to inherited-surface mode for report-remind-smoke.",
+    "package.json change is limited to report:remind/report-status smoke scripts with dependency sets unchanged.",
     "report-remind.ts avoids mutating DB helpers, report-create/report-run/report-status imports, Telegram, promote, preflight/Codex, process, network, LLM, and prompt surfaces.",
   ];
 }
