@@ -141,6 +141,12 @@ Micro-cycles are unavailable for runtime product code, any `src/` file, database
 
 Normative edits to operative governance files are not micro-cycle work. Operative governance files include `ROLE_POSITIONING.md`, `docs/process/operating-model.md`, `PLAN.md` / `TODOS.md` approval or scope lines, `AGENTS.md`, and any future committed file that controls worker authority, operator-only boundaries, reviewer gates, or file-scope rules. Pure typo or formatting edits to such files may use a micro-cycle only when the review artifacts explicitly attest that no normative meaning changed.
 
+Lightweight closure slices are a narrow review-only variant for retiring a previously recorded forward observation or one-cycle-bounded exemption.
+
+They may be used only when the closure target was pre-committed in a prior locked spec or operator-approved close-out. A review artifact can serve as the source only when the operator explicitly accepted that artifact's closure commitment in a subsequent close-out or dispatch packet. The diff must be non-product test/policy/evidence infrastructure only; all runtime and operative governance hard-outs must be zero-diff; and the closure must be structurally proven by review evidence, preferably an in-tree regression or synthetic counterexample.
+
+Lightweight closure slices do not authorize product runtime edits, worker execution, PLAN/TODOS product-slice mutation, or gate reduction. If the closure requires a new behavioral product contract or a runtime file change, use an ordinary slice or charter cycle.
+
 Bounded reopen is a declared-scope subtype, not an exception to declared scope.
 
 A PLAN.md/TODOS.md approved-slice line MAY list a file as:

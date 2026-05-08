@@ -252,6 +252,52 @@ Micro-cycles do not replace slice approval, Gate 1, or Gate 2 for product work. 
 
 Origin: Phase 4.14 smoke-helper extraction (`8b1aef9..b1a904d`) reviewed by hc-Claude textual lane and hc-Codex behavioral lane, both approving r1, with no runtime product file diff and no `report:run` / real Telegram execution.
 
+### Lightweight closure slices
+
+A lightweight closure slice is a review-only cycle used to retire a previously recorded forward observation, exemption debt, or structurally bounded harness gap.
+
+Eligibility is strict. A lightweight closure slice may be used only when all are true:
+
+1. the closure target was pre-committed in a prior locked spec or operator-approved close-out; review artifacts are sufficient only when the operator explicitly accepted the closure commitment in a subsequent close-out or dispatch packet;
+2. the diff is limited to non-product test, smoke, static-policy helper, or evidence-doc files;
+3. no product runtime file changes, including no `src/` product surface, package or lockfile, DB schema/migration, command grammar, prompt/LLM, Telegram, notifier, promote, report-run, preflight, authorization, retry/CAS, approval, publish, or operator-only execution surface;
+4. all runtime hard-outs named by the prior slice or close-out are zero-diff;
+5. no new behavioral product contract is introduced;
+6. the closure is structurally proven, preferably by an in-tree smoke row, regression, or synthetic counterexample that exercises the previously failing shape;
+7. two independent review lanes run before close-out: one textual/source/governance lane and one behavioral/replay lane;
+8. if the change has already been pushed because it is operator-owned closure work, cz-side Gate 2 remains required before memorialization unless the operator records an explicit charter override.
+
+Required dispatch metadata:
+
+- phase number and short subject;
+- base SHA and target or fix HEAD;
+- declared file scope;
+- prior locked spec, operator-approved close-out, or explicitly operator-accepted review artifact that committed the closure target;
+- runtime hard-out list or pointer to the prior list;
+- structural proof expected from the textual lane;
+- replay evidence expected from the behavioral lane;
+- commands that remain operator-only or out of scope.
+
+Required artifacts:
+
+- one textual artifact and one behavioral artifact in the reviewer-owning `.omx/artifacts/` tree;
+- each artifact must record base/target SHAs, declared scope, closure target, hard-out status, verdict line using the standard `VERDICT:` vocabulary, and commands intentionally not run;
+- if an artifact path does not use the legacy `microreview` filename, the dispatch must name the canonical path. The close-out must cite the canonical path and SHA-256 for each lane.
+
+Allowed outcomes:
+
+- both lanes approve r1: operator may close out the closure slice and memorialize the retired observation;
+- either lane returns findings: fold within the closure slice or open a micro-fix cycle;
+- either lane finds product/runtime behavior change, new behavioral contract, or authority-surface change: stop and reclassify as ordinary slice or charter work.
+
+Lightweight closure slices are not gate reduction. They are scope reduction. The number of lanes remains dual; the replay burden scales with product-behavior delta. Product slices still use ordinary slice approval, Gate 1, and Gate 2.
+
+Origin: Phase 4.21 retired Slice 4.12's bot-smoke source-pinning debt by extracting cycle-scope policy into `scripts/lib/static-guardrails.ts`. The commit changed five smoke/helper/evidence files, no product runtime files, and passed hc + cz dual-lane review with 0H/0M/0L.
+
+Clean-cycle streaks are evidence, not authorization.
+
+Even when a corpus pattern reaches N=3 or higher for clean r1 / zero-blocking outcomes, do not reduce required lanes or gates unless a future charter amendment explicitly codifies that reduction and explains the residual-risk tradeoff. v3.8 preserves lane discipline. It only lets review burden scale to product-behavior delta inside an otherwise dual-lane process.
+
 ## 8. One-line summary
 
 See `ROLE_POSITIONING.md` § "One-Line Summary". Reproduced here as a guard against drift: oh-healthcare thinks, organizes, dispatches, and validates. oh-healthcare workers code. content-zoe judges whether the result is the right product.
@@ -474,6 +520,32 @@ Do not hide a per-cycle base SHA and declared scope inside a long-lived feature 
 
 Origin: Phase 4.14 extracted `scripts/lib/static-guardrails.ts` after repeated boundary-static-check omissions across Slice 4.6 and Slice 4.7. The extraction preserved smoke counts while centralizing prompt/process/Telegram guardrails and widening process-spawn coverage.
 
+Long-lived smokes must separate current-cycle scope validation from inherited product-surface validation.
+
+When a smoke is reused across slices, it SHOULD use a cycle-scope policy with two conceptual modes:
+
+- `active-slice`: the current changed files intersect the smoke's active trigger surface, so the smoke enforces the current slice's declared scope strictly and verifies frozen files/directories stayed untouched;
+- `inherited-surface`: the current changed files do not touch the smoke's active trigger surface, so unrelated slice files are allowed while the smoke's owned product surfaces remain frozen.
+
+Equivalent implementations are acceptable. The rule is semantic, not tied to a specific helper name. A helper such as `assertCycleScopePolicy` is preferred when multiple smokes need the same policy.
+
+Cycle-scope policies should declare:
+
+1. the changed files under review;
+2. active trigger files;
+3. active declared scope;
+4. active frozen files and directories;
+5. inherited frozen files and directories.
+
+Smokes that adopt active/inherited policy SHOULD include bidirectional proof when feasible:
+
+- an inherited-mode synthetic or fixture input showing that a prior unrelated slice would no longer need a one-off exemption;
+- an active-mode synthetic or fixture input showing that out-of-scope files are still rejected when the smoke owns the current slice.
+
+Do not encode a stale `targetBase` and declared scope directly in a long-lived feature smoke when a cycle-scope helper or equivalent active/inherited policy is available. If a one-off exemption is temporarily needed, the approving spec or close-out must bind a follow-on closure slice or explicitly accept permanent residual risk.
+
+Origin: Phase 4.21 extracted cycle-scope policy after Slice 4.12 required a one-cycle bot-smoke exemption. `bot-smoke` proved Slice 4.12-style report-create files resolve as inherited-surface; `report-create-smoke` proved active mode still rejects out-of-scope Telegram files.
+
 ### 9.11 Pre-relay fold compression and fold-to-layer discipline
 
 **Rule**: for framework, framework-conservative, borderline, high-surface handler, or charter-amendment cycles, the operator SHOULD use a pre-relay fold pass before formal dispatch when a planning lane is available.
@@ -506,6 +578,23 @@ Close-out should record a compression metric: r1 finding count -> unique fold en
 - Phase 4.14 review-only micro-cycle: `1 -> 1 -> 0 -> 0` (one LOW non-blocking forward observation carried as a disposition entry; no fold cycle and no r2 required); r1 dual-lane approve.
 
 For micro-cycles, record carried forward observations as disposition entries when they are reviewed and accepted rather than silently excluded from the metric. A LOW finding explicitly carried as a forward observation is not an r2 residual if the approving reviewer labels it non-blocking and the operator accepts that disposition in close-out.
+
+Review-only/refactor and lightweight closure cycles may use a binding-text compression metric when there is no full slice-approval draft:
+
+`binding text -> r1 findings -> implementation fix cycles -> final`
+
+Fields:
+
+- `binding text`: prior locked spec line, operator-approved close-out commitment, or explicitly operator-accepted review artifact reference that authorized the closure/refactor target;
+- `r1 findings`: total blocking findings from the first dual-lane review round of the closure/refactor cycle;
+- `implementation fix cycles`: number of follow-on fix cycles required after r1;
+- `final`: final blocking finding count and whether the original binding text was satisfied, retired, or reclassified.
+
+This metric is for closure/refactor cycles only. Product slices keep the ordinary `r1 finding count -> unique fold entries -> fold cycles -> r2 residual finding count` metric.
+
+Data point:
+
+- Phase 4.21 lightweight closure: `Slice 4.12 v1.3 F6 binding -> 0H/0M/0L hc r1 + 0H/0M/0L cz Gate 2 -> 0 implementation fix cycles -> FO5 structurally closed`.
 
 **How to apply**: pre-relay analysis should identify likely reviewer flags, not pre-decide them. Formal reviewers remain free to raise different severities. Divergence between pre-relay severity and in-cycle severity is expected because pre-relay is fold-design assistance, not a gate.
 
@@ -593,6 +682,21 @@ When a learning tag is promoted, the next close-out should choose one dispositio
 5. Reject or retire with canonical-source evidence.
 
 Origin: Slice 4.7 Gate 1 introduced Cross-Slice Learning Tags for `boundary-static-check`; Phase 4.13 close-out promoted the recurrence; Phase 4.14 implemented a shared static guardrail helper within hours. This is the first canonical corpus-to-structural-fix loop: the corpus did not merely describe a pattern, it directly caused a structural refactor.
+
+Learning tags can authorize helper extraction before N=3 call sites when the tag is specific and the next structural fix naturally owns the helper.
+
+Early helper promotion is admissible only when all are true:
+
+1. a prior review or close-out emitted a learning tag naming the helper class or concrete helper candidate;
+2. the tag records `promotion_candidate: yes` or an equivalent explicit promotion note;
+3. the later slice has independent structural reason to touch the same helper/policy surface;
+4. the helper extraction is coverage-preserving or coverage-raising under § 9.10;
+5. review artifacts verify no product behavior or authority surface was broadened by the extraction;
+6. close-out records why promotion before N=3 call sites is justified and whether future call-site growth is expected.
+
+This bridge is not a license for speculative abstraction. A generic "might be useful later" observation is insufficient. The tag must point to a concrete recurring mechanism, and the implementation must ship cleanly under the appropriate dual-lane review.
+
+Origin: Slice 4.12 emitted `helper-extraction-candidate-stripAllowedStaticCheckStrings` after report-create-smoke introduced a self-referential static-check token stripping idiom. Phase 4.21 promoted the helper into `scripts/lib/static-guardrails.ts` while already touching that module for cycle-scope extraction; all four review lanes approved 0H/0M/0L.
 
 ## Out of scope for this doc
 
