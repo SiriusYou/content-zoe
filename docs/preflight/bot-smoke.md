@@ -1,9 +1,9 @@
 # Bot Smoke Evidence
 
 - Command: `bun run bot-smoke`
-- Started: 2026-05-07T13:55:33.056Z
-- Finished: 2026-05-07T13:55:33.235Z
-- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-07T13-55-33.055Z (removed by finally-cleanup)
+- Started: 2026-05-08T04:12:36.870Z
+- Finished: 2026-05-08T04:12:37.017Z
+- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-08T04-12-36.869Z (removed by finally-cleanup)
 - Result: 60/60 PASS
 
 ## Evidence Ceiling
@@ -70,7 +70,7 @@ This smoke exercises deterministic allowlist parsing, injected bot runtime seams
 | command-long-poll-overlap-guard | PASS | A scheduled callback during an in-flight long poll did not issue a second getUpdates request.<br>After the pending long poll settled, a later scheduled callback issued the next request normally. |
 | command-long-poll-stop-clears-future-polls | PASS | stop() cleared the local command poll interval and prevented later fake-timer triggers from polling.<br>Calling stop() before start or after an already-stopped transport remained safe. |
 | bot-command-wiring | PASS | startBotRuntime registered /approve, /reject, and /status on a fake command transport, opened the configured DB path per command, replied through the command seam, and left notifier tick orchestration separate.<br>/status summarized a configured DB job without writing events or calling notifyPendingApprovals. |
-| boundary-static-check | PASS | Cycle-scope boundary check ran in active-slice mode and saw changed files: docs/preflight/bot-smoke.md, docs/preflight/report-create-smoke.md, scripts/bot-smoke.ts, scripts/lib/static-guardrails.ts, scripts/report-create-smoke.ts.<br>Synthetic Slice 4.12 report:create files resolve to inherited-surface mode without a bot-smoke exemption.<br>Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.<br>commands.ts and product support surfaces stayed out of scope; bot.ts contains no abort plumbing.<br>Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and status handling does not call promoteJob or inspect .runs. |
+| boundary-static-check | PASS | Cycle-scope boundary check ran in active-slice mode and saw changed files: docs/preflight/bot-smoke.md, docs/preflight/report-create-smoke.md, package.json, scripts/bot-smoke.ts, scripts/report-create-smoke.ts, docs/preflight/report-remind-smoke.md, scripts/report-remind-smoke.ts, src/bin/report-remind.ts.<br>Synthetic Slice 4.12 report:create files resolve to inherited-surface mode without a bot-smoke exemption.<br>Synthetic Slice 4.13 report:remind files resolve to inherited-surface mode without a bot-smoke exemption.<br>Synthetic active-slice scope check rejects out-of-scope prompt product files.<br>Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.<br>commands.ts and product support surfaces stayed out of scope; bot.ts contains no abort plumbing.<br>Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and status handling does not call promoteJob or inspect .runs. |
 | dependency-boundary-check | PASS | Telegram SDK/network concept-class checks are shared and absent from notifier.ts, commands.ts, and promote.ts.<br>commands.ts does not add Telegram network or new publish/process surfaces for /status, and package.json exposes only the expected bot runtime and bot-smoke command surfaces. |
-| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-07T13-55-33.055Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
+| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-08T04-12-36.869Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
 | no-preflight-codex-survivability | PASS | Changed bot, allowlist, and command surfaces have no preflight, Codex smoke, LLM, prompt, process-spawn, or report-run execution dependency. |

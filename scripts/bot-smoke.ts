@@ -213,8 +213,11 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
-const phase421Scope = new Set([
-  "scripts/lib/static-guardrails.ts",
+const slice413Scope = new Set([
+  "src/bin/report-remind.ts",
+  "scripts/report-remind-smoke.ts",
+  "docs/preflight/report-remind-smoke.md",
+  "package.json",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
   "scripts/report-create-smoke.ts",
@@ -231,7 +234,6 @@ const botSmokeActiveTriggers = new Set([
   "docs/preflight/bot-smoke.md",
 ]);
 const botSmokeActiveFrozenFiles = [
-  "package.json",
   "bun.lock",
   "bun.lockb",
   "src/telegram/bot.ts",
@@ -270,6 +272,12 @@ const slice412ReportCreateFiles = [
   "scripts/report-create-smoke.ts",
   "src/bin/report-create.ts",
   "src/security/sanitize.ts",
+];
+const slice413ReportRemindFiles = [
+  "docs/preflight/report-remind-smoke.md",
+  "package.json",
+  "scripts/report-remind-smoke.ts",
+  "src/bin/report-remind.ts",
 ];
 
 const rejectScopes = ["en", "zh", "bundle"] as const satisfies readonly RejectScope[];
@@ -2760,7 +2768,7 @@ function runBoundaryStaticCheck(): string[] {
   const scopeMode = assertCycleScopePolicy({
     changed,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: phase421Scope,
+    activeScope: slice413Scope,
     activeFrozenFiles: botSmokeActiveFrozenFiles,
     activeFrozenDirectories: botSmokeActiveFrozenDirectories,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
@@ -2769,11 +2777,34 @@ function runBoundaryStaticCheck(): string[] {
   const slice412Mode = assertCycleScopePolicy({
     changed: slice412ReportCreateFiles,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: phase421Scope,
+    activeScope: slice413Scope,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
     inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
   });
   assert(slice412Mode === "inherited-surface", "Slice 4.12 report:create files should be inherited for bot-smoke");
+  const slice413Mode = assertCycleScopePolicy({
+    changed: slice413ReportRemindFiles,
+    activeTriggerFiles: botSmokeActiveTriggers,
+    activeScope: slice413Scope,
+    inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
+    inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
+  });
+  assert(slice413Mode === "inherited-surface", "Slice 4.13 report:remind files should be inherited for bot-smoke");
+  let activeScopeRejectedOutOfScope = false;
+  try {
+    assertCycleScopePolicy({
+      changed: ["scripts/bot-smoke.ts", "src/prompts/bot.md"],
+      activeTriggerFiles: botSmokeActiveTriggers,
+      activeScope: slice413Scope,
+      activeFrozenFiles: botSmokeActiveFrozenFiles,
+      activeFrozenDirectories: botSmokeActiveFrozenDirectories,
+      inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
+      inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
+    });
+  } catch (err) {
+    activeScopeRejectedOutOfScope = String(err).includes("changed files outside declared scope");
+  }
+  assert(activeScopeRejectedOutOfScope, "active-slice scope check did not reject out-of-scope prompt files");
 
   const changedSources = changed
     .filter((file) =>
@@ -2804,6 +2835,8 @@ function runBoundaryStaticCheck(): string[] {
   return [
     `Cycle-scope boundary check ran in ${scopeMode} mode and saw changed files: ${changed.join(", ") || "<none>"}.`,
     "Synthetic Slice 4.12 report:create files resolve to inherited-surface mode without a bot-smoke exemption.",
+    "Synthetic Slice 4.13 report:remind files resolve to inherited-surface mode without a bot-smoke exemption.",
+    "Synthetic active-slice scope check rejects out-of-scope prompt product files.",
     "Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.",
     "commands.ts and product support surfaces stayed out of scope; bot.ts contains no abort plumbing.",
     "Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and status handling does not call promoteJob or inspect .runs.",
