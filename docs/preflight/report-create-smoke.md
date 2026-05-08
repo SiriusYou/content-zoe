@@ -1,9 +1,9 @@
 # report-create smoke evidence
 
 - Command: `bun run report-create-smoke`
-- Started: 2026-05-08T13:20:15.653Z
-- Finished: 2026-05-08T13:20:15.701Z
-- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-report-create-smoke-2026-05-08T13-20-15.653Z (removed by finally-cleanup)
+- Started: 2026-05-08T16:15:38.080Z
+- Finished: 2026-05-08T16:15:38.122Z
+- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-report-create-smoke-2026-05-08T16-15-38.080Z (removed by finally-cleanup)
 - Result: 10/10 PASS
 
 This smoke exercises the report:create CLI seed surface only. It does not run operator-only `bun run report:run`, real Codex report generation, real Telegram network, real git/process execution, report generation, notifier sending, or publish/promote behavior.
@@ -19,4 +19,4 @@ This smoke exercises the report:create CLI seed surface only. It does not run op
 | report-create-duplicate-week | PASS | Duplicate week failed with exact WEEK_ALREADY_EXISTS stderr including existing job ID and status.<br>Duplicate week left the existing row unchanged and wrote no events or .runs directory. |
 | report-create-force-rejected | PASS | --force is recognized but rejected with UNSUPPORTED_FORCE before DB mutation. |
 | report-create-no-filesystem-touch | PASS | Successful create only created the cwd-owned SQLite DB.<br>No .runs, attempt directory, reports directory, or artifact output was created. |
-| report-create-boundary-static-check | PASS | Cycle-scope boundary check ran in active-slice mode and saw changed files: docs/preflight/bot-smoke.md, docs/preflight/report-create-smoke.md, docs/preflight/report-remind-smoke.md, package.json, scripts/bot-smoke.ts, scripts/report-create-smoke.ts, scripts/report-remind-smoke.ts, docs/preflight/report-status-smoke.md, scripts/report-status-smoke.ts, src/bin/report-status.ts<br>Synthetic active-slice scope check rejects out-of-scope Telegram product files.<br>Synthetic Slice 4.13 report:remind files resolve to inherited-surface mode without a report-create-smoke exemption.<br>Synthetic Slice 4.14 report:status files resolve to inherited-surface mode without a report-create-smoke exemption.<br>package.json preserves report:create/report-create-smoke, report:remind/report-remind-smoke, and adds only report:status/report-status-smoke with dependency sets unchanged.<br>report-create.ts and sanitize.ts avoid report-run, Telegram, promote, pipeline, LLM, prompt, preflight, process, and network surfaces. |
+| report-create-boundary-static-check | PASS | Cycle-scope boundary check ran in active-slice mode and saw changed files: docs/preflight/report-remind-smoke.md, docs/preflight/report-status-smoke.md, package.json, scripts/bot-smoke.ts, scripts/report-create-smoke.ts, scripts/report-remind-smoke.ts, scripts/report-status-smoke.ts, docs/preflight/report-show-smoke.md, scripts/report-show-smoke.ts, src/bin/report-show.ts<br>Synthetic active-slice scope check rejects out-of-scope Telegram product files.<br>Synthetic Slice 4.13 report:remind files resolve to inherited-surface mode without a report-create-smoke exemption.<br>Synthetic Slice 4.14 report:status files resolve to inherited-surface mode without a report-create-smoke exemption.<br>Synthetic Slice 4.15 report:show files resolve to inherited-surface mode without a report-create-smoke exemption.<br>package.json preserves report:create/report-create-smoke, report:remind/report-remind-smoke, report:status/report-status-smoke, and adds report:show/report-show-smoke with dependency sets unchanged.<br>report-create.ts and sanitize.ts avoid report-run/report-show, Telegram, promote, pipeline, LLM, prompt, preflight, process, and network surfaces. |

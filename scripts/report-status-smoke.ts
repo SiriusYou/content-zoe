@@ -85,11 +85,13 @@ const smokeRoot = path.join(
   `cz-report-status-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "report-status-smoke.md");
-const slice414Scope = new Set([
-  "src/bin/report-status.ts",
+const slice415Scope = new Set([
+  "src/bin/report-show.ts",
+  "scripts/report-show-smoke.ts",
+  "docs/preflight/report-show-smoke.md",
+  "package.json",
   "scripts/report-status-smoke.ts",
   "docs/preflight/report-status-smoke.md",
-  "package.json",
   "scripts/report-remind-smoke.ts",
   "docs/preflight/report-remind-smoke.md",
   "scripts/report-create-smoke.ts",
@@ -107,6 +109,7 @@ const reportStatusActiveFrozenFiles = [
   "bun.lockb",
   "src/bin/report-create.ts",
   "src/bin/report-remind.ts",
+  "src/bin/report-status.ts",
   "src/bin/report-run.ts",
   "src/security/sanitize.ts",
   "src/promote.ts",
@@ -151,6 +154,12 @@ const slice413ReportRemindFiles = [
   "package.json",
   "scripts/report-remind-smoke.ts",
   "src/bin/report-remind.ts",
+];
+const slice415ReportShowFiles = [
+  "docs/preflight/report-show-smoke.md",
+  "package.json",
+  "scripts/report-show-smoke.ts",
+  "src/bin/report-show.ts",
 ];
 const fixedNow = 1_778_100_000;
 
@@ -573,7 +582,7 @@ function runBoundaryStaticCheck(): string[] {
   const scopeMode = assertCycleScopePolicy({
     changed,
     activeTriggerFiles: reportStatusActiveTriggers,
-    activeScope: slice414Scope,
+    activeScope: slice415Scope,
     activeFrozenFiles: reportStatusActiveFrozenFiles,
     activeFrozenDirectories: reportStatusActiveFrozenDirectories,
     inheritedFrozenFiles: reportStatusInheritedFrozenFiles,
@@ -586,7 +595,7 @@ function runBoundaryStaticCheck(): string[] {
     assertCycleScopePolicy({
       changed: ["scripts/report-status-smoke.ts", "src/telegram/bot.ts"],
       activeTriggerFiles: reportStatusActiveTriggers,
-      activeScope: slice414Scope,
+      activeScope: slice415Scope,
       activeFrozenFiles: reportStatusActiveFrozenFiles,
       activeFrozenDirectories: reportStatusActiveFrozenDirectories,
       inheritedFrozenFiles: reportStatusInheritedFrozenFiles,
@@ -600,11 +609,20 @@ function runBoundaryStaticCheck(): string[] {
   const slice413Mode = assertCycleScopePolicy({
     changed: slice413ReportRemindFiles,
     activeTriggerFiles: reportStatusActiveTriggers,
-    activeScope: slice414Scope,
+    activeScope: slice415Scope,
     inheritedFrozenFiles: reportStatusInheritedFrozenFiles,
     inheritedFrozenDirectories: reportStatusInheritedFrozenDirectories,
   });
   assert(slice413Mode === "inherited-surface", "Slice 4.13 report:remind files should be inherited for report-status-smoke");
+
+  const slice415Mode = assertCycleScopePolicy({
+    changed: slice415ReportShowFiles,
+    activeTriggerFiles: reportStatusActiveTriggers,
+    activeScope: slice415Scope,
+    inheritedFrozenFiles: reportStatusInheritedFrozenFiles,
+    inheritedFrozenDirectories: reportStatusInheritedFrozenDirectories,
+  });
+  assert(slice415Mode === "inherited-surface", "Slice 4.15 report:show files should be inherited for report-status-smoke");
 
   const packageJson = JSON.parse(readRepoSource(repoRoot, "package.json")) as {
     scripts?: Record<string, string>;
@@ -613,6 +631,8 @@ function runBoundaryStaticCheck(): string[] {
   };
   assert(packageJson.scripts?.["report:status"] === "bun src/bin/report-status.ts", "missing report:status script");
   assert(packageJson.scripts?.["report-status-smoke"] === "bun scripts/report-status-smoke.ts", "missing report-status-smoke script");
+  assert(packageJson.scripts?.["report:show"] === "bun src/bin/report-show.ts", "missing report:show script");
+  assert(packageJson.scripts?.["report-show-smoke"] === "bun scripts/report-show-smoke.ts", "missing report-show-smoke script");
   assert(packageJson.scripts?.["report:remind"] === "bun src/bin/report-remind.ts", "report:remind script drifted");
   assert(packageJson.scripts?.["report:create"] === "bun src/bin/report-create.ts", "report:create script drifted");
   assert(packageJson.dependencies === undefined, "package.json gained dependencies");
@@ -626,7 +646,7 @@ function runBoundaryStaticCheck(): string[] {
     ...PROMPT_SURFACE_PATTERNS,
     [/from\s+["'][^"']*db\.ts["']|openDb|insertJob|insertEvent|updateJob|casUpdateJob|runMigrations/, "mutating DB helper import"],
     [/\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bCREATE\s+TABLE\b|\bALTER\b|\bDROP\b|\bPRAGMA\b/i, "DB mutation SQL"],
-    [/from\s+["'][^"']*report-create\.ts["']|from\s+["'][^"']*report-remind\.ts["']|from\s+["'][^"']*report-run\.ts["']/, "other CLI import"],
+    [/from\s+["'][^"']*report-create\.ts["']|from\s+["'][^"']*report-remind\.ts["']|from\s+["'][^"']*report-show\.ts["']|from\s+["'][^"']*report-run\.ts["']/, "other CLI import"],
     [/from\s+["'][^"']*\/telegram\//, "Telegram import"],
     [/from\s+["'][^"']*promote\.ts["']|promoteJob/, "promote import"],
     [/from\s+["'][^"']*preflight\.ts["']|CodexCliProvider/, "preflight/Codex import"],
@@ -642,8 +662,9 @@ function runBoundaryStaticCheck(): string[] {
     `Cycle-scope boundary check ran in ${scopeMode} mode and saw changed files: ${changed.join(", ") || "<none>"}.`,
     "Synthetic active-slice scope check rejects out-of-scope Telegram product files.",
     "Synthetic Slice 4.13 report:remind changed-set resolves to inherited-surface mode for report-status-smoke.",
-    "package.json change is limited to report:status and report-status-smoke scripts with dependency sets unchanged.",
-    "report-status.ts avoids mutating DB helpers, other CLI imports, Telegram, promote, preflight/Codex, process, network, LLM, and prompt surfaces.",
+    "Synthetic Slice 4.15 report:show changed-set resolves to inherited-surface mode for report-status-smoke.",
+    "package.json includes report:show/report-show-smoke additions while preserving report:status/remind/create scripts and dependency sets.",
+    "report-status.ts avoids mutating DB helpers, other CLI imports including report-show, Telegram, promote, preflight/Codex, process, network, LLM, and prompt surfaces.",
   ];
 }
 

@@ -1,9 +1,9 @@
 # report-status smoke evidence
 
 - Command: `bun run report-status-smoke`
-- Started: 2026-05-08T13:21:26.162Z
-- Finished: 2026-05-08T13:21:26.210Z
-- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-report-status-smoke-2026-05-08T13-21-26.162Z (removed by finally-cleanup)
+- Started: 2026-05-08T16:15:31.112Z
+- Finished: 2026-05-08T16:15:31.162Z
+- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-report-status-smoke-2026-05-08T16-15-31.112Z (removed by finally-cleanup)
 - Result: 13/13 PASS
 
 This smoke exercises the read-only `report:status` CLI surface only. It does not run operator-only `bun run report:run`, real Codex report generation, real Telegram network, real git/process execution, notifier sending, publish/promote behavior, DB migrations beyond scenario setup, or preflight.
@@ -22,4 +22,4 @@ This smoke exercises the read-only `report:status` CLI surface only. It does not
 | report-status-notify-error | PASS | Notification error is collapsed and capped in APPROVAL last_notify_error. |
 | report-status-read-only-no-mutation | PASS | Jobs and events snapshots are byte-identical before and after report:status.<br>No .runs, reports, or attempt output directories are created. |
 | report-status-malformed-db | PASS | Malformed existing DB exits non-zero with DB_READ_FAILED on stderr and no stdout.<br>Malformed DB handling does not remove or recreate the DB file. |
-| report-status-boundary-static-check | PASS | Cycle-scope boundary check ran in active-slice mode and saw changed files: docs/preflight/bot-smoke.md, docs/preflight/report-create-smoke.md, docs/preflight/report-remind-smoke.md, docs/preflight/report-status-smoke.md, package.json, scripts/bot-smoke.ts, scripts/report-create-smoke.ts, scripts/report-remind-smoke.ts, scripts/report-status-smoke.ts, src/bin/report-status.ts.<br>Synthetic active-slice scope check rejects out-of-scope Telegram product files.<br>Synthetic Slice 4.13 report:remind changed-set resolves to inherited-surface mode for report-status-smoke.<br>package.json change is limited to report:status and report-status-smoke scripts with dependency sets unchanged.<br>report-status.ts avoids mutating DB helpers, other CLI imports, Telegram, promote, preflight/Codex, process, network, LLM, and prompt surfaces. |
+| report-status-boundary-static-check | PASS | Cycle-scope boundary check ran in active-slice mode and saw changed files: docs/preflight/report-remind-smoke.md, package.json, scripts/bot-smoke.ts, scripts/report-create-smoke.ts, scripts/report-remind-smoke.ts, scripts/report-status-smoke.ts, docs/preflight/report-show-smoke.md, scripts/report-show-smoke.ts, src/bin/report-show.ts.<br>Synthetic active-slice scope check rejects out-of-scope Telegram product files.<br>Synthetic Slice 4.13 report:remind changed-set resolves to inherited-surface mode for report-status-smoke.<br>Synthetic Slice 4.15 report:show changed-set resolves to inherited-surface mode for report-status-smoke.<br>package.json includes report:show/report-show-smoke additions while preserving report:status/remind/create scripts and dependency sets.<br>report-status.ts avoids mutating DB helpers, other CLI imports including report-show, Telegram, promote, preflight/Codex, process, network, LLM, and prompt surfaces. |

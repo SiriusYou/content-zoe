@@ -73,11 +73,13 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const isoStamp = new Date().toISOString().replaceAll(":", "-");
 const smokeRoot = resolve(tmpdir(), `cz-report-create-smoke-${isoStamp}`);
 const docPath = resolve(repoRoot, "docs", "preflight", "report-create-smoke.md");
-const slice414Scope = new Set([
-  "src/bin/report-status.ts",
+const slice415Scope = new Set([
+  "src/bin/report-show.ts",
+  "scripts/report-show-smoke.ts",
+  "docs/preflight/report-show-smoke.md",
+  "package.json",
   "scripts/report-status-smoke.ts",
   "docs/preflight/report-status-smoke.md",
-  "package.json",
   "scripts/report-remind-smoke.ts",
   "docs/preflight/report-remind-smoke.md",
   "scripts/bot-smoke.ts",
@@ -96,6 +98,8 @@ const reportCreateActiveFrozenFiles = [
   "bun.lock",
   "bun.lockb",
   "src/bin/report-create.ts",
+  "src/bin/report-remind.ts",
+  "src/bin/report-status.ts",
   "src/bin/report-run.ts",
   "src/security/sanitize.ts",
   "src/promote.ts",
@@ -443,7 +447,7 @@ function runBoundaryStaticCheck(): string[] {
   const scopeMode = assertCycleScopePolicy({
     changed,
     activeTriggerFiles: reportCreateActiveTriggers,
-    activeScope: slice414Scope,
+    activeScope: slice415Scope,
     activeFrozenFiles: reportCreateActiveFrozenFiles,
     activeFrozenDirectories: reportCreateActiveFrozenDirectories,
     inheritedFrozenFiles: reportCreateInheritedFrozenFiles,
@@ -453,7 +457,7 @@ function runBoundaryStaticCheck(): string[] {
     assertCycleScopePolicy({
       changed: ["scripts/report-create-smoke.ts", "src/telegram/bot.ts"],
       activeTriggerFiles: reportCreateActiveTriggers,
-      activeScope: slice414Scope,
+      activeScope: slice415Scope,
       activeFrozenFiles: reportCreateActiveFrozenFiles,
       activeFrozenDirectories: reportCreateActiveFrozenDirectories,
       inheritedFrozenFiles: reportCreateInheritedFrozenFiles,
@@ -472,7 +476,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice413ReportRemindMode = assertCycleScopePolicy({
     changed: slice413ReportRemindFiles,
     activeTriggerFiles: reportCreateActiveTriggers,
-    activeScope: slice414Scope,
+    activeScope: slice415Scope,
     activeFrozenFiles: reportCreateActiveFrozenFiles,
     activeFrozenDirectories: reportCreateActiveFrozenDirectories,
     inheritedFrozenFiles: reportCreateInheritedFrozenFiles,
@@ -488,12 +492,28 @@ function runBoundaryStaticCheck(): string[] {
   const slice414ReportStatusMode = assertCycleScopePolicy({
     changed: slice414ReportStatusFiles,
     activeTriggerFiles: reportCreateActiveTriggers,
-    activeScope: slice414Scope,
+    activeScope: slice415Scope,
     activeFrozenFiles: reportCreateActiveFrozenFiles,
     activeFrozenDirectories: reportCreateActiveFrozenDirectories,
     inheritedFrozenFiles: reportCreateInheritedFrozenFiles,
   });
   assert(slice414ReportStatusMode === "inherited-surface", "Slice 4.14 report:status files should be inherited for report-create-smoke");
+
+  const slice415ReportShowFiles = [
+    "docs/preflight/report-show-smoke.md",
+    "package.json",
+    "scripts/report-show-smoke.ts",
+    "src/bin/report-show.ts",
+  ];
+  const slice415ReportShowMode = assertCycleScopePolicy({
+    changed: slice415ReportShowFiles,
+    activeTriggerFiles: reportCreateActiveTriggers,
+    activeScope: slice415Scope,
+    activeFrozenFiles: reportCreateActiveFrozenFiles,
+    activeFrozenDirectories: reportCreateActiveFrozenDirectories,
+    inheritedFrozenFiles: reportCreateInheritedFrozenFiles,
+  });
+  assert(slice415ReportShowMode === "inherited-surface", "Slice 4.15 report:show files should be inherited for report-create-smoke");
 
   const packageJson = JSON.parse(readRepoSource(repoRoot, "package.json")) as {
     scripts?: Record<string, string>;
@@ -506,6 +526,8 @@ function runBoundaryStaticCheck(): string[] {
   assert(packageJson.scripts?.["report-remind-smoke"] === "bun scripts/report-remind-smoke.ts", "missing report-remind-smoke script");
   assert(packageJson.scripts?.["report:status"] === "bun src/bin/report-status.ts", "missing report:status script");
   assert(packageJson.scripts?.["report-status-smoke"] === "bun scripts/report-status-smoke.ts", "missing report-status-smoke script");
+  assert(packageJson.scripts?.["report:show"] === "bun src/bin/report-show.ts", "missing report:show script");
+  assert(packageJson.scripts?.["report-show-smoke"] === "bun scripts/report-show-smoke.ts", "missing report-show-smoke script");
   assert(packageJson.dependencies === undefined, "package.json gained dependencies");
   assert(packageJson.devDependencies?.typescript === "^5.6.3", "typescript devDependency drifted");
   assert(packageJson.devDependencies?.["@types/bun"] === "^1.1.13", "@types/bun devDependency drifted");
@@ -515,7 +537,7 @@ function runBoundaryStaticCheck(): string[] {
   assertNoForbiddenPatterns(createSource, [
     ...PROCESS_SPAWN_PATTERNS,
     ...TELEGRAM_SDK_NETWORK_PATTERNS,
-    [/from\s+["'][^"']*report-run\.ts["']|src\/bin\/report-run/, "report-run import"],
+    [/from\s+["'][^"']*report-run\.ts["']|from\s+["'][^"']*report-show\.ts["']|src\/bin\/report-run/, "report-run/report-show import"],
     [/from\s+["'][^"']*\/telegram\//, "Telegram import"],
     [/from\s+["'][^"']*promote\.ts["']|promoteJob/, "promote import"],
     [/from\s+["'][^"']*\/pipeline\//, "pipeline import"],
@@ -544,8 +566,9 @@ function runBoundaryStaticCheck(): string[] {
     "Synthetic active-slice scope check rejects out-of-scope Telegram product files.",
     "Synthetic Slice 4.13 report:remind files resolve to inherited-surface mode without a report-create-smoke exemption.",
     "Synthetic Slice 4.14 report:status files resolve to inherited-surface mode without a report-create-smoke exemption.",
-    "package.json preserves report:create/report-create-smoke, report:remind/report-remind-smoke, and adds only report:status/report-status-smoke with dependency sets unchanged.",
-    "report-create.ts and sanitize.ts avoid report-run, Telegram, promote, pipeline, LLM, prompt, preflight, process, and network surfaces.",
+    "Synthetic Slice 4.15 report:show files resolve to inherited-surface mode without a report-create-smoke exemption.",
+    "package.json preserves report:create/report-create-smoke, report:remind/report-remind-smoke, report:status/report-status-smoke, and adds report:show/report-show-smoke with dependency sets unchanged.",
+    "report-create.ts and sanitize.ts avoid report-run/report-show, Telegram, promote, pipeline, LLM, prompt, preflight, process, and network surfaces.",
   ];
 }
 
