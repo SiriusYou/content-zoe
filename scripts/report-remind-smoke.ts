@@ -77,7 +77,10 @@ const smokeRoot = path.join(
   `cz-report-remind-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "report-remind-smoke.md");
-const slice415Scope = new Set([
+const slice416Scope = new Set([
+  "src/bin/report-list.ts",
+  "scripts/report-list-smoke.ts",
+  "docs/preflight/report-list-smoke.md",
   "src/bin/report-show.ts",
   "scripts/report-show-smoke.ts",
   "docs/preflight/report-show-smoke.md",
@@ -463,7 +466,7 @@ function runBoundaryStaticCheck(): string[] {
   const scopeMode = assertCycleScopePolicy({
     changed,
     activeTriggerFiles: reportRemindActiveTriggers,
-    activeScope: slice415Scope,
+    activeScope: slice416Scope,
     activeFrozenFiles: reportRemindActiveFrozenFiles,
     activeFrozenDirectories: reportRemindActiveFrozenDirectories,
     inheritedFrozenFiles: reportRemindInheritedFrozenFiles,
@@ -476,7 +479,7 @@ function runBoundaryStaticCheck(): string[] {
     assertCycleScopePolicy({
       changed: ["scripts/report-remind-smoke.ts", "src/telegram/bot.ts"],
       activeTriggerFiles: reportRemindActiveTriggers,
-      activeScope: slice415Scope,
+      activeScope: slice416Scope,
       activeFrozenFiles: reportRemindActiveFrozenFiles,
       activeFrozenDirectories: reportRemindActiveFrozenDirectories,
       inheritedFrozenFiles: reportRemindInheritedFrozenFiles,
@@ -497,7 +500,7 @@ function runBoundaryStaticCheck(): string[] {
   const reportCreateMode = assertCycleScopePolicy({
     changed: reportCreateFiles,
     activeTriggerFiles: reportRemindActiveTriggers,
-    activeScope: slice415Scope,
+    activeScope: slice416Scope,
     inheritedFrozenFiles: reportRemindInheritedFrozenFiles,
     inheritedFrozenDirectories: reportRemindInheritedFrozenDirectories,
   });
@@ -512,7 +515,7 @@ function runBoundaryStaticCheck(): string[] {
   const reportStatusMode = assertCycleScopePolicy({
     changed: reportStatusFiles,
     activeTriggerFiles: reportRemindActiveTriggers,
-    activeScope: slice415Scope,
+    activeScope: slice416Scope,
     inheritedFrozenFiles: reportRemindInheritedFrozenFiles,
     inheritedFrozenDirectories: reportRemindInheritedFrozenDirectories,
   });
@@ -527,11 +530,26 @@ function runBoundaryStaticCheck(): string[] {
   const reportShowMode = assertCycleScopePolicy({
     changed: reportShowFiles,
     activeTriggerFiles: reportRemindActiveTriggers,
-    activeScope: slice415Scope,
+    activeScope: slice416Scope,
     inheritedFrozenFiles: reportRemindInheritedFrozenFiles,
     inheritedFrozenDirectories: reportRemindInheritedFrozenDirectories,
   });
   assert(reportShowMode === "inherited-surface", "Slice 4.15 report:show files should be inherited for report-remind-smoke");
+
+  const reportListFiles = [
+    "docs/preflight/report-list-smoke.md",
+    "package.json",
+    "scripts/report-list-smoke.ts",
+    "src/bin/report-list.ts",
+  ];
+  const reportListMode = assertCycleScopePolicy({
+    changed: reportListFiles,
+    activeTriggerFiles: reportRemindActiveTriggers,
+    activeScope: slice416Scope,
+    inheritedFrozenFiles: reportRemindInheritedFrozenFiles,
+    inheritedFrozenDirectories: reportRemindInheritedFrozenDirectories,
+  });
+  assert(reportListMode === "inherited-surface", "Slice 4.16 report:list files should be inherited for report-remind-smoke");
 
   const packageJson = JSON.parse(readRepoSource(repoRoot, "package.json")) as {
     scripts?: Record<string, string>;
@@ -540,6 +558,8 @@ function runBoundaryStaticCheck(): string[] {
   };
   assert(packageJson.scripts?.["report:remind"] === "bun src/bin/report-remind.ts", "missing report:remind script");
   assert(packageJson.scripts?.["report-remind-smoke"] === "bun scripts/report-remind-smoke.ts", "missing report-remind-smoke script");
+  assert(packageJson.scripts?.["report:list"] === "bun src/bin/report-list.ts", "missing report:list script");
+  assert(packageJson.scripts?.["report-list-smoke"] === "bun scripts/report-list-smoke.ts", "missing report-list-smoke script");
   assert(packageJson.scripts?.["report:status"] === "bun src/bin/report-status.ts", "missing report:status script");
   assert(packageJson.scripts?.["report-status-smoke"] === "bun scripts/report-status-smoke.ts", "missing report-status-smoke script");
   assert(packageJson.scripts?.["report:show"] === "bun src/bin/report-show.ts", "missing report:show script");
@@ -556,7 +576,7 @@ function runBoundaryStaticCheck(): string[] {
     ...PROMPT_SURFACE_PATTERNS,
     [/from\s+["'][^"']*db\.ts["']|openDb|insertJob|updateJob|insertEvent|runMigrations/, "mutating DB helper import"],
     [/\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bCREATE\s+TABLE\b|\bPRAGMA\b/i, "DB mutation SQL"],
-    [/from\s+["'][^"']*report-create\.ts["']|from\s+["'][^"']*report-run\.ts["']|from\s+["'][^"']*report-status\.ts["']|from\s+["'][^"']*report-show\.ts["']/, "other CLI import"],
+    [/from\s+["'][^"']*report-create\.ts["']|from\s+["'][^"']*report-run\.ts["']|from\s+["'][^"']*report-status\.ts["']|from\s+["'][^"']*report-show\.ts["']|from\s+["'][^"']*report-list\.ts["']/, "other CLI import"],
     [/from\s+["'][^"']*\/telegram\//, "Telegram import"],
     [/from\s+["'][^"']*promote\.ts["']|promoteJob/, "promote import"],
     [/from\s+["'][^"']*preflight\.ts["']|CodexCliProvider/, "preflight/Codex import"],
@@ -574,7 +594,8 @@ function runBoundaryStaticCheck(): string[] {
     "Synthetic report-create changed-set resolves to inherited-surface mode for report-remind-smoke.",
     "Synthetic Slice 4.14 report:status changed-set resolves to inherited-surface mode for report-remind-smoke.",
     "Synthetic Slice 4.15 report:show changed-set resolves to inherited-surface mode for report-remind-smoke.",
-    "package.json includes report:show/report-show-smoke additions while preserving report:remind/status/create scripts and dependency sets.",
+    "Synthetic Slice 4.16 report:list changed-set resolves to inherited-surface mode for report-remind-smoke.",
+    "package.json includes report:list/report-list-smoke and report:show/report-show-smoke additions while preserving report:remind/status/create scripts and dependency sets.",
     "report-remind.ts avoids mutating DB helpers, report-create/report-run/report-status/report-show imports, Telegram, promote, preflight/Codex, process, network, LLM, and prompt surfaces.",
   ];
 }

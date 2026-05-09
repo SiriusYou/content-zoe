@@ -213,7 +213,10 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
-const slice415Scope = new Set([
+const slice416Scope = new Set([
+  "src/bin/report-list.ts",
+  "scripts/report-list-smoke.ts",
+  "docs/preflight/report-list-smoke.md",
   "src/bin/report-show.ts",
   "scripts/report-show-smoke.ts",
   "docs/preflight/report-show-smoke.md",
@@ -297,6 +300,12 @@ const slice415ReportShowFiles = [
   "package.json",
   "scripts/report-show-smoke.ts",
   "src/bin/report-show.ts",
+];
+const slice416ReportListFiles = [
+  "docs/preflight/report-list-smoke.md",
+  "package.json",
+  "scripts/report-list-smoke.ts",
+  "src/bin/report-list.ts",
 ];
 
 const rejectScopes = ["en", "zh", "bundle"] as const satisfies readonly RejectScope[];
@@ -2787,7 +2796,7 @@ function runBoundaryStaticCheck(): string[] {
   const scopeMode = assertCycleScopePolicy({
     changed,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice415Scope,
+    activeScope: slice416Scope,
     activeFrozenFiles: botSmokeActiveFrozenFiles,
     activeFrozenDirectories: botSmokeActiveFrozenDirectories,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
@@ -2796,7 +2805,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice412Mode = assertCycleScopePolicy({
     changed: slice412ReportCreateFiles,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice415Scope,
+    activeScope: slice416Scope,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
     inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
   });
@@ -2804,7 +2813,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice413Mode = assertCycleScopePolicy({
     changed: slice413ReportRemindFiles,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice415Scope,
+    activeScope: slice416Scope,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
     inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
   });
@@ -2812,7 +2821,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice414Mode = assertCycleScopePolicy({
     changed: slice414ReportStatusFiles,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice415Scope,
+    activeScope: slice416Scope,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
     inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
   });
@@ -2820,17 +2829,25 @@ function runBoundaryStaticCheck(): string[] {
   const slice415Mode = assertCycleScopePolicy({
     changed: slice415ReportShowFiles,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice415Scope,
+    activeScope: slice416Scope,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
     inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
   });
   assert(slice415Mode === "inherited-surface", "Slice 4.15 report:show files should be inherited for bot-smoke");
+  const slice416Mode = assertCycleScopePolicy({
+    changed: slice416ReportListFiles,
+    activeTriggerFiles: botSmokeActiveTriggers,
+    activeScope: slice416Scope,
+    inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
+    inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
+  });
+  assert(slice416Mode === "inherited-surface", "Slice 4.16 report:list files should be inherited for bot-smoke");
   let activeScopeRejectedOutOfScope = false;
   try {
     assertCycleScopePolicy({
       changed: ["scripts/bot-smoke.ts", "src/prompts/bot.md"],
       activeTriggerFiles: botSmokeActiveTriggers,
-      activeScope: slice415Scope,
+      activeScope: slice416Scope,
       activeFrozenFiles: botSmokeActiveFrozenFiles,
       activeFrozenDirectories: botSmokeActiveFrozenDirectories,
       inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
@@ -2873,6 +2890,7 @@ function runBoundaryStaticCheck(): string[] {
     "Synthetic Slice 4.13 report:remind files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic Slice 4.14 report:status files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic Slice 4.15 report:show files resolve to inherited-surface mode without a bot-smoke exemption.",
+    "Synthetic Slice 4.16 report:list files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic active-slice scope check rejects out-of-scope prompt product files.",
     "Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.",
     "commands.ts and product support surfaces stayed out of scope; bot.ts contains no abort plumbing.",
