@@ -84,6 +84,8 @@ Gate 1 classifies edits to bounded-reopen files as:
 
 Gate 1 should reject any worker handback that treats an undeclared file as bounded solely because a prior slice or draft discussed similar risk. If the operator intentionally merges without repairing the authority surfaces, record it as a manual charter override outside the bounded-reopen success path, not as an accepted Gate 1 bounded disposition.
 
+Gate 1 review artifacts and Gate dispatch packets follow operating-model implementation hard-out anchor discipline. When a slice has separate approval-label and implementation commits, reviewers distinguish cumulative range from implementation range and name the implementation hard-out anchor. Companion-artifact existence claims follow operating-model artifact searched-scope discipline.
+
 ### Gate 2: Target-Side Review
 
 Gate 2 reviews product and content correctness. It runs only after Gate 1 approves.

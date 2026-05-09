@@ -128,6 +128,33 @@ Working-tree reads are acceptable only for generated evidence files that exist s
 
 **Origin**: Slice 3.7 and Slice 4.1/4.2 implementation reviews. Immutable full-SHA reads prevented review drift when worker cleanup, branch advancement, or operator-side worktree state changed after implementation.
 
+### Implementation hard-out anchor discipline
+
+When a cycle has both an approval-label commit and a later implementation commit, dispatch packets, Gate dispatch packets, and Gate review artifacts MUST name the implementation hard-out anchor.
+
+Use two ranges when both are relevant:
+
+- `cumulative range`: cycle base to fix HEAD, including approval-label authority edits;
+- `implementation range`: approval-label commit, worker-intake commit, or other pre-implementation anchor to fix HEAD.
+
+Dispatch and Gate artifacts should name at least:
+
+- cycle base;
+- approval-label commit, when one exists;
+- implementation hard-out anchor;
+- fix HEAD or target implementation commit;
+- whether cumulative and implementation ranges differ.
+
+Hard-out checks for runtime/product/package/lockfile/smoke/governance drift are implementation-defect checks against the implementation range unless the dispatch explicitly asks reviewers to review approval-label authority edits.
+
+Approval-label PLAN.md/TODOS.md tracking edits are authority-surface process events only when they are limited to the `[x] (cz-Claude approved YYYY-MM-DD; classification=...) Slice N: ...` approved-slice line and an adjacent operator-recorded classification rationale note. Other PLAN.md/TODOS.md edits in approval-label commits remain subject to hard-out review.
+
+Hard-out anchor language guides reviewer interpretation of which diff range to inspect. Worker-time scope guard mechanics are unchanged: workers continue to fail when they write outside declared file scope, regardless of which commit is the hard-out anchor.
+
+Reviewers MAY still record cumulative-range differences when they matter for close-out or process accounting. If cumulative and implementation ranges disagree, the artifact must say which range carries the finding.
+
+**Origin**: Slice 4.15 Gate 1 hc-Claude LOW on PLAN.md approval-label tracking. The implementation commit respected the PLAN.md hard-out, while the operator-authored approval-label commit added the slice tracking line. The lesson is anchor clarity, not relaxed hard-outs.
+
 ### Review artifact write-path discipline
 
 Reviewers SHOULD write review artifacts to the canonical artifact path for their lane, as defined in § 4.
@@ -135,6 +162,12 @@ Reviewers SHOULD write review artifacts to the canonical artifact path for their
 Review artifacts SHOULD include a load-bearing refs table near the top naming the target implementation SHA, base SHA, locked draft SHA, predecessor review SHAs when relevant, and any mirrored artifact paths. Artifact SHA-256 values should be recorded in full when used for cross-session lookup.
 
 If an artifact is written to the wrong repo because the reviewer cwd drifted, the operator may reconcile it by copying it to the canonical path only if the byte-identical SHA is preserved. The close-out should record the reconciliation.
+
+Artifact existence and absence claims MUST state the searched repo/path scope, especially when artifacts may live in either `openclaw-healthcare/.omx/artifacts/` or `content-zoe/.omx/artifacts/`.
+
+Metadata-only checks of existence, path, file size, SHA-256, lane, round, and verdict signature are permitted before verdict formation and do not violate lane independence.
+
+The no-body-consultation rule applies to peer or companion-lane artifact bodies before the reviewer commits to an independent verdict. It does not block reading own-lane prior-round artifacts, locked specs/drafts, dispatch packets, source commits, operator-provided fold summaries, or cross-lane artifacts after the reviewer has committed to their verdict for reconciliation or close-out.
 
 **Origin**: Slice 4.3 hc-Codex Gate 1 artifact routing divergence and reconciliation; Slice 4.4 hc-Codex Gate 1 direct hc-side landing.
 
@@ -680,6 +713,18 @@ When a learning tag is promoted, the next close-out should choose one dispositio
 3. Fold into the next product slice when the fix naturally belongs to that slice's declared scope.
 4. Carry forward with an explicit threshold if more evidence is needed.
 5. Reject or retire with canonical-source evidence.
+
+N=3 recurrence is evidence for shape-convergence review, not automatic code consolidation.
+
+Before extracting a helper from recurrent tags, the dispatch or review artifact should classify the observed call sites as one of:
+
+- same abstraction: helper extraction is eligible if scope, ownership, and review coverage are also appropriate;
+- similar but separate: carry the pattern forward without consolidation;
+- coincidental recurrence: retire or narrow the helper candidate.
+
+This applies both before and after N=3. A count threshold can authorize a closer look; it does not by itself authorize helper extraction, product changes, worker-authority changes, or gate reduction.
+
+This ceiling discipline does not relax the existing helper-promotion bridge. Pre-N=3 helper extraction remains admissible only when the full bridge admissibility test is met: a specific `promotion_candidate: yes` learning tag or equivalent, independent structural reason in the later slice, coverage-preserving or coverage-raising implementation under § 9.10, no product/authority broadening, and appropriate dual-lane review. N=3 recurrence alone authorizes only shape-convergence review and does not substitute for any bridge admissibility criterion.
 
 Origin: Slice 4.7 Gate 1 introduced Cross-Slice Learning Tags for `boundary-static-check`; Phase 4.13 close-out promoted the recurrence; Phase 4.14 implemented a shared static guardrail helper within hours. This is the first canonical corpus-to-structural-fix loop: the corpus did not merely describe a pattern, it directly caused a structural refactor.
 
