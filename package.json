@@ -27,6 +27,8 @@
     "report-show-smoke": "bun scripts/report-show-smoke.ts",
     "report:list": "bun src/bin/report-list.ts",
     "report-list-smoke": "bun scripts/report-list-smoke.ts",
+    "report:deliver-local": "bun src/bin/report-deliver-local.ts",
+    "report-deliver-local-smoke": "bun scripts/report-deliver-local-smoke.ts",
     "report:run": "bun src/bin/report-run.ts",
     "approval-summary-smoke": "bun scripts/approval-summary-smoke.ts",
     "report-run-smoke": "bun scripts/report-run-smoke.ts",

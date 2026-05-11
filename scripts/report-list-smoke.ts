@@ -91,6 +91,10 @@ const slice416Scope = new Set([
   "src/bin/report-list.ts",
   "scripts/report-list-smoke.ts",
   "docs/preflight/report-list-smoke.md",
+  "src/lib/publish-destination.ts",
+  "src/bin/report-deliver-local.ts",
+  "scripts/report-deliver-local-smoke.ts",
+  "docs/preflight/report-deliver-local-smoke.md",
   "package.json",
   "scripts/report-show-smoke.ts",
   "docs/preflight/report-show-smoke.md",
@@ -519,7 +523,7 @@ function runBoundaryStaticCheck(): string[] {
     inheritedFrozenFiles: reportListInheritedFrozenFiles,
     inheritedFrozenDirectories: reportListInheritedFrozenDirectories,
   });
-  assert(scopeMode === "active-slice", "report-list smoke should run in active-slice mode for Slice 4.17 inherited evidence refresh");
+  assert(scopeMode === "active-slice", "report-list smoke should run in active-slice mode for Slice 4.18 inherited evidence refresh");
 
   let activeScopeRejectedOutOfScope = false;
   try {

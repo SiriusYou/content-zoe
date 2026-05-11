@@ -1,9 +1,9 @@
 # report-run smoke evidence
 
 - Command: `bun run report-run-smoke`
-- Started: 2026-05-11T04:16:30.099Z
-- Finished: 2026-05-11T04:16:30.499Z
-- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-11T04-16-30.099Z (removed by finally-cleanup)
+- Started: 2026-05-11T07:15:40.004Z
+- Finished: 2026-05-11T07:15:40.355Z
+- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-11T07-15-40.004Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
