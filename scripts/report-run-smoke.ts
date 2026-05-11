@@ -17,6 +17,10 @@ import {
   insertJob,
   openDb,
   recordRecoveryCleanup,
+  recordResearchStageComplete,
+  recordStageComplete,
+  recordStageEnter,
+  updateJob,
 } from "../src/db.ts";
 import { FakeProvider } from "../src/llm/fake.ts";
 import {
@@ -30,12 +34,15 @@ import {
   runReportLoop,
   type ReportLoopResult,
   type RunState,
+  type StageLifecycleHooks,
 } from "../src/lib/report-loop.ts";
 import { Stage } from "../src/pipeline/types.ts";
 
 type ScenarioName =
   | "happy-path"
   | "approval-summary-continuity"
+  | "lifecycle-happy-path-db-audit"
+  | "lifecycle-failure-db-audit"
   | "default-llm-provider-when-unset"
   | "en-only-skip"
   | "stage-failure-mid-run"
@@ -58,6 +65,8 @@ interface ScenarioOutcome {
 const SCENARIOS: ScenarioName[] = [
   "happy-path",
   "approval-summary-continuity",
+  "lifecycle-happy-path-db-audit",
+  "lifecycle-failure-db-audit",
   "default-llm-provider-when-unset",
   "en-only-skip",
   "stage-failure-mid-run",
@@ -134,6 +143,10 @@ async function scenarioImpl(
       return runHappyPath(dir);
     case "approval-summary-continuity":
       return runApprovalSummaryContinuity(dir);
+    case "lifecycle-happy-path-db-audit":
+      return runLifecycleHappyPathDbAudit(dir);
+    case "lifecycle-failure-db-audit":
+      return runLifecycleFailureDbAudit(dir);
     case "default-llm-provider-when-unset":
       return runDefaultLlmProviderWhenUnset(dir);
     case "en-only-skip":
@@ -158,6 +171,7 @@ async function scenarioImpl(
 }
 
 async function runHappyPath(dir: string): Promise<string[]> {
+  seedJobRow(dir, "happy");
   const result = runReportRunCli(dir, ["happy", "--locales=en,zh"]);
   assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
   assert(
@@ -179,6 +193,7 @@ async function runHappyPath(dir: string): Promise<string[]> {
 }
 
 async function runDefaultLlmProviderWhenUnset(dir: string): Promise<string[]> {
+  seedJobRow(dir, "default-provider");
   const result = runReportRunCli(
     dir,
     ["default-provider", "--locales=en"],
@@ -244,6 +259,106 @@ async function runApprovalSummaryContinuity(dir: string): Promise<string[]> {
   return [
     "Seeded CLI run persisted a non-empty approval_summary with job-root run_dir and attempt-local report paths.",
     "A completed resume stayed idempotent: no attempt-2 and the persisted approval_summary remained unchanged.",
+  ];
+}
+
+async function runLifecycleHappyPathDbAudit(dir: string): Promise<string[]> {
+  const jobId = "lifecycle-happy";
+  seedJobRow(dir, jobId);
+  const dbBefore = openDb(resolve(dir, ".data", "content.db"));
+  try {
+    const job = findJobById(dbBefore, jobId);
+    assert(job?.as_of === null, "expected jobs.as_of to be null before report:run");
+  } finally {
+    dbBefore.close();
+  }
+
+  const result = runReportRunCli(dir, [jobId, "--locales=en,zh"]);
+  assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
+
+  const db = openDb(resolve(dir, ".data", "content.db"));
+  try {
+    const events = findEventsByJob(db, jobId).filter(
+      (event) => event.type === "stage_enter" || event.type === "stage_complete",
+    );
+    const eventNames = events.map((event) => `${event.type}:${eventPayload(event.payload).stage}`);
+    assert(
+      eventNames.join(" > ") === [
+        "stage_enter:research",
+        "stage_complete:research",
+        "stage_enter:draft_en",
+        "stage_complete:draft_en",
+        "stage_enter:edit_en",
+        "stage_complete:edit_en",
+        "stage_enter:translate_zh",
+        "stage_complete:translate_zh",
+      ].join(" > "),
+      `unexpected lifecycle event order: ${eventNames.join(" > ")}`,
+    );
+
+    for (const event of events) {
+      assert(event.attempt_number === 1, `unexpected attempt ${event.attempt_number}`);
+      assertLifecyclePayloadShape(event.type, event.payload);
+    }
+
+    const researchComplete = events.find(
+      (event) =>
+        event.type === "stage_complete" &&
+        eventPayload(event.payload).stage === Stage.RESEARCH,
+    );
+    assert(researchComplete !== undefined, "missing research stage_complete event");
+    const job = findJobById(db, jobId);
+    assert(job !== null, "missing job after lifecycle run");
+    assert(
+      job.as_of === researchComplete.created_at,
+      `expected jobs.as_of=${researchComplete.created_at}, got ${job.as_of}`,
+    );
+    assert(job.status === "awaiting_approval", `expected awaiting_approval, got ${job.status}`);
+  } finally {
+    db.close();
+  }
+
+  return [
+    "CLI happy path wrote ordered stage_enter/stage_complete pairs for all four stages.",
+    "Lifecycle payloads used exact key sets and excluded raw fake-provider output/body/prompt fields.",
+    "Research stage_complete and jobs.as_of shared the same durable completion timestamp.",
+  ];
+}
+
+async function runLifecycleFailureDbAudit(dir: string): Promise<string[]> {
+  const jobId = "lifecycle-failure";
+  seedJobRow(dir, jobId);
+  const db = openDb(resolve(dir, ".data", "content.db"));
+  try {
+    const result = await runPreparedReportLoop({
+      jobId,
+      locales: ["en", "zh"],
+      provider: providerOmitting([Stage.EDIT_EN]),
+      cwd: dir,
+      lifecycle: createSmokeLifecycleHooks(db, dir),
+    });
+    assert(result.status === "stage_failed", `expected stage_failed, got ${result.status}`);
+
+    const events = findEventsByJob(db, jobId).filter(
+      (event) => event.type === "stage_enter" || event.type === "stage_complete",
+    );
+    const editEnter = events.filter(
+      (event) =>
+        event.type === "stage_enter" && eventPayload(event.payload).stage === Stage.EDIT_EN,
+    );
+    const editComplete = events.filter(
+      (event) =>
+        event.type === "stage_complete" && eventPayload(event.payload).stage === Stage.EDIT_EN,
+    );
+    assert(editEnter.length === 1, `expected one edit_en enter, got ${editEnter.length}`);
+    assert(editComplete.length === 0, `expected zero edit_en complete, got ${editComplete.length}`);
+  } finally {
+    db.close();
+  }
+
+  return [
+    "Loop-level lifecycle callbacks wrote stage_enter for the failed edit_en stage.",
+    "The failed edit_en stage did not receive a stage_complete event.",
   ];
 }
 
@@ -446,6 +561,7 @@ async function runResumeCarryForward(dir: string): Promise<string[]> {
 }
 
 async function runResumeAfterSuccessIdempotent(dir: string): Promise<string[]> {
+  seedJobRow(dir, "idempotent");
   const first = runReportRunCli(dir, ["idempotent", "--locales=en,zh"]);
   assert(first.exitCode === 0, `expected initial exit 0, got ${first.exitCode}: ${first.stderr}`);
   const second = runReportRunCli(dir, ["idempotent", "--locales=en,zh", "--resume"]);
@@ -559,6 +675,7 @@ async function runRecoveryCleanupDbAudit(dir: string): Promise<string[]> {
   const jobId = "recovery-audit";
   seedJobRow(dir, jobId);
   writeFailedAttemptForRecovery(dir, jobId);
+  setJobAttempt(dir, jobId, 2, Stage.EDIT_EN);
 
   const result = runReportRunCli(dir, [jobId, "--locales=en,zh", "--resume"]);
   assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
@@ -651,6 +768,7 @@ async function runPreparedReportLoop(opts: {
   cwd: string;
   resume?: boolean;
   fsOps?: Parameters<typeof prepareReportRunAttempt>[0]["fsOps"];
+  lifecycle?: StageLifecycleHooks;
 }): Promise<ReportLoopResult> {
   const attempt = prepareReportRunAttempt({
     jobId: opts.jobId,
@@ -684,7 +802,34 @@ async function runPreparedReportLoop(opts: {
     startStage: attempt.startStage,
     startedAt: attempt.startedAt,
     recoveryCleanup: attempt.recoveryCleanup,
+    lifecycle: opts.lifecycle,
   });
+}
+
+function createSmokeLifecycleHooks(db: ReturnType<typeof openDb>, cwd: string): StageLifecycleHooks {
+  return {
+    onStageEnter(event) {
+      recordStageEnter(db, {
+        jobId: event.jobId,
+        attemptNumber: event.attemptNumber,
+        stage: event.stage,
+        runDir: displayPath(cwd, event.runDir),
+      });
+    },
+    onStageComplete(event) {
+      const params = {
+        jobId: event.jobId,
+        attemptNumber: event.attemptNumber,
+        stage: event.stage,
+        runDir: displayPath(cwd, event.runDir),
+      };
+      if (event.stage === Stage.RESEARCH) {
+        recordResearchStageComplete(db, params);
+      } else {
+        recordStageComplete(db, params);
+      }
+    },
+  };
 }
 
 function readState(cwd: string, jobId: string, attemptNumber: number): RunState {
@@ -756,6 +901,73 @@ function seedJobRow(cwd: string, jobId: string): void {
   } finally {
     db.close();
   }
+}
+
+function setJobAttempt(
+  cwd: string,
+  jobId: string,
+  attemptNumber: number,
+  currentStage: Stage,
+): void {
+  const db = openDb(resolve(cwd, ".data", "content.db"));
+  try {
+    const updated = updateJob(db, jobId, {
+      attempt_number: attemptNumber,
+      status: "queued",
+      current_stage: currentStage,
+      updated_at: unixNow(),
+    });
+    assert(updated.rowsAffected === 1, `expected to update ${jobId} attempt`);
+  } finally {
+    db.close();
+  }
+}
+
+function eventPayload(payload: string | null): Record<string, unknown> {
+  assert(payload !== null, "expected lifecycle payload");
+  const parsed = JSON.parse(payload) as Record<string, unknown>;
+  return parsed;
+}
+
+function assertLifecyclePayloadShape(type: string, payload: string | null): void {
+  const parsed = eventPayload(payload);
+  const keys = Object.keys(parsed).sort();
+  if (type === "stage_enter") {
+    assert(
+      keys.join(",") === "run_dir,stage",
+      `unexpected stage_enter keys ${keys.join(",")}`,
+    );
+  } else if (type === "stage_complete") {
+    assert(
+      keys.join(",") === "run_dir,stage,status",
+      `unexpected stage_complete keys ${keys.join(",")}`,
+    );
+    assert(parsed.status === "ok", `expected status ok, got ${String(parsed.status)}`);
+  } else {
+    throw new Error(`unexpected lifecycle event type ${type}`);
+  }
+
+  assert(typeof parsed.stage === "string" && parsed.stage.length > 0, "missing stage");
+  assert(typeof parsed.run_dir === "string" && parsed.run_dir.startsWith(".runs/"), "bad run_dir");
+  const payloadText = JSON.stringify(parsed);
+  for (const forbidden of [
+    "content",
+    "markdown",
+    "body",
+    "response",
+    "artifact_text",
+    "prompt",
+    "output",
+    "Synthetic fake-provider",
+  ]) {
+    assert(!payloadText.includes(forbidden), `payload leaked forbidden token ${forbidden}`);
+  }
+}
+
+function displayPath(cwd: string, absolutePath: string): string {
+  const relative = path.relative(cwd, absolutePath);
+  if (relative.startsWith(".")) return relative.replaceAll(path.sep, "/");
+  return `.${path.sep}${relative}`.replaceAll(path.sep, "/");
 }
 
 function writeFailedAttemptForRecovery(cwd: string, jobId: string): void {

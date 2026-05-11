@@ -214,6 +214,13 @@ const smokeRoot = path.join(
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
 const slice416Scope = new Set([
+  "src/db.ts",
+  "src/lib/report-loop.ts",
+  "src/bin/report-run.ts",
+  "scripts/db-smoke.ts",
+  "docs/preflight/db-smoke.md",
+  "scripts/report-run-smoke.ts",
+  "docs/preflight/report-run-smoke.md",
   "src/bin/report-list.ts",
   "scripts/report-list-smoke.ts",
   "docs/preflight/report-list-smoke.md",
@@ -247,15 +254,12 @@ const botSmokeActiveFrozenFiles = [
   "src/telegram/commands.ts",
   "src/telegram/notifier.ts",
   "src/telegram/allowlist.ts",
-  "src/bin/report-run.ts",
-  "src/lib/report-loop.ts",
   "src/lib/report-run-fake-provider.ts",
   "src/lib/runtime-config.ts",
   "src/bin/report-create.ts",
   "src/bin/report-remind.ts",
   "src/bin/report-status.ts",
   "src/promote.ts",
-  "src/db.ts",
   "src/preflight.ts",
 ];
 const botSmokeActiveFrozenDirectories = [

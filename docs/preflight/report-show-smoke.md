@@ -1,9 +1,9 @@
 # report-show smoke evidence
 
 - Command: `bun run report-show-smoke`
-- Started: 2026-05-09T04:15:46.717Z
-- Finished: 2026-05-09T04:15:46.779Z
-- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-report-show-smoke-2026-05-09T04-15-46.717Z (removed by finally-cleanup)
+- Started: 2026-05-11T04:17:06.336Z
+- Finished: 2026-05-11T04:17:06.457Z
+- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-report-show-smoke-2026-05-11T04-17-06.335Z (removed by finally-cleanup)
 - Result: 20/20 PASS
 
 This smoke exercises the read-only `report:show` CLI surface only. It does not run operator-only `bun run report:run`, real Codex report generation, real Telegram network, real git/process execution, notifier sending, publish/promote behavior, manifest authority reads, DB migrations beyond scenario setup, or preflight.
@@ -21,7 +21,7 @@ This smoke exercises the read-only `report:show` CLI surface only. It does not r
 | report-show-missing-artifact-value | PASS | Blank DB-backed approval summary exits 1 with NO_ARTIFACT. |
 | report-show-missing-artifact-file | PASS | Missing repo-contained artifact file exits 1 with ARTIFACT_MISSING. |
 | report-show-unsafe-traversal | PASS | Unsafe path ../outside.md is rejected before artifact read. |
-| report-show-unsafe-absolute-outside | PASS | Unsafe path /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-report-show-smoke-2026-05-09T04-15-46.717Z/absolute-outside.md is rejected before artifact read. |
+| report-show-unsafe-absolute-outside | PASS | Unsafe path /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-report-show-smoke-2026-05-11T04-17-06.335Z/absolute-outside.md is rejected before artifact read. |
 | report-show-unsafe-sibling-prefix | PASS | Sibling-prefix absolute path is rejected with path-relative containment, not string prefix. |
 | report-show-unsafe-symlink-outside | PASS | Symlink-to-outside artifact path is rejected after realpath containment check. |
 | report-show-directory-rejection | PASS | Directory artifact path is rejected as unsafe/non-file. |
@@ -29,4 +29,4 @@ This smoke exercises the read-only `report:show` CLI surface only. It does not r
 | report-show-newline-bytes | PASS | Body without trailing newline gets exactly one newline and bytes= counts the emitted body. |
 | report-show-read-only-no-mutation | PASS | Representative success and failure calls leave jobs/events byte-identical. |
 | report-show-malformed-db | PASS | Malformed existing DB exits non-zero with DB_READ_FAILED and no stdout. |
-| report-show-boundary-static-check | PASS | Cycle-scope boundary check ran in active-slice mode and saw changed files: package.json, scripts/bot-smoke.ts, scripts/report-create-smoke.ts, scripts/report-remind-smoke.ts, scripts/report-show-smoke.ts, scripts/report-status-smoke.ts, docs/preflight/report-list-smoke.md, scripts/report-list-smoke.ts, src/bin/report-list.ts.<br>Synthetic active-slice scope check rejects out-of-scope Telegram product files.<br>Synthetic Slice 4.14 report:status changed-set resolves to inherited-surface mode for report-show-smoke.<br>Synthetic Slice 4.16 report:list changed-set resolves to inherited-surface mode for report-show-smoke.<br>package.json preserves report:show/report-show-smoke and includes report:list/report-list-smoke with dependency sets unchanged.<br>report-show.ts avoids mutating DB helpers, events reads, other CLI imports, Telegram, promote/manifest authority, preflight/Codex, process, network, LLM, and prompt surfaces. |
+| report-show-boundary-static-check | PASS | Cycle-scope boundary check ran in active-slice mode and saw changed files: docs/preflight/bot-smoke.md, docs/preflight/db-smoke.md, docs/preflight/report-create-smoke.md, docs/preflight/report-list-smoke.md, docs/preflight/report-remind-smoke.md, docs/preflight/report-run-smoke.md, docs/preflight/report-show-smoke.md, docs/preflight/report-status-smoke.md, scripts/bot-smoke.ts, scripts/db-smoke.ts, scripts/report-create-smoke.ts, scripts/report-list-smoke.ts, scripts/report-remind-smoke.ts, scripts/report-run-smoke.ts, scripts/report-show-smoke.ts, scripts/report-status-smoke.ts, src/bin/report-run.ts, src/db.ts, src/lib/report-loop.ts.<br>Synthetic active-slice scope check rejects out-of-scope Telegram product files.<br>Synthetic Slice 4.14 report:status changed-set resolves to inherited-surface mode for report-show-smoke.<br>Synthetic Slice 4.16 report:list changed-set resolves to inherited-surface mode for report-show-smoke.<br>package.json preserves report:show/report-show-smoke and includes report:list/report-list-smoke with dependency sets unchanged.<br>report-show.ts avoids mutating DB helpers, events reads, other CLI imports, Telegram, promote/manifest authority, preflight/Codex, process, network, LLM, and prompt surfaces. |

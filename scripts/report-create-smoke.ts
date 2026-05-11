@@ -74,6 +74,13 @@ const isoStamp = new Date().toISOString().replaceAll(":", "-");
 const smokeRoot = resolve(tmpdir(), `cz-report-create-smoke-${isoStamp}`);
 const docPath = resolve(repoRoot, "docs", "preflight", "report-create-smoke.md");
 const slice416Scope = new Set([
+  "src/db.ts",
+  "src/lib/report-loop.ts",
+  "src/bin/report-run.ts",
+  "scripts/db-smoke.ts",
+  "docs/preflight/db-smoke.md",
+  "scripts/report-run-smoke.ts",
+  "docs/preflight/report-run-smoke.md",
   "src/bin/report-list.ts",
   "scripts/report-list-smoke.ts",
   "docs/preflight/report-list-smoke.md",
@@ -103,16 +110,13 @@ const reportCreateActiveFrozenFiles = [
   "src/bin/report-create.ts",
   "src/bin/report-remind.ts",
   "src/bin/report-status.ts",
-  "src/bin/report-run.ts",
   "src/security/sanitize.ts",
   "src/promote.ts",
-  "src/db.ts",
   "src/preflight.ts",
 ];
 const reportCreateActiveFrozenDirectories = [
   "src/telegram/",
   "src/migrations/",
-  "src/lib/",
   "src/pipeline/",
   "src/llm/",
   "src/prompts/",

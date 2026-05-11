@@ -19,6 +19,9 @@ import {
   findJobById,
   openDb,
   recordRecoveryCleanup,
+  recordResearchStageComplete,
+  recordStageComplete,
+  recordStageEnter,
   updateJob,
 } from "../db.ts";
 import { createReportRunFakeProvider } from "../lib/report-run-fake-provider.ts";
@@ -29,6 +32,7 @@ import {
   runReportLoop,
   type RunState,
   type RunStateStatus,
+  type StageLifecycleHooks,
 } from "../lib/report-loop.ts";
 import { composeApprovalSummary } from "../pipeline/approval-summary.ts";
 import { nextStage, STAGES } from "../pipeline/stages.ts";
@@ -214,7 +218,10 @@ async function main(): Promise<number> {
       ? createReportRunFakeProvider()
       : new CodexCliProvider({ quiesceWindowMs: config.quiesceWindowMs });
 
+  let lifecycleDb: DbClient | undefined;
   try {
+    lifecycleDb = openDb(path.resolve(config.cwd, ".data", "content.db"));
+    const lifecycleJob = findJobById(lifecycleDb, args.jobId);
     const result = await runReportLoop({
       jobId: args.jobId,
       locales: args.locales,
@@ -225,6 +232,13 @@ async function main(): Promise<number> {
       startStage: attempt.startStage,
       startedAt: attempt.startedAt,
       recoveryCleanup: attempt.recoveryCleanup,
+      lifecycle:
+        lifecycleJob === null
+          ? undefined
+          : createDbLifecycleHooks({
+              db: lifecycleDb,
+              cwd: config.cwd,
+            }),
     });
 
     if (result.status === "stage_failed") {
@@ -256,7 +270,38 @@ async function main(): Promise<number> {
   } catch (err) {
     console.error(formatError(err));
     return 1;
+  } finally {
+    lifecycleDb?.close();
   }
+}
+
+function createDbLifecycleHooks(params: {
+  db: DbClient;
+  cwd: string;
+}): StageLifecycleHooks {
+  return {
+    onStageEnter(event) {
+      recordStageEnter(params.db, {
+        jobId: event.jobId,
+        attemptNumber: event.attemptNumber,
+        stage: event.stage,
+        runDir: displayPath(params.cwd, event.runDir),
+      });
+    },
+    onStageComplete(event) {
+      const lifecycleParams = {
+        jobId: event.jobId,
+        attemptNumber: event.attemptNumber,
+        stage: event.stage,
+        runDir: displayPath(params.cwd, event.runDir),
+      };
+      if (event.stage === Stage.RESEARCH) {
+        recordResearchStageComplete(params.db, lifecycleParams);
+      } else {
+        recordStageComplete(params.db, lifecycleParams);
+      }
+    },
+  };
 }
 
 export function persistApprovalSummaryAfterLoop(

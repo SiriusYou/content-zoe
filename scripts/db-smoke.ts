@@ -13,8 +13,12 @@ import {
   findJobsByStatus,
   insertEvent,
   insertJob,
+  LifecyclePersistenceError,
   openDb,
   recordRecoveryCleanup,
+  recordResearchStageComplete,
+  recordStageComplete,
+  recordStageEnter,
   runMigrations,
   updateJob,
 } from "../src/db.ts";
@@ -26,6 +30,7 @@ type ScenarioName =
   | "migration-sha-mismatch"
   | "jobs-crud"
   | "events-append-fk"
+  | "stage-lifecycle"
   | "cas-semantics"
   | "recovery-cleanup"
   | "wal-concurrent-reader";
@@ -50,6 +55,7 @@ const SCENARIOS: ScenarioName[] = [
   "migration-sha-mismatch",
   "jobs-crud",
   "events-append-fk",
+  "stage-lifecycle",
   "cas-semantics",
   "recovery-cleanup",
   "wal-concurrent-reader",
@@ -118,6 +124,8 @@ async function scenarioImpl(
       return runJobsCrud(dir);
     case "events-append-fk":
       return runEventsAppendFk(dir);
+    case "stage-lifecycle":
+      return runStageLifecycle(dir);
     case "cas-semantics":
       return runCasSemantics(dir);
     case "recovery-cleanup":
@@ -343,6 +351,116 @@ function runEventsAppendFk(dir: string): string[] {
     return [
       "insertEvent/findEventsByJob preserved payload as a string and supported type filtering.",
       "F6 foreign-key violation surfaced DbConstraintError.subcode=SQLITE_CONSTRAINT_FOREIGNKEY.",
+    ];
+  } finally {
+    db.close();
+  }
+}
+
+function runStageLifecycle(dir: string): string[] {
+  const db = openDb(resolve(dir, "content.db"));
+  try {
+    const now = unixNow();
+    insertJob(db, {
+      id: "job-lifecycle",
+      week_key: "2026-W23",
+      topic: "Lifecycle",
+      status: "queued",
+      current_stage: Stage.RESEARCH,
+      created_at: now,
+      updated_at: now,
+    });
+
+    const enter = recordStageEnter(db, {
+      jobId: "job-lifecycle",
+      attemptNumber: 1,
+      stage: Stage.RESEARCH,
+      runDir: ".runs/job-lifecycle/attempt-1",
+      timestamp: now + 1,
+    });
+    assert(enter.type === "stage_enter", "expected stage_enter");
+    assertPayloadShape(enter.payload, ["stage", "run_dir"]);
+    const afterEnter = findJobById(db, "job-lifecycle");
+    assert(afterEnter?.status === "running", "stage_enter did not set running");
+    assert(afterEnter.current_stage === Stage.RESEARCH, "stage_enter did not set current_stage");
+
+    const researchComplete = recordResearchStageComplete(db, {
+      jobId: "job-lifecycle",
+      attemptNumber: 1,
+      stage: Stage.RESEARCH,
+      runDir: ".runs/job-lifecycle/attempt-1",
+      timestamp: now + 2,
+    });
+    assert(researchComplete.type === "stage_complete", "expected research stage_complete");
+    assertPayloadShape(researchComplete.payload, ["stage", "run_dir", "status"]);
+    const afterResearch = findJobById(db, "job-lifecycle");
+    assert(afterResearch?.as_of === now + 2, `expected as_of ${now + 2}`);
+
+    const draftComplete = recordStageComplete(db, {
+      jobId: "job-lifecycle",
+      attemptNumber: 1,
+      stage: Stage.DRAFT_EN,
+      runDir: ".runs/job-lifecycle/attempt-1",
+      timestamp: now + 3,
+    });
+    assertPayloadShape(draftComplete.payload, ["stage", "run_dir", "status"]);
+
+    let staleEnter: unknown;
+    try {
+      recordStageEnter(db, {
+        jobId: "job-lifecycle",
+        attemptNumber: 2,
+        stage: Stage.EDIT_EN,
+        runDir: ".runs/job-lifecycle/attempt-2",
+        timestamp: now + 4,
+      });
+    } catch (err) {
+      staleEnter = err;
+    }
+    assert(staleEnter instanceof LifecyclePersistenceError, "expected stale enter lifecycle error");
+    assert(
+      staleEnter.message.startsWith("LIFECYCLE_PERSISTENCE_FAILED:"),
+      `unexpected stale enter error ${formatError(staleEnter)}`,
+    );
+    assert(
+      scalar<number>(
+        db,
+        "SELECT COUNT(*) AS value FROM events WHERE job_id = 'job-lifecycle' AND attempt_number = 2",
+      ) === 0,
+      "stale stage_enter left an event row",
+    );
+
+    let staleResearchComplete: unknown;
+    try {
+      recordResearchStageComplete(db, {
+        jobId: "job-lifecycle",
+        attemptNumber: 2,
+        stage: Stage.RESEARCH,
+        runDir: ".runs/job-lifecycle/attempt-2",
+        timestamp: now + 5,
+      });
+    } catch (err) {
+      staleResearchComplete = err;
+    }
+    assert(
+      staleResearchComplete instanceof LifecyclePersistenceError,
+      "expected stale research lifecycle error",
+    );
+    const afterStaleResearch = findJobById(db, "job-lifecycle");
+    assert(afterStaleResearch?.as_of === now + 2, "stale research changed as_of");
+    assert(
+      scalar<number>(
+        db,
+        "SELECT COUNT(*) AS value FROM events WHERE job_id = 'job-lifecycle' AND type = 'stage_complete'",
+      ) === 2,
+      "stale research stage_complete left a durable event",
+    );
+
+    return [
+      "recordStageEnter guarded the current attempt, wrote exact stage_enter payload, and updated running/current_stage.",
+      "recordResearchStageComplete atomically wrote research stage_complete plus jobs.as_of.",
+      "recordStageComplete guarded event-only boundaries without broad job mutation.",
+      "Wrong-attempt lifecycle writes failed with LIFECYCLE_PERSISTENCE_FAILED and left no event/as_of split-brain.",
     ];
   } finally {
     db.close();
@@ -603,6 +721,33 @@ function scalar<T>(db: { query: (sql: string) => { get: () => Record<string, T> 
   const row = db.query(sql).get();
   assert(row !== null, `query returned no rows: ${sql}`);
   return Object.values(row)[0] as T;
+}
+
+function assertPayloadShape(payload: string | null, expectedKeys: string[]): void {
+  assert(payload !== null, "expected payload");
+  const parsed = JSON.parse(payload) as Record<string, unknown>;
+  const keys = Object.keys(parsed).sort();
+  assert(
+    keys.join(",") === [...expectedKeys].sort().join(","),
+    `unexpected payload keys ${keys.join(",")}`,
+  );
+  assert(typeof parsed.stage === "string", "payload missing stage");
+  assert(typeof parsed.run_dir === "string", "payload missing run_dir");
+  if (expectedKeys.includes("status")) {
+    assert(parsed.status === "ok", "stage_complete status must be ok");
+  }
+  const payloadText = JSON.stringify(parsed);
+  for (const forbidden of [
+    "content",
+    "markdown",
+    "body",
+    "response",
+    "artifact_text",
+    "prompt",
+    "output",
+  ]) {
+    assert(!payloadText.includes(forbidden), `payload leaked forbidden token ${forbidden}`);
+  }
 }
 
 function unixNow(): number {

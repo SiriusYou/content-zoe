@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { Database } from "bun:sqlite";
 
 import type { RecoveryCleanup as Slice35RecoveryCleanup } from "./lib/report-loop.ts";
+import { Stage } from "./pipeline/types.ts";
 
 export type DbClient = Database;
 export type RecoveryCleanup = Slice35RecoveryCleanup;
@@ -89,6 +90,17 @@ export class DbConstraintError extends Error {
     this.tableName = args.tableName;
     this.columnHint = args.columnHint;
     this.cause = args.originalError;
+  }
+}
+
+export class LifecyclePersistenceError extends Error {
+  readonly name = "LifecyclePersistenceError";
+  readonly errorCode = "LIFECYCLE_PERSISTENCE_FAILED";
+  override readonly cause?: unknown;
+
+  constructor(message: string, cause?: unknown) {
+    super(`LIFECYCLE_PERSISTENCE_FAILED: ${message}`);
+    this.cause = cause;
   }
 }
 
@@ -189,6 +201,14 @@ export interface RecoveryCleanupParams {
   jobId: string;
   attemptNumber: number;
   recoveryCleanup: RecoveryCleanup;
+}
+
+export interface StageLifecycleParams {
+  jobId: string;
+  attemptNumber: number;
+  stage: Stage;
+  runDir: string;
+  timestamp?: number;
 }
 
 export interface OpenDbOptions {
@@ -510,6 +530,144 @@ export function recordRecoveryCleanup(
   }
 }
 
+export function recordStageEnter(
+  db: DbClient,
+  params: StageLifecycleParams,
+): Event {
+  const timestamp = params.timestamp ?? unixNow();
+  return runLifecycleTransaction(db, () => {
+    const updated = updateJobWhere(
+      db,
+      "id = ? AND attempt_number = ?",
+      [params.jobId, params.attemptNumber],
+      {
+        status: "running",
+        current_stage: params.stage,
+        updated_at: timestamp,
+      },
+    );
+    assertLifecycleGuard(
+      updated.rowsAffected,
+      params,
+      `stage_enter guard missed for ${params.stage}`,
+    );
+    return insertEvent(db, {
+      job_id: params.jobId,
+      attempt_number: params.attemptNumber,
+      type: "stage_enter",
+      payload: JSON.stringify({
+        stage: params.stage,
+        run_dir: params.runDir,
+      }),
+      created_at: timestamp,
+    });
+  });
+}
+
+export function recordStageComplete(
+  db: DbClient,
+  params: StageLifecycleParams,
+): Event {
+  const timestamp = params.timestamp ?? unixNow();
+  return runLifecycleTransaction(db, () => {
+    assertCurrentAttempt(db, params, `stage_complete guard missed for ${params.stage}`);
+    return insertEvent(db, {
+      job_id: params.jobId,
+      attempt_number: params.attemptNumber,
+      type: "stage_complete",
+      payload: JSON.stringify({
+        stage: params.stage,
+        run_dir: params.runDir,
+        status: "ok",
+      }),
+      created_at: timestamp,
+    });
+  });
+}
+
+export function recordResearchStageComplete(
+  db: DbClient,
+  params: StageLifecycleParams,
+): Event {
+  if (params.stage !== Stage.RESEARCH) {
+    throw new LifecyclePersistenceError(
+      `recordResearchStageComplete received non-research stage ${params.stage}`,
+    );
+  }
+
+  const timestamp = params.timestamp ?? unixNow();
+  return runLifecycleTransaction(db, () => {
+    const updated = updateJobWhere(
+      db,
+      "id = ? AND attempt_number = ?",
+      [params.jobId, params.attemptNumber],
+      {
+        as_of: timestamp,
+        updated_at: timestamp,
+      },
+    );
+    assertLifecycleGuard(
+      updated.rowsAffected,
+      params,
+      `research stage_complete guard missed for ${params.stage}`,
+    );
+    return insertEvent(db, {
+      job_id: params.jobId,
+      attempt_number: params.attemptNumber,
+      type: "stage_complete",
+      payload: JSON.stringify({
+        stage: params.stage,
+        run_dir: params.runDir,
+        status: "ok",
+      }),
+      created_at: timestamp,
+    });
+  });
+}
+
+function runLifecycleTransaction<T>(db: DbClient, fn: () => T): T {
+  try {
+    db.exec("BEGIN IMMEDIATE");
+    const result = fn();
+    db.exec("COMMIT");
+    return result;
+  } catch (err) {
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      // Preserve the lifecycle persistence error over rollback cleanup noise.
+    }
+    if (err instanceof LifecyclePersistenceError) {
+      throw err;
+    }
+    throw new LifecyclePersistenceError("lifecycle transaction failed", err);
+  }
+}
+
+function assertCurrentAttempt(
+  db: DbClient,
+  params: StageLifecycleParams,
+  message: string,
+): void {
+  const row = db
+    .query<{ id: string }, [string, number]>(
+      "SELECT id FROM jobs WHERE id = ? AND attempt_number = ?",
+    )
+    .get(params.jobId, params.attemptNumber);
+  assertLifecycleGuard(row ? 1 : 0, params, message);
+}
+
+function assertLifecycleGuard(
+  rowsAffected: number,
+  params: StageLifecycleParams,
+  message: string,
+): void {
+  if (rowsAffected === 1) return;
+  throw new LifecyclePersistenceError(
+    `${message}: job_id=${JSON.stringify(params.jobId)} attempt_number=${params.attemptNumber}`,
+  );
+}
+
 function updateJobWhere(
   db: DbClient,
   whereSql: string,
@@ -559,6 +717,10 @@ function pragmaScalar<T>(db: DbClient, sql: string): T {
     throw new DbInitError("DB_PRAGMA_FAILED", `pragma returned no rows: ${sql}`);
   }
   return Object.values(row)[0] as T;
+}
+
+function unixNow(): number {
+  return Math.floor(Date.now() / 1000);
 }
 
 function mapConstraintError(err: unknown): never {

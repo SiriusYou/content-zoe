@@ -44,6 +44,7 @@ export interface ReportLoopOptions {
   startStage: Stage;
   startedAt?: string;
   recoveryCleanup?: RecoveryCleanup;
+  lifecycle?: Partial<StageLifecycleHooks>;
   fsOps?: Partial<FileSystemOps>;
 }
 
@@ -66,6 +67,18 @@ export type ReportLoopResult =
 interface FileSystemOps {
   renameSync: typeof renameSync;
   writeFileSync: typeof writeFileSync;
+}
+
+export interface StageLifecycleEvent {
+  jobId: string;
+  attemptNumber: number;
+  stage: Stage;
+  runDir: string;
+}
+
+export interface StageLifecycleHooks {
+  onStageEnter: (event: StageLifecycleEvent) => Promise<void> | void;
+  onStageComplete: (event: StageLifecycleEvent) => Promise<void> | void;
 }
 
 const RUN_STATE_FILE = "run-state.json";
@@ -97,6 +110,13 @@ export async function runReportLoop(
     };
     writeRunState(runDir, runningState, fsOps);
 
+    await opts.lifecycle?.onStageEnter?.({
+      jobId: opts.jobId,
+      attemptNumber: opts.attemptNumber,
+      stage: current,
+      runDir,
+    });
+
     const result = await runStage(STAGES[current], opts.provider, {
       runDir,
       cwd,
@@ -122,6 +142,13 @@ export async function runReportLoop(
         error: formatStageError(result),
       };
     }
+
+    await opts.lifecycle?.onStageComplete?.({
+      jobId: opts.jobId,
+      attemptNumber: opts.attemptNumber,
+      stage: current,
+      runDir,
+    });
 
     const following = nextStage(current, opts.locales);
     if (following === "awaiting_approval") {

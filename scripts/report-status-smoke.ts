@@ -86,6 +86,13 @@ const smokeRoot = path.join(
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "report-status-smoke.md");
 const slice416Scope = new Set([
+  "src/db.ts",
+  "src/lib/report-loop.ts",
+  "src/bin/report-run.ts",
+  "scripts/db-smoke.ts",
+  "docs/preflight/db-smoke.md",
+  "scripts/report-run-smoke.ts",
+  "docs/preflight/report-run-smoke.md",
   "src/bin/report-list.ts",
   "scripts/report-list-smoke.ts",
   "docs/preflight/report-list-smoke.md",
@@ -113,17 +120,14 @@ const reportStatusActiveFrozenFiles = [
   "src/bin/report-create.ts",
   "src/bin/report-remind.ts",
   "src/bin/report-status.ts",
-  "src/bin/report-run.ts",
   "src/security/sanitize.ts",
   "src/promote.ts",
-  "src/db.ts",
   "src/preflight.ts",
   "scripts/lib/static-guardrails.ts",
 ];
 const reportStatusActiveFrozenDirectories = [
   "src/telegram/",
   "src/migrations/",
-  "src/lib/",
   "src/pipeline/",
   "src/llm/",
   "src/prompts/",
@@ -597,7 +601,7 @@ function runBoundaryStaticCheck(): string[] {
     inheritedFrozenFiles: reportStatusInheritedFrozenFiles,
     inheritedFrozenDirectories: reportStatusInheritedFrozenDirectories,
   });
-  assert(scopeMode === "active-slice", "report-status smoke should run in active-slice mode for Slice 4.14");
+  assert(scopeMode === "active-slice", "report-status smoke should run in active-slice mode for Slice 4.17 inherited evidence refresh");
 
   let activeScopeRejectedOutOfScope = false;
   try {
