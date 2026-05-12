@@ -117,6 +117,10 @@ const reportStatusActiveTriggers = new Set([
   "src/bin/report-status.ts",
   "scripts/report-status-smoke.ts",
   "docs/preflight/report-status-smoke.md",
+  "src/lib/publish-destination.ts",
+  "src/bin/report-deliver-local.ts",
+  "scripts/report-deliver-local-smoke.ts",
+  "docs/preflight/report-deliver-local-smoke.md",
 ]);
 const reportStatusActiveFrozenFiles = [
   "bun.lock",

@@ -316,7 +316,7 @@ function resolveDestinationRoot(opts: {
       `destination uses protected root: ${firstSegment}`,
     );
   }
-  assertNoEscapingSymlinkComponents(opts.realCwd, relative, "destination");
+  assertNoUnsafeDestinationSymlinkComponents(opts.realCwd, relative);
   const absolute = path.resolve(opts.realCwd, relative);
   assertInside(opts.realCwd, absolute, "destination");
   if (path.resolve(absolute) === opts.sourceRoot) {
@@ -529,6 +529,29 @@ function validateRelativeBundlePath(value: string, subject: string): void {
   }
 }
 
+function assertNoUnsafeDestinationSymlinkComponents(
+  root: string,
+  relativePath: string,
+): void {
+  const parts = toPosixPath(relativePath).split("/");
+  let current = root;
+  for (let index = 0; index < parts.length; index += 1) {
+    current = path.resolve(current, parts[index]);
+    if (!existsSync(current)) return;
+    const stat = lstatSync(current);
+    if (stat.isSymbolicLink()) {
+      const real = realpathSync(current);
+      if (!isInside(root, real)) {
+        throw new PublishDestinationError(
+          "INVALID_DESTINATION",
+          "destination escapes through symlink",
+        );
+      }
+      assertNotInsideProtectedDestinationRoot(root, real);
+    }
+  }
+}
+
 function assertNoEscapingSymlinkComponents(
   root: string,
   relativePath: string,
@@ -548,6 +571,18 @@ function assertNoEscapingSymlinkComponents(
           `${subject} escapes through symlink`,
         );
       }
+    }
+  }
+}
+
+function assertNotInsideProtectedDestinationRoot(root: string, candidate: string): void {
+  for (const protectedRoot of protectedDestinationRoots) {
+    const protectedPath = path.resolve(root, protectedRoot);
+    if (isInside(protectedPath, candidate)) {
+      throw new PublishDestinationError(
+        "INVALID_DESTINATION",
+        `destination resolves through protected root: ${protectedRoot}`,
+      );
     }
   }
 }

@@ -1,7 +1,7 @@
 # report-deliver-local smoke
 
-Generated: 2026-05-11T07:28:35.437Z
-Result: 29/29 PASS
+Generated: 2026-05-12T02:03:52.195Z
+Result: 30/30 PASS
 
 | Scenario | Status | Details |
 |---|---:|---|
@@ -10,11 +10,12 @@ Result: 29/29 PASS
 | report-deliver-local-invalid-missing-dest | PASS | Invalid command ["job-1"] exits 1 with exact INVALID_COMMAND stderr. |
 | report-deliver-local-invalid-dest-equals-form | PASS | Invalid command ["job-1","--dest=outbox"] exits 1 with exact INVALID_COMMAND stderr. |
 | report-deliver-local-reverse-flag-order | PASS | Canonical and reverse flag order both deliver successfully to isolated destinations. |
-| report-deliver-local-invalid-absolute-dest | PASS | Destination ["deliver-1","--dest","/var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-report-deliver-local-smoke-2026-05-11T07-28-35.328Z/report-deliver-local-invalid-absolute-dest/abs"] fails with INVALID_DESTINATION: before delivery. |
+| report-deliver-local-invalid-absolute-dest | PASS | Destination ["deliver-1","--dest","/var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-report-deliver-local-smoke-2026-05-12T02-03-52.094Z/report-deliver-local-invalid-absolute-dest/abs"] fails with INVALID_DESTINATION: before delivery. |
 | report-deliver-local-invalid-traversal-dest | PASS | Destination ["deliver-1","--dest","../escape"] fails with INVALID_DESTINATION: before delivery. |
 | report-deliver-local-protected-destination-roots | PASS | All protected destination roots are rejected with INVALID_DESTINATION. |
 | report-deliver-local-destination-equals-source | PASS | Destination resolving to the source artifact directory is rejected. |
 | report-deliver-local-destination-symlink-escape | PASS | Existing destination symlink component escaping repo root is rejected. |
+| report-deliver-local-destination-protected-root-symlink | PASS | Destination symlink components resolving inside protected roots are rejected. |
 | report-deliver-local-unknown-job | PASS | Unknown job fails with stable UNKNOWN_JOB stderr. |
 | report-deliver-local-job-not-published | PASS | Non-published job fails with stable JOB_NOT_PUBLISHED stderr. |
 | report-deliver-local-missing-promoted-manifest | PASS | Published job without promoted event fails with manifest-missing error. |
@@ -33,4 +34,4 @@ Result: 29/29 PASS
 | report-deliver-local-partial-copy-cleanup-static | PASS | Static cleanup proof: temp bundle is verified before final rename, failures call cleanupTempDir, and retained temp naming uses .delivery-tmp- prefix. |
 | report-deliver-local-field-safety | PASS | Success output is a single tab-delimited DELIVERY record with field-safe values. |
 | report-deliver-local-read-only-no-mutation | PASS | Delivery leaves job row, events table, source bundle, and .runs absent/unchanged. |
-| report-deliver-local-boundary-static-check | PASS | Cycle-scope boundary check ran in active-slice mode and saw changed files: docs/preflight/bot-smoke.md, docs/preflight/report-deliver-local-smoke.md, docs/preflight/report-list-smoke.md, docs/preflight/report-run-smoke.md, docs/preflight/report-status-smoke.md, package.json, scripts/bot-smoke.ts, scripts/report-deliver-local-smoke.ts, scripts/report-list-smoke.ts, scripts/report-status-smoke.ts, src/bin/report-deliver-local.ts, src/lib/publish-destination.ts.<br>package.json adds only report:deliver-local and report-deliver-local-smoke scripts with dependency sets unchanged.<br>Implementation contains no network, Telegram, prompt/LLM, git post-step, promote mutation, report-run/stage, migration, or DB mutation surface. |
+| report-deliver-local-boundary-static-check | PASS | Cycle-scope boundary check ran in active-slice mode and saw changed files: docs/preflight/bot-smoke.md, docs/preflight/report-deliver-local-smoke.md, docs/preflight/report-list-smoke.md, docs/preflight/report-run-smoke.md, docs/preflight/report-status-smoke.md, scripts/report-deliver-local-smoke.ts, scripts/report-list-smoke.ts, scripts/report-status-smoke.ts, src/lib/publish-destination.ts.<br>package.json adds only report:deliver-local and report-deliver-local-smoke scripts with dependency sets unchanged.<br>Implementation contains no network, Telegram, prompt/LLM, git post-step, promote mutation, report-run/stage, migration, or DB mutation surface. |
