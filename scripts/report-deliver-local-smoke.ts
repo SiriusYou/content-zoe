@@ -45,6 +45,7 @@ type ScenarioName =
   | "report-deliver-local-destination-equals-source"
   | "report-deliver-local-destination-symlink-escape"
   | "report-deliver-local-destination-protected-root-symlink"
+  | "report-deliver-local-destination-protected-root-parent-symlink"
   | "report-deliver-local-unknown-job"
   | "report-deliver-local-job-not-published"
   | "report-deliver-local-missing-promoted-manifest"
@@ -100,6 +101,7 @@ const SCENARIOS: readonly ScenarioName[] = [
   "report-deliver-local-destination-equals-source",
   "report-deliver-local-destination-symlink-escape",
   "report-deliver-local-destination-protected-root-symlink",
+  "report-deliver-local-destination-protected-root-parent-symlink",
   "report-deliver-local-unknown-job",
   "report-deliver-local-job-not-published",
   "report-deliver-local-missing-promoted-manifest",
@@ -213,6 +215,8 @@ async function scenarioImpl(name: ScenarioName, dir: string): Promise<string[]> 
       return destinationSymlinkEscape(dir);
     case "report-deliver-local-destination-protected-root-symlink":
       return destinationProtectedRootSymlink(dir);
+    case "report-deliver-local-destination-protected-root-parent-symlink":
+      return destinationProtectedRootParentSymlink(dir);
     case "report-deliver-local-unknown-job":
       return unknownJob(dir);
     case "report-deliver-local-job-not-published":
@@ -353,6 +357,24 @@ async function destinationProtectedRootSymlink(dir: string): Promise<string[]> {
       "protected-root symlink destination wrote receipt under reports",
     );
     return ["Destination symlink components resolving inside protected roots are rejected."];
+  } finally {
+    fixture.close();
+  }
+}
+
+async function destinationProtectedRootParentSymlink(dir: string): Promise<string[]> {
+  const fixture = createPublishedFixture(dir, {});
+  try {
+    const protectedTarget = resolve(dir, "reports", "deliveries");
+    mkdirSync(protectedTarget, { recursive: true });
+    symlinkSync(".", resolve(dir, "root-link"));
+    const result = await runCli(dir, ["deliver-1", "--dest", "root-link/reports/deliveries"]);
+    assertFailurePrefix(result, "INVALID_DESTINATION:");
+    assert(
+      !existsSync(resolve(protectedTarget, "2026-W47-ai-trends", ".delivery-receipt.json")),
+      "parent symlink destination wrote receipt under reports",
+    );
+    return ["Destination symlink aliases to repo root cannot later enter protected roots."];
   } finally {
     fixture.close();
   }

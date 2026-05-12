@@ -1,9 +1,9 @@
 # report-list smoke evidence
 
 - Command: `bun run report-list-smoke`
-- Started: 2026-05-12T02:03:17.393Z
-- Finished: 2026-05-12T02:03:17.436Z
-- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-report-list-smoke-2026-05-12T02-03-17.393Z (removed by finally-cleanup)
+- Started: 2026-05-12T02:16:29.587Z
+- Finished: 2026-05-12T02:16:29.627Z
+- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-report-list-smoke-2026-05-12T02-16-29.587Z (removed by finally-cleanup)
 - Result: 13/13 PASS
 
 This smoke exercises the read-only `report:list` CLI surface only. It does not run operator-only `bun run report:run`, real Codex report generation, real Telegram network, real git/process execution, notifier sending, publish/promote behavior, manifest authority reads, artifact body reads, events reads, DB migrations beyond scenario setup, or preflight.
@@ -22,4 +22,4 @@ This smoke exercises the read-only `report:list` CLI surface only. It does not r
 | report-list-excerpt-format | PASS | DB-derived path/excerpt fields collapse tabs/newlines/repeated whitespace into field-safe values.<br>Blank path-like fields degrade to '-' and long error text is capped at 160 chars. |
 | report-list-read-only-no-mutation | PASS | Jobs and events snapshots are byte-identical before and after report:list.<br>No .runs, reports, or attempt output directories are created. |
 | report-list-malformed-db | PASS | Malformed existing DB exits non-zero with DB_READ_FAILED on stderr and no stdout.<br>Malformed DB handling does not remove or recreate the DB file. |
-| report-list-boundary-static-check | PASS | Cycle-scope boundary check ran in active-slice mode and saw changed files: docs/preflight/bot-smoke.md, docs/preflight/report-deliver-local-smoke.md, docs/preflight/report-run-smoke.md, docs/preflight/report-status-smoke.md, scripts/report-deliver-local-smoke.ts, scripts/report-list-smoke.ts, scripts/report-status-smoke.ts, src/lib/publish-destination.ts.<br>Synthetic active-slice scope check rejects out-of-scope Telegram product files.<br>Synthetic Slice 4.12 report:create, Slice 4.13 report:remind, Slice 4.14 report:status, and Slice 4.15 report:show changed-sets resolve to inherited-surface mode for report-list-smoke.<br>package.json change is limited to report:list and report-list-smoke additions with dependency sets unchanged.<br>report-list.ts avoids mutating DB helpers, events reads, other CLI imports, Telegram, promote/manifest authority, preflight/Codex, process, network, LLM, and prompt surfaces. |
+| report-list-boundary-static-check | PASS | Cycle-scope boundary check ran in active-slice mode and saw changed files: docs/preflight/bot-smoke.md, docs/preflight/report-deliver-local-smoke.md, docs/preflight/report-run-smoke.md, docs/preflight/report-status-smoke.md, scripts/report-deliver-local-smoke.ts, src/lib/publish-destination.ts.<br>Synthetic active-slice scope check rejects out-of-scope Telegram product files.<br>Synthetic Slice 4.12 report:create, Slice 4.13 report:remind, Slice 4.14 report:status, and Slice 4.15 report:show changed-sets resolve to inherited-surface mode for report-list-smoke.<br>package.json change is limited to report:list and report-list-smoke additions with dependency sets unchanged.<br>report-list.ts avoids mutating DB helpers, events reads, other CLI imports, Telegram, promote/manifest authority, preflight/Codex, process, network, LLM, and prompt surfaces. |

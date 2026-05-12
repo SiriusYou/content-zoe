@@ -316,8 +316,7 @@ function resolveDestinationRoot(opts: {
       `destination uses protected root: ${firstSegment}`,
     );
   }
-  assertNoUnsafeDestinationSymlinkComponents(opts.realCwd, relative);
-  const absolute = path.resolve(opts.realCwd, relative);
+  const absolute = resolveSafeDestinationAbsolute(opts.realCwd, relative);
   assertInside(opts.realCwd, absolute, "destination");
   if (path.resolve(absolute) === opts.sourceRoot) {
     throw new PublishDestinationError(
@@ -529,27 +528,35 @@ function validateRelativeBundlePath(value: string, subject: string): void {
   }
 }
 
-function assertNoUnsafeDestinationSymlinkComponents(
+function resolveSafeDestinationAbsolute(
   root: string,
   relativePath: string,
-): void {
+): string {
   const parts = toPosixPath(relativePath).split("/");
   let current = root;
   for (let index = 0; index < parts.length; index += 1) {
-    current = path.resolve(current, parts[index]);
-    if (!existsSync(current)) return;
-    const stat = lstatSync(current);
-    if (stat.isSymbolicLink()) {
-      const real = realpathSync(current);
-      if (!isInside(root, real)) {
-        throw new PublishDestinationError(
-          "INVALID_DESTINATION",
-          "destination escapes through symlink",
-        );
-      }
-      assertNotInsideProtectedDestinationRoot(root, real);
+    const candidate = path.resolve(current, parts[index]);
+    assertInside(root, candidate, "destination");
+    assertNotInsideProtectedDestinationRoot(root, candidate);
+    if (!existsSync(candidate)) {
+      const absolute = path.resolve(candidate, ...parts.slice(index + 1));
+      assertInside(root, absolute, "destination");
+      assertNotInsideProtectedDestinationRoot(root, absolute);
+      return absolute;
     }
+
+    const real = realpathSync(candidate);
+    if (!isInside(root, real)) {
+      throw new PublishDestinationError(
+        "INVALID_DESTINATION",
+        "destination escapes through symlink",
+      );
+    }
+    assertNotInsideProtectedDestinationRoot(root, real);
+    current = real;
   }
+  assertNotInsideProtectedDestinationRoot(root, current);
+  return current;
 }
 
 function assertNoEscapingSymlinkComponents(
