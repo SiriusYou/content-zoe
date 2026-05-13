@@ -41,6 +41,21 @@ export interface DeliveryResult {
   readonly receipt: DeliveryReceipt;
 }
 
+export type DeliveryInspectionStatus = "not_delivered" | "delivered" | "diverged";
+export type DeliveryInspectionReceipt = "present" | "missing" | "invalid" | "mismatch";
+
+export interface DeliveryInspectionResult {
+  readonly status: DeliveryInspectionStatus;
+  readonly destinationKind: PublishDestinationKind;
+  readonly jobId: string;
+  readonly artifactDir: string;
+  readonly deliveredDir: string;
+  readonly files: number;
+  readonly aggregateSha256: string;
+  readonly receipt: DeliveryInspectionReceipt;
+  readonly deliveredAt: string;
+}
+
 export interface PublishDestinationInput {
   readonly cwd: string;
   readonly destinationRoot: string;
@@ -86,6 +101,133 @@ const protectedDestinationRoots = new Set([
   "docs",
   "node_modules",
 ]);
+
+export function inspectLocalFolderDelivery(
+  input: PublishDestinationInput,
+): DeliveryInspectionResult {
+  const realCwd = safeRealpath(input.cwd, "repository cwd");
+  const manifest = validateManifest(input.manifest);
+  const sourceRoot = resolveSourceArtifactDir(realCwd, manifest.artifact_dir);
+  const sourceSnapshot = verifySourceBundle(realCwd, sourceRoot, manifest);
+  const destinationRoot = resolveDestinationRoot({
+    destinationRoot: input.destinationRoot,
+    realCwd,
+    sourceRoot,
+  });
+  const deliveredDir = path.resolve(
+    destinationRoot.absolute,
+    path.basename(manifest.artifact_dir),
+  );
+  assertInside(destinationRoot.absolute, deliveredDir, "delivered bundle");
+  if (path.resolve(deliveredDir) === sourceRoot) {
+    throw new PublishDestinationError(
+      "INVALID_DESTINATION",
+      "destination resolves to source artifact directory",
+    );
+  }
+
+  const base = {
+    destinationKind: "local_folder" as const,
+    jobId: manifest.job_id,
+    artifactDir: manifest.artifact_dir,
+    deliveredDir: toPosixRelative(realCwd, deliveredDir),
+    files: manifest.files.length,
+    aggregateSha256: manifest.aggregate_sha256,
+  };
+  if (!existsSync(deliveredDir)) {
+    return {
+      ...base,
+      status: "not_delivered",
+      receipt: "missing",
+      deliveredAt: "-",
+    };
+  }
+
+  let deliveredStat;
+  try {
+    deliveredStat = lstatSync(deliveredDir);
+  } catch {
+    return {
+      ...base,
+      status: "not_delivered",
+      receipt: "missing",
+      deliveredAt: "-",
+    };
+  }
+  if (!deliveredStat.isDirectory()) {
+    return {
+      ...base,
+      status: "diverged",
+      receipt: "missing",
+      deliveredAt: "-",
+    };
+  }
+
+  const receiptPath = path.resolve(deliveredDir, ".delivery-receipt.json");
+  if (!existsSync(receiptPath)) {
+    return {
+      ...base,
+      status: "diverged",
+      receipt: "missing",
+      deliveredAt: "-",
+    };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(receiptPath, "utf8"));
+  } catch {
+    return {
+      ...base,
+      status: "diverged",
+      receipt: "invalid",
+      deliveredAt: "-",
+    };
+  }
+
+  const receipt = readReceipt(parsed);
+  if (receipt === null) {
+    return {
+      ...base,
+      status: "diverged",
+      receipt: "invalid",
+      deliveredAt: "-",
+    };
+  }
+  if (!receiptMatches(receipt, {
+    deliveredRelative: base.deliveredDir,
+    manifest,
+    sourceSnapshot,
+  })) {
+    return {
+      ...base,
+      status: "diverged",
+      receipt: "mismatch",
+      deliveredAt: "-",
+    };
+  }
+
+  try {
+    verifyInspectedDeliveredBundle(deliveredDir, manifest);
+  } catch (err) {
+    if (err instanceof PublishDestinationError && err.code === "DELIVERY_ARTIFACT_DIVERGED") {
+      return {
+        ...base,
+        status: "diverged",
+        receipt: "mismatch",
+        deliveredAt: "-",
+      };
+    }
+    throw err;
+  }
+
+  return {
+    ...base,
+    status: "delivered",
+    receipt: "present",
+    deliveredAt: receipt.delivered_at,
+  };
+}
 
 export class LocalFolderPublishDestination implements PublishDestination {
   deliver(input: PublishDestinationInput): DeliveryResult {
@@ -421,6 +563,47 @@ function verifyDeliveredBundle(
   }
 }
 
+function verifyInspectedDeliveredBundle(
+  deliveredDir: string,
+  manifest: PublishManifest,
+): void {
+  const sha256: Record<string, string> = {};
+  for (const file of manifest.files) {
+    assertNoDeliveredSymlinkComponents(deliveredDir, file, `delivered file ${file}`);
+    const deliveredFile = path.resolve(deliveredDir, file);
+    assertInside(deliveredDir, deliveredFile, `delivered file ${file}`);
+    let stat;
+    try {
+      stat = lstatSync(deliveredFile);
+    } catch (err) {
+      throw new PublishDestinationError(
+        "DELIVERY_ARTIFACT_DIVERGED",
+        `delivered file missing: ${file}`,
+        err,
+      );
+    }
+    if (!stat.isFile()) {
+      throw new PublishDestinationError(
+        "DELIVERY_ARTIFACT_DIVERGED",
+        `delivered path is not a file: ${file}`,
+      );
+    }
+    sha256[file] = shaFile(deliveredFile);
+    if (sha256[file] !== manifest.sha256[file]) {
+      throw new PublishDestinationError(
+        "DELIVERY_ARTIFACT_DIVERGED",
+        `delivered file hash diverged: ${file}`,
+      );
+    }
+  }
+  if (aggregateFor(manifest.files, sha256) !== manifest.aggregate_sha256) {
+    throw new PublishDestinationError(
+      "DELIVERY_ARTIFACT_DIVERGED",
+      "delivered aggregate hash diverged",
+    );
+  }
+}
+
 function buildReceipt(params: {
   readonly deliveredAt: string;
   readonly deliveredRelative: string;
@@ -578,6 +761,35 @@ function assertNoEscapingSymlinkComponents(
           `${subject} escapes through symlink`,
         );
       }
+    }
+  }
+}
+
+function assertNoDeliveredSymlinkComponents(
+  root: string,
+  relativePath: string,
+  subject: string,
+): void {
+  const parts = toPosixPath(relativePath).split("/");
+  let current = root;
+  for (const part of parts) {
+    current = path.resolve(current, part);
+    assertInside(root, current, subject);
+    let stat;
+    try {
+      stat = lstatSync(current);
+    } catch (err) {
+      throw new PublishDestinationError(
+        "DELIVERY_ARTIFACT_DIVERGED",
+        `${subject} missing`,
+        err,
+      );
+    }
+    if (stat.isSymbolicLink()) {
+      throw new PublishDestinationError(
+        "DELIVERY_ARTIFACT_DIVERGED",
+        `${subject} resolves through symlink`,
+      );
     }
   }
 }
