@@ -31,6 +31,8 @@
     "report-deliver-local-smoke": "bun scripts/report-deliver-local-smoke.ts",
     "report:delivery-status": "bun src/bin/report-delivery-status.ts",
     "report-delivery-status-smoke": "bun scripts/report-delivery-status-smoke.ts",
+    "report:publish-readme": "bun src/bin/report-publish-readme.ts",
+    "report-publish-readme-smoke": "bun scripts/report-publish-readme-smoke.ts",
     "report:run": "bun src/bin/report-run.ts",
     "approval-summary-smoke": "bun scripts/approval-summary-smoke.ts",
     "report-run-smoke": "bun scripts/report-run-smoke.ts",
