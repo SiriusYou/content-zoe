@@ -276,6 +276,10 @@ async function invalidPromotedManifest(dir: string): Promise<string[]> {
     ["wrong job", { manifestPatch: { job_id: "wrong-job" } }],
     ["wrong attempt", { manifestPatch: { attempt_number: 99 } }],
     ["wrong artifact_dir", { manifestPatch: { artifact_dir: "reports/wrong" } }],
+    ["missing sha256", { manifestPatch: malformedManifestPatch({ sha256: undefined }) }],
+    ["null sha256", { manifestPatch: malformedManifestPatch({ sha256: null }) }],
+    ["non-object sha256", { manifestPatch: malformedManifestPatch({ sha256: "not-a-map" }) }],
+    ["non-string file entry", { manifestPatch: malformedManifestPatch({ files: [1, "sources.json"] }) }],
     ["invalid file path", {
       manifestPatch: {
         files: ["../bad"],
@@ -920,6 +924,10 @@ function aggregateFor(
   return createHash("sha256")
     .update(JSON.stringify(files.map((file) => [file, sha256[file]])))
     .digest("hex");
+}
+
+function malformedManifestPatch(value: Record<string, unknown>): Partial<PublishManifest> {
+  return value as unknown as Partial<PublishManifest>;
 }
 
 function countOccurrences(value: string, needle: string): number {

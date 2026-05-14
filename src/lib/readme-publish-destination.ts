@@ -167,7 +167,18 @@ function assertManifestShape(job: ReadmePublishJobRow, manifest: PublishManifest
   if (!Array.isArray(manifest.files) || manifest.files.length === 0) {
     throw new ReadmePublishDestinationError("PUBLISH_MANIFEST_INVALID", "manifest files missing");
   }
-  const files = [...manifest.files];
+  const files: string[] = [];
+  for (const file of manifest.files as readonly unknown[]) {
+    if (typeof file !== "string") {
+      throw new ReadmePublishDestinationError("PUBLISH_MANIFEST_INVALID", "manifest files invalid");
+    }
+    files.push(file);
+  }
+  const sha256 = manifest.sha256 as unknown;
+  if (!isPlainRecord(sha256)) {
+    throw new ReadmePublishDestinationError("PUBLISH_MANIFEST_INVALID", "invalid sha256 map");
+  }
+  const digestMap: Record<string, string> = {};
   const sorted = [...files].sort();
   if (JSON.stringify(files) !== JSON.stringify(sorted) || new Set(files).size !== files.length) {
     throw new ReadmePublishDestinationError(
@@ -179,23 +190,30 @@ function assertManifestShape(job: ReadmePublishJobRow, manifest: PublishManifest
     if (!isSafeManifestRelativePath(file)) {
       throw new ReadmePublishDestinationError("PUBLISH_MANIFEST_INVALID", "unsafe manifest path");
     }
-    const digest = manifest.sha256[file];
-    if (!lowercaseSha256Pattern.test(digest ?? "")) {
+    const digest = sha256[file];
+    if (typeof digest !== "string" || !lowercaseSha256Pattern.test(digest)) {
       throw new ReadmePublishDestinationError("PUBLISH_MANIFEST_INVALID", "invalid sha256 map");
     }
+    digestMap[file] = digest;
   }
-  if (Object.keys(manifest.sha256).sort().join("\n") !== files.join("\n")) {
+  if (Object.keys(sha256).sort().join("\n") !== files.join("\n")) {
     throw new ReadmePublishDestinationError("PUBLISH_MANIFEST_INVALID", "sha256 map mismatch");
   }
   if (!lowercaseSha256Pattern.test(manifest.aggregate_sha256)) {
     throw new ReadmePublishDestinationError("PUBLISH_MANIFEST_INVALID", "invalid aggregate_sha256");
   }
   const expectedAggregate = createHash("sha256")
-    .update(JSON.stringify(files.map((file) => [file, manifest.sha256[file]])))
+    .update(JSON.stringify(files.map((file) => [file, digestMap[file]])))
     .digest("hex");
   if (manifest.aggregate_sha256 !== expectedAggregate) {
     throw new ReadmePublishDestinationError("PUBLISH_MANIFEST_INVALID", "aggregate mismatch");
   }
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
 }
 
 function validateArtifactRoot(cwd: string, artifactDir: string): string {
