@@ -86,6 +86,8 @@ Gate 1 should reject any worker handback that treats an undeclared file as bound
 
 Gate 1 review artifacts and Gate dispatch packets follow operating-model implementation hard-out anchor discipline. When a slice has separate approval-label and implementation commits, reviewers distinguish cumulative range from implementation range and name the implementation hard-out anchor. Companion-artifact existence claims follow operating-model artifact searched-scope discipline.
 
+Reviewer eligibility depends on session identity as well as lane role. A session that implemented a slice cannot issue the review verdict for that same slice's Gate 1 or Gate 2 reviewer slot. `Session-distinct` means a different conversation thread / process invocation that did not participate in implementation; a fresh re-invocation of the same actor identity qualifies only if it did not author, integrate, or belong to the implementation context. If a standard reviewer lane is ineligible because it performed implementation work, the slot is filled by an independent replacement reviewer with explicit disclosure in the review artifact and close-out. Methodology diversity does not substitute for implementer/reviewer session separation.
+
 ### Gate 2: Target-Side Review
 
 Gate 2 reviews product and content correctness. It runs only after Gate 1 approves.

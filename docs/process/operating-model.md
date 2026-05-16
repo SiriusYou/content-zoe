@@ -165,9 +165,37 @@ If an artifact is written to the wrong repo because the reviewer cwd drifted, th
 
 Artifact existence and absence claims MUST state the searched repo/path scope, especially when artifacts may live in either `openclaw-healthcare/.omx/artifacts/` or `content-zoe/.omx/artifacts/`.
 
-Metadata-only checks of existence, path, file size, SHA-256, lane, round, and verdict signature are permitted before verdict formation and do not violate lane independence.
+Metadata-only checks of existence, path, file size, SHA-256, mtime, lane, round, and the canonical single-line `VERDICT:` signature are permitted before verdict formation and do not violate lane independence.
 
 The no-body-consultation rule applies to peer or companion-lane artifact bodies before the reviewer commits to an independent verdict. It does not block reading own-lane prior-round artifacts, locked specs/drafts, dispatch packets, source commits, operator-provided fold summaries, or cross-lane artifacts after the reviewer has committed to their verdict for reconciliation or close-out.
+
+### Companion-artifact timing protocol
+
+This pattern is referenced as Tag-E in review artifacts prior to v3.10.
+
+For same-round peer or companion-lane artifacts, reviewers MUST use a three-checkpoint metadata-only sweep:
+
+1. review-start checkpoint: record whether same-round companion artifacts already exist;
+2. pre-write checkpoint: re-check immediately before writing the reviewer artifact;
+3. post-write checkpoint: re-check immediately after the artifact write returns and before declaring the artifact final.
+
+Allowed metadata before verdict formation is the metadata-only set above: existence, path, file size, SHA-256, mtime, lane, round, and the canonical single-line `VERDICT:` signature. The companion artifact body remains unread until the reviewer has committed to an independent verdict.
+
+Placement taxonomy:
+
+- placement (a): companion artifact exists by review-start, or appears during review and is caught at the pre-write checkpoint before this reviewer writes;
+- placement (b): companion artifact appears after the pre-write checkpoint but before the post-write checkpoint completes;
+- placement (c): companion artifact appears only after this reviewer's post-write checkpoint completes.
+
+For placement (a), the reviewer records metadata-only existence and proceeds without reading the body. No post-write correction is needed unless the post-write checkpoint detects companion metadata drift that changes the gate-state narrative, such as a verdict-signature change or lane/round identity change.
+
+For placement (b), the reviewer preserves the verdict already committed from independent evidence and applies a post-write correction note that records the companion metadata, the placement-(b) timing, and that the body remained unread. The correction may update gate-state metadata and lane-attestation sections, but MUST NOT retroactively change the verdict unless the reviewer explicitly restarts the review under an amended artifact.
+
+For placement (c), no correction is required for the already-final artifact. The next relay stage may record the companion metadata.
+
+If both lanes modify their artifacts during the same write window, each lane records only the metadata visible at its own correction checkpoint. Later companion modifications do not require repeated correction unless the operator explicitly reopens the artifact.
+
+Origin: Tag-E recurrence across Slice 4.18, Slice 4.19, Slice 4.20, and Slice 4.21. The Slice 4.21 three-checkpoint protocol caught placement (a)-mid-review-arrival and classic placement (b), including a two-way mid-write race, without verdict drift.
 
 **Origin**: Slice 4.3 hc-Codex Gate 1 artifact routing divergence and reconciliation; Slice 4.4 hc-Codex Gate 1 direct hc-side landing.
 
@@ -418,6 +446,28 @@ At gates that require two lanes, the gate SHOULD preserve methodology diversity:
 Do not homogenize lanes by requiring every reviewer to perform both methods. Homogenization erases the diagnostic signal that dual-lane review was designed to provide.
 
 Each review artifact MUST tag finding methodology with `[method: textual]`, `[method: behavioral]`, or `[method: hybrid]`. Each artifact SHOULD include a short methodology summary naming the concrete checks performed.
+
+Methodology diversity is necessary but not sufficient. Review-lane independence also requires session-identity independence from the implementation. A reviewer session that participated in the implementation under review cannot serve as an independent reviewer for that same slice, even if it would normally occupy a different methodology lane.
+
+Implementation participation includes direct file edits, applying or integrating implementation patches, generating implementation code through a spawned subagent or forked context, and membership in the implementation worker/swarm context. It excludes pure slice drafting, dispatch packet drafting, approval-label commits, reviewer-only validation, and close-out/ledger authorship when that session did not author or integrate the implementation patch.
+
+If a standard reviewer lane becomes ineligible, the operator fills that slot with an independent replacement reviewer or reruns implementation through a session-distinct worker before review. The replacement artifact must disclose the replacement context, name the ineligible implementer session when known, and state that the replacement reviewer did not participate in implementation.
+
+Replacement reviewers must be lane-capable as well as session-independent. They inherit the original reviewer slot's methodology, evidence burden, artifact path convention, and verdict vocabulary. A textual-only replacement does not satisfy a behavioral slot unless the artifact explicitly records why behavioral replay is not applicable and the operator accepts that evidence ceiling.
+
+Implementation dispatch SHOULD keep worker sessions distinct from all reviewer sessions expected to issue Gate 1 or Gate 2 verdicts. The preferred form is a dispatched hc-worker or swarm worker that implements the product slice, followed by hc-Codex / hc-Claude / cz-Codex / cz-Claude reviews by sessions that did not implement.
+
+Every Gate 1 and Gate 2 review artifact must include a reviewer-eligibility block or equivalent metadata fields naming:
+
+- implementation authoring mode (`hc-worker`, `swarm`, `operator-local`, `operator-supervised-driver`, or other);
+- implementer identity when known (task id, worker label, session label, swarm label, or operator-authored local commit);
+- reviewer identity or role label;
+- eligibility status (`standard-eligible`, `replacement`, or `ineligible`);
+- non-participation attestation, or an evidence ceiling explaining why implementer identity cannot be established.
+
+Unknown implementer identity is not an automatic approval path. If the implementation author cannot be established from dispatch, handback, commit, or operator attestation metadata, the reviewer must disclose that ceiling and either use an independent replacement reviewer with operator attestation or return HOLD for authority repair.
+
+When session separation fails, the affected reviewer slot is not waived. It is filled by an independent, lane-capable replacement reviewer. The close-out records the replacement event, including replacement cause (direct implementer identity, parent/subagent/fork identity, worker/swarm membership, or unknown-authority repair), replacement artifact path, SHA-256, verdict, and whether the replacement found implementation defects.
 
 **Data points**: Slice 3.5 showed zero finding overlap across textual and behavioral lanes. Slice 3.6 added severity-divergent cross-confirmation where textual and behavioral lanes both found recovery/idempotence risk through different evidence. Slice 3.7 exercised both methodologies on a handler-slice DB recovery-audit wiring without producing divergence findings, demonstrating that methodology coverage is sustainable across slice classifications. Slice 4.1 and Slice 4.2 added cross-methodology confirmations where different methods independently found the same contract gap.
 
