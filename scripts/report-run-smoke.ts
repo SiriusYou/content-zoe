@@ -1077,6 +1077,37 @@ async function runResumeStateConsistencyClassification(dir: string): Promise<str
   });
   await expectResumeError(dir, "bad-cleanup", "resume precondition failed: invalid recoveryCleanup");
 
+  const mismatchJobId = "attempt-dir-mismatch";
+  const mismatchAttempt = resolve(dir, ".runs", mismatchJobId, "attempt-2");
+  mkdirSync(mismatchAttempt, { recursive: true });
+  writeCarryForwardFiles(mismatchAttempt);
+  writeState(mismatchAttempt, {
+    schemaVersion: 1,
+    jobId: mismatchJobId,
+    attemptNumber: 3,
+    lastStage: Stage.TRANSLATE_ZH,
+    status: "running",
+    startedAt: new Date().toISOString(),
+    recoveryCleanup: {
+      fromAttempt: 2,
+      copiedFromAttempt: 2,
+      deletedFiles: [],
+      restartStage: Stage.TRANSLATE_ZH,
+      carryForward: ["research", "sources.json", "report.en.md"],
+    },
+  });
+  seedJobRow(dir, mismatchJobId);
+  setJobState(dir, mismatchJobId, 2, "running", Stage.TRANSLATE_ZH);
+  const mismatch = runReportRunCli(dir, [mismatchJobId, "--locales=en,zh", "--resume"]);
+  assert(mismatch.exitCode === 1, `expected mismatch exit 1, got ${mismatch.exitCode}`);
+  assert(
+    mismatch.stderr.includes("run-state attemptNumber does not match attempt directory"),
+    `expected attempt/directory mismatch error, got ${mismatch.stderr}`,
+  );
+  assert(readJob(dir, mismatchJobId)?.attempt_number === 2, "mismatch advanced jobs row");
+  assert(recoveryCleanupEvents(dir, mismatchJobId, 3).length === 0, "mismatch wrote attempt-3 cleanup");
+  assert(!existsSync(resolve(dir, ".runs", mismatchJobId, "attempt-3")), "mismatch created attempt-3");
+
   const staleJobId = "bad-job-row";
   seedRunningTranslateFixture(dir, staleJobId);
   const prepared = prepareReportRunAttempt({
@@ -1101,7 +1132,8 @@ async function runResumeStateConsistencyClassification(dir: string): Promise<str
   assert(!formatError(stale).includes("DB_READ_FAILED"), "stale job row was misclassified as DB_READ_FAILED");
 
   return [
-    "Invalid attemptNumber and malformed recoveryCleanup failed as resume precondition errors.",
+    "Invalid attemptNumber, malformed recoveryCleanup, and attempt-directory/run-state mismatch failed as resume precondition errors.",
+    "The attempt-directory/run-state mismatch left jobs.attempt_number and recovery_cleanup events unchanged.",
     "A structurally stale jobs row failed as LIFECYCLE_PERSISTENCE_FAILED, not as generic DB_READ_FAILED.",
   ];
 }

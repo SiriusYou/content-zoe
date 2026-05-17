@@ -1,9 +1,9 @@
 # report-run smoke evidence
 
 - Command: `bun run report-run-smoke`
-- Started: 2026-05-17T03:58:21.921Z
-- Finished: 2026-05-17T03:58:22.423Z
-- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-17T03-58-21.921Z (removed by finally-cleanup)
+- Started: 2026-05-17T04:43:10.207Z
+- Finished: 2026-05-17T04:43:10.734Z
+- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-17T04-43-10.207Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
@@ -27,6 +27,6 @@
 | resume-race-or-stale-guard | PASS | A stale resume whose jobs row had already moved to another attempt failed with LIFECYCLE_PERSISTENCE_FAILED.<br>The transaction rolled back recovery_cleanup insertion and produced no successful stage history for the losing attempt. |
 | recovery-cleanup-idempotence-and-divergence | PASS | A matching duplicate recovery_cleanup bootstrap was idempotent and kept exactly one row.<br>A divergent pre-existing cleanup payload was rejected with LIFECYCLE_PERSISTENCE_FAILED before jobs.attempt_number advanced. |
 | resume-half-bootstrap-reconciliation | PASS | The fixture approximated the Phase 4.35 half-bootstrap class: attempt-2 run-state plus cleanup event, jobs.attempt_number still 1.<br>CLI --resume safely reused attempt-2, reconciled the jobs row, and did not create attempt-3. |
-| resume-state-consistency-classification | PASS | Invalid attemptNumber and malformed recoveryCleanup failed as resume precondition errors.<br>A structurally stale jobs row failed as LIFECYCLE_PERSISTENCE_FAILED, not as generic DB_READ_FAILED. |
+| resume-state-consistency-classification | PASS | Invalid attemptNumber, malformed recoveryCleanup, and attempt-directory/run-state mismatch failed as resume precondition errors.<br>The attempt-directory/run-state mismatch left jobs.attempt_number and recovery_cleanup events unchanged.<br>A structurally stale jobs row failed as LIFECYCLE_PERSISTENCE_FAILED, not as generic DB_READ_FAILED. |
 | record-stage-enter-guard-preserved | PASS | recordStageEnter still updates only where id and attempt_number match.<br>Attempt-number bootstrapping lives in bootstrapResumeAttemptLifecycle, not in recordStageEnter. |
 | report-run-boundary-static-check | PASS | Approval-label-anchor diff inspected (3016a52b94cacf4cd9f8a42ce47bea19fe7873cd..HEAD plus working tree): docs/preflight/db-smoke.md, docs/preflight/report-run-smoke.md, scripts/db-smoke.ts, scripts/report-run-smoke.ts, src/bin/report-run.ts, src/db.ts.<br>Only Slice 4.22 allowed implementation/evidence files were present in the boundary diff.<br>Static source inspection found the report-run bootstrap call and no hard-out package/schema/provider/prompt surfaces. |

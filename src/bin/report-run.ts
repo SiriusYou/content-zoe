@@ -477,6 +477,7 @@ function prepareResumeAttempt(
   }
 
   const validated = validateRunState(priorState, opts.jobId);
+  assertRunStateAttemptMatchesDirectory(validated, prior);
   if (validated.recoveryCleanup && validated.status === "running") {
     return {
       runDir: realpathSync(prior.dir),
@@ -672,6 +673,16 @@ function validateRunState(raw: Record<string, unknown>, jobId: string): RunState
   }
 
   return raw as unknown as RunState;
+}
+
+function assertRunStateAttemptMatchesDirectory(
+  state: RunState,
+  attempt: AttemptEntry,
+): void {
+  if (state.attemptNumber === attempt.attemptNumber) return;
+  throw new Error(
+    `resume precondition failed: run-state attemptNumber does not match attempt directory: run-state=${state.attemptNumber} directory=${attempt.attemptNumber}`,
+  );
 }
 
 function validateRecoveryCleanup(raw: unknown, attemptNumber: number): void {
