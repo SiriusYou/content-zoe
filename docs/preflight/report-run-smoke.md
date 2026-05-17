@@ -1,9 +1,9 @@
 # report-run smoke evidence
 
 - Command: `bun run report-run-smoke`
-- Started: 2026-05-12T02:16:20.950Z
-- Finished: 2026-05-12T02:16:21.311Z
-- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-12T02-16-20.950Z (removed by finally-cleanup)
+- Started: 2026-05-17T03:58:21.921Z
+- Finished: 2026-05-17T03:58:22.423Z
+- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-17T03-58-21.921Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
@@ -20,4 +20,13 @@
 | resume-after-success-idempotent | PASS | A completed job resumed as an idempotent no-op.<br>The resume path emitted already complete and did not create attempt-2. |
 | resume-edge-cases | PASS | Missing job directory, empty job directory, missing run-state, corrupted JSON, and schema mismatch all failed with exit-class precondition errors. |
 | carry-forward-partial-failure | PASS | Injected copy failure removed the bootstrap directory and left attempt-2 absent.<br>A subsequent resume still selected attempt-1 as highest and published attempt-2 successfully. |
-| recovery-cleanup-db-audit | PASS | CLI resume with LLM_PROVIDER=fake wrote one recovery_cleanup event for attempt-2.<br>The event payload matched run-state.json recoveryCleanup fields.<br>A duplicate recordRecoveryCleanup call with the same job/attempt/payload left exactly one event row.<br>A cleanup resume without a DB jobs row failed before stage execution with an operator-readable recovery audit error. |
+| recovery-cleanup-db-audit | PASS | CLI resume with LLM_PROVIDER=fake wrote one recovery_cleanup event for attempt-2.<br>The event payload matched run-state.json recoveryCleanup fields.<br>A duplicate recordRecoveryCleanup call with the same job/attempt/payload left exactly one event row.<br>The smoke no longer pre-set jobs.attempt_number=2 before invoking --resume.<br>A cleanup resume without a DB jobs row failed before stage execution with an operator-readable recovery audit error. |
+| resume-running-attempt-db-transition | PASS | The W20-shaped fixture started with filesystem attempt-1, jobs.attempt_number=1, and no attempt-2 recovery_cleanup.<br>CLI --resume created attempt-2, atomically bootstrapped the DB, and stage_enter for attempt-2 succeeded.<br>Post-state agreed across filesystem, events, and jobs: attempt_number=2, awaiting_approval, translate_zh. |
+| resume-attempt-bootstrap-coherence | PASS | Filesystem attempt-2 was prepared before the DB row moved from attempt 1.<br>The bootstrap transaction established resume-attempt-bootstrap-coherence before any stage_enter event existed.<br>The unchanged stage_enter guard succeeded only after jobs.attempt_number matched attempt-2. |
+| recovery-cleanup-atomicity-and-atom-edge | PASS | Filesystem attempt-2 prep happened before DB bootstrap; without a jobs row, the DB remained unadvanced and event-free.<br>A later retry reused the existing attempt-2 run-state/recoveryCleanup and completed the SQLite bootstrap.<br>The normal implementation cannot leave the W20 split-brain through the DB transaction path. |
+| resume-race-or-stale-guard | PASS | A stale resume whose jobs row had already moved to another attempt failed with LIFECYCLE_PERSISTENCE_FAILED.<br>The transaction rolled back recovery_cleanup insertion and produced no successful stage history for the losing attempt. |
+| recovery-cleanup-idempotence-and-divergence | PASS | A matching duplicate recovery_cleanup bootstrap was idempotent and kept exactly one row.<br>A divergent pre-existing cleanup payload was rejected with LIFECYCLE_PERSISTENCE_FAILED before jobs.attempt_number advanced. |
+| resume-half-bootstrap-reconciliation | PASS | The fixture approximated the Phase 4.35 half-bootstrap class: attempt-2 run-state plus cleanup event, jobs.attempt_number still 1.<br>CLI --resume safely reused attempt-2, reconciled the jobs row, and did not create attempt-3. |
+| resume-state-consistency-classification | PASS | Invalid attemptNumber and malformed recoveryCleanup failed as resume precondition errors.<br>A structurally stale jobs row failed as LIFECYCLE_PERSISTENCE_FAILED, not as generic DB_READ_FAILED. |
+| record-stage-enter-guard-preserved | PASS | recordStageEnter still updates only where id and attempt_number match.<br>Attempt-number bootstrapping lives in bootstrapResumeAttemptLifecycle, not in recordStageEnter. |
+| report-run-boundary-static-check | PASS | Approval-label-anchor diff inspected (3016a52b94cacf4cd9f8a42ce47bea19fe7873cd..HEAD plus working tree): docs/preflight/db-smoke.md, docs/preflight/report-run-smoke.md, scripts/db-smoke.ts, scripts/report-run-smoke.ts, src/bin/report-run.ts, src/db.ts.<br>Only Slice 4.22 allowed implementation/evidence files were present in the boundary diff.<br>Static source inspection found the report-run bootstrap call and no hard-out package/schema/provider/prompt surfaces. |

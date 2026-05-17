@@ -15,10 +15,10 @@ import path from "node:path";
 import { CodexCliProvider } from "../llm/codex-cli.ts";
 import type { LLMProvider } from "../llm/provider.ts";
 import {
+  bootstrapResumeAttemptLifecycle,
   type DbClient,
   findJobById,
   openDb,
-  recordRecoveryCleanup,
   recordResearchStageComplete,
   recordStageComplete,
   recordStageEnter,
@@ -429,9 +429,12 @@ export function recordRecoveryCleanupAudit(
         )} before recovery cleanup can be recorded`,
       );
     }
-    recordRecoveryCleanup(db, {
+    bootstrapResumeAttemptLifecycle(db, {
       jobId: opts.jobId,
       attemptNumber: opts.attemptNumber,
+      expectedPreviousAttemptNumber: opts.recoveryCleanup.fromAttempt,
+      restartStage: opts.recoveryCleanup.restartStage,
+      runDir: `.runs/${opts.jobId}`,
       recoveryCleanup: opts.recoveryCleanup,
     });
   } finally {
@@ -474,6 +477,17 @@ function prepareResumeAttempt(
   }
 
   const validated = validateRunState(priorState, opts.jobId);
+  if (validated.recoveryCleanup && validated.status === "running") {
+    return {
+      runDir: realpathSync(prior.dir),
+      attemptNumber: validated.attemptNumber,
+      startStage: validated.lastStage,
+      startedAt: validated.startedAt,
+      recoveryCleanup: validated.recoveryCleanup,
+      alreadyComplete: false,
+    };
+  }
+
   if (validated.status === "awaiting_approval") {
     return {
       runDir: realpathSync(prior.dir),
@@ -653,8 +667,37 @@ function validateRunState(raw: Record<string, unknown>, jobId: string): RunState
   if (typeof raw.startedAt !== "string" || raw.startedAt.length === 0) {
     throw new Error(`resume precondition failed: invalid startedAt`);
   }
+  if (raw.recoveryCleanup !== undefined) {
+    validateRecoveryCleanup(raw.recoveryCleanup, Number(raw.attemptNumber));
+  }
 
   return raw as unknown as RunState;
+}
+
+function validateRecoveryCleanup(raw: unknown, attemptNumber: number): void {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`resume precondition failed: invalid recoveryCleanup`);
+  }
+  const cleanup = raw as Record<string, unknown>;
+  const fromAttempt = cleanup.fromAttempt;
+  const copiedFromAttempt = cleanup.copiedFromAttempt;
+  const restartStage = cleanup.restartStage;
+  const deletedFiles = cleanup.deletedFiles;
+  const carryForward = cleanup.carryForward;
+
+  if (
+    !Number.isInteger(fromAttempt) ||
+    !Number.isInteger(copiedFromAttempt) ||
+    fromAttempt !== attemptNumber - 1 ||
+    copiedFromAttempt !== fromAttempt ||
+    !isStage(restartStage) ||
+    !Array.isArray(deletedFiles) ||
+    !deletedFiles.every((value) => typeof value === "string") ||
+    !Array.isArray(carryForward) ||
+    !carryForward.every((value) => typeof value === "string")
+  ) {
+    throw new Error(`resume precondition failed: invalid recoveryCleanup`);
+  }
 }
 
 function writeRunState(

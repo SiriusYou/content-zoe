@@ -14,7 +14,9 @@ import { fileURLToPath } from "node:url";
 import {
   findEventsByJob,
   findJobById,
+  insertEvent,
   insertJob,
+  LifecyclePersistenceError,
   openDb,
   recordRecoveryCleanup,
   recordResearchStageComplete,
@@ -52,7 +54,16 @@ type ScenarioName =
   | "resume-after-success-idempotent"
   | "resume-edge-cases"
   | "carry-forward-partial-failure"
-  | "recovery-cleanup-db-audit";
+  | "recovery-cleanup-db-audit"
+  | "resume-running-attempt-db-transition"
+  | "resume-attempt-bootstrap-coherence"
+  | "recovery-cleanup-atomicity-and-atom-edge"
+  | "resume-race-or-stale-guard"
+  | "recovery-cleanup-idempotence-and-divergence"
+  | "resume-half-bootstrap-reconciliation"
+  | "resume-state-consistency-classification"
+  | "record-stage-enter-guard-preserved"
+  | "report-run-boundary-static-check";
 
 interface ScenarioOutcome {
   name: ScenarioName;
@@ -77,6 +88,15 @@ const SCENARIOS: ScenarioName[] = [
   "resume-edge-cases",
   "carry-forward-partial-failure",
   "recovery-cleanup-db-audit",
+  "resume-running-attempt-db-transition",
+  "resume-attempt-bootstrap-coherence",
+  "recovery-cleanup-atomicity-and-atom-edge",
+  "resume-race-or-stale-guard",
+  "recovery-cleanup-idempotence-and-divergence",
+  "resume-half-bootstrap-reconciliation",
+  "resume-state-consistency-classification",
+  "record-stage-enter-guard-preserved",
+  "report-run-boundary-static-check",
 ];
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -167,6 +187,24 @@ async function scenarioImpl(
       return runCarryForwardPartialFailure(dir);
     case "recovery-cleanup-db-audit":
       return runRecoveryCleanupDbAudit(dir);
+    case "resume-running-attempt-db-transition":
+      return runResumeRunningAttemptDbTransition(dir);
+    case "resume-attempt-bootstrap-coherence":
+      return runResumeAttemptBootstrapCoherence(dir);
+    case "recovery-cleanup-atomicity-and-atom-edge":
+      return runRecoveryCleanupAtomicityAndAtomEdge(dir);
+    case "resume-race-or-stale-guard":
+      return runResumeRaceOrStaleGuard(dir);
+    case "recovery-cleanup-idempotence-and-divergence":
+      return runRecoveryCleanupIdempotenceAndDivergence(dir);
+    case "resume-half-bootstrap-reconciliation":
+      return runResumeHalfBootstrapReconciliation(dir);
+    case "resume-state-consistency-classification":
+      return runResumeStateConsistencyClassification(dir);
+    case "record-stage-enter-guard-preserved":
+      return runRecordStageEnterGuardPreserved();
+    case "report-run-boundary-static-check":
+      return runReportRunBoundaryStaticCheck();
   }
 }
 
@@ -675,7 +713,8 @@ async function runRecoveryCleanupDbAudit(dir: string): Promise<string[]> {
   const jobId = "recovery-audit";
   seedJobRow(dir, jobId);
   writeFailedAttemptForRecovery(dir, jobId);
-  setJobAttempt(dir, jobId, 2, Stage.EDIT_EN);
+  const before = readJob(dir, jobId);
+  assert(before?.attempt_number === 1, "resume smoke must not pre-set jobs.attempt_number=2");
 
   const result = runReportRunCli(dir, [jobId, "--locales=en,zh", "--resume"]);
   assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
@@ -727,7 +766,397 @@ async function runRecoveryCleanupDbAudit(dir: string): Promise<string[]> {
     "CLI resume with LLM_PROVIDER=fake wrote one recovery_cleanup event for attempt-2.",
     "The event payload matched run-state.json recoveryCleanup fields.",
     "A duplicate recordRecoveryCleanup call with the same job/attempt/payload left exactly one event row.",
+    "The smoke no longer pre-set jobs.attempt_number=2 before invoking --resume.",
     "A cleanup resume without a DB jobs row failed before stage execution with an operator-readable recovery audit error.",
+  ];
+}
+
+async function runResumeRunningAttemptDbTransition(dir: string): Promise<string[]> {
+  const jobId = "resume-running-attempt-db-transition";
+  seedRunningTranslateFixture(dir, jobId);
+
+  const preJob = readJob(dir, jobId);
+  assert(preJob?.attempt_number === 1, "pre-state jobs.attempt_number must be 1");
+  assert(preJob.status === "running", `pre-state status must be running, got ${preJob.status}`);
+  assert(preJob.current_stage === Stage.TRANSLATE_ZH, "pre-state current_stage mismatch");
+  assert(existsSync(resolve(dir, ".runs", jobId, "attempt-1")), "missing attempt-1");
+  assert(!existsSync(resolve(dir, ".runs", jobId, "attempt-2")), "attempt-2 must not pre-exist");
+  assert(recoveryCleanupEvents(dir, jobId, 2).length === 0, "attempt-2 cleanup must not pre-exist");
+
+  const result = runReportRunCli(dir, [jobId, "--locales=en,zh", "--resume"]);
+  assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
+
+  const state = readState(dir, jobId, 2);
+  assert(state.status === "awaiting_approval", `expected awaiting_approval, got ${state.status}`);
+  assert(state.recoveryCleanup?.restartStage === Stage.TRANSLATE_ZH, "bad restartStage");
+  assert(existsSync(resolve(dir, ".runs", jobId, "attempt-2", "report.en.md")), "missing carried report.en.md");
+  const postJob = readJob(dir, jobId);
+  assert(postJob?.attempt_number === 2, `expected DB attempt 2, got ${postJob?.attempt_number}`);
+  assert(postJob.status === "awaiting_approval", `expected DB awaiting_approval, got ${postJob.status}`);
+  assert(postJob.current_stage === Stage.TRANSLATE_ZH, "post-state current_stage mismatch");
+  const cleanupEvents = recoveryCleanupEvents(dir, jobId, 2);
+  assert(cleanupEvents.length === 1, `expected one cleanup, got ${cleanupEvents.length}`);
+  assert(findAttemptEvents(dir, jobId, 2, "stage_enter").length >= 1, "missing attempt-2 stage_enter");
+
+  return [
+    "The W20-shaped fixture started with filesystem attempt-1, jobs.attempt_number=1, and no attempt-2 recovery_cleanup.",
+    "CLI --resume created attempt-2, atomically bootstrapped the DB, and stage_enter for attempt-2 succeeded.",
+    "Post-state agreed across filesystem, events, and jobs: attempt_number=2, awaiting_approval, translate_zh.",
+  ];
+}
+
+async function runResumeAttemptBootstrapCoherence(dir: string): Promise<string[]> {
+  const jobId = "resume-attempt-bootstrap-coherence";
+  seedRunningTranslateFixture(dir, jobId);
+
+  const attempt = prepareReportRunAttempt({
+    jobId,
+    locales: ["en", "zh"],
+    cwd: dir,
+    resume: true,
+  });
+  assert(attempt.attemptNumber === 2, `expected attempt-2, got ${attempt.attemptNumber}`);
+  assert(existsSync(attempt.runDir), "filesystem attempt-2 must exist before DB bootstrap");
+  const beforeJob = readJob(dir, jobId);
+  assert(beforeJob?.attempt_number === 1, "DB advanced before bootstrap");
+
+  recordRecoveryCleanupAudit({
+    cwd: dir,
+    jobId,
+    attemptNumber: attempt.attemptNumber,
+    recoveryCleanup: attempt.recoveryCleanup,
+  });
+
+  const bootstrappedJob = readJob(dir, jobId);
+  assert(bootstrappedJob?.attempt_number === 2, "bootstrap did not advance DB attempt");
+  assert(bootstrappedJob.status === "running", "bootstrap did not set running status");
+  assert(bootstrappedJob.current_stage === Stage.TRANSLATE_ZH, "bootstrap stage mismatch");
+  assert(bootstrappedJob.run_dir === `.runs/${jobId}`, `unexpected run_dir ${bootstrappedJob.run_dir}`);
+  assert(recoveryCleanupEvents(dir, jobId, 2).length === 1, "missing one cleanup event");
+  assert(findAttemptEvents(dir, jobId, 2, "stage_enter").length === 0, "stage_enter ran before bootstrap proof");
+
+  const db = openDb(resolve(dir, ".data", "content.db"));
+  try {
+    recordStageEnter(db, {
+      jobId,
+      attemptNumber: 2,
+      stage: Stage.TRANSLATE_ZH,
+      runDir: `.runs/${jobId}/attempt-2`,
+    });
+  } finally {
+    db.close();
+  }
+  assert(findAttemptEvents(dir, jobId, 2, "stage_enter").length === 1, "strict stage_enter did not succeed after bootstrap");
+
+  return [
+    "Filesystem attempt-2 was prepared before the DB row moved from attempt 1.",
+    "The bootstrap transaction established resume-attempt-bootstrap-coherence before any stage_enter event existed.",
+    "The unchanged stage_enter guard succeeded only after jobs.attempt_number matched attempt-2.",
+  ];
+}
+
+async function runRecoveryCleanupAtomicityAndAtomEdge(dir: string): Promise<string[]> {
+  const jobId = "recovery-cleanup-atomicity";
+  writeRunningTranslateAttempt(dir, jobId);
+
+  const attempt = prepareReportRunAttempt({
+    jobId,
+    locales: ["en", "zh"],
+    cwd: dir,
+    resume: true,
+  });
+  assert(attempt.attemptNumber === 2, "expected filesystem attempt-2 prep");
+  assert(existsSync(resolve(dir, ".runs", jobId, "attempt-2")), "attempt-2 not prepared");
+  assert(readJob(dir, jobId) === null, "missing-row fixture should not have a jobs row");
+
+  let failed: unknown;
+  try {
+    recordRecoveryCleanupAudit({
+      cwd: dir,
+      jobId,
+      attemptNumber: attempt.attemptNumber,
+      recoveryCleanup: attempt.recoveryCleanup,
+    });
+  } catch (err) {
+    failed = err;
+  }
+  assert(formatError(failed).includes("recovery audit requires a DB jobs row"), "expected typed recovery audit failure");
+  assert(existsSync(resolve(dir, ".runs", jobId, "attempt-2")), "DB failure must not delete published attempt-2");
+  assert(recoveryCleanupEvents(dir, jobId, 2).length === 0, "failed DB bootstrap left cleanup event");
+
+  seedJobRow(dir, jobId);
+  setJobState(dir, jobId, 1, "running", Stage.TRANSLATE_ZH);
+  const retry = prepareReportRunAttempt({
+    jobId,
+    locales: ["en", "zh"],
+    cwd: dir,
+    resume: true,
+  });
+  assert(retry.attemptNumber === 2, `retry must reuse attempt-2, got attempt-${retry.attemptNumber}`);
+  recordRecoveryCleanupAudit({
+    cwd: dir,
+    jobId,
+    attemptNumber: retry.attemptNumber,
+    recoveryCleanup: retry.recoveryCleanup,
+  });
+  assert(!existsSync(resolve(dir, ".runs", jobId, "attempt-3")), "retry created attempt-3 instead of reusing attempt-2");
+  assert(readJob(dir, jobId)?.attempt_number === 2, "retry bootstrap did not advance DB");
+
+  return [
+    "Filesystem attempt-2 prep happened before DB bootstrap; without a jobs row, the DB remained unadvanced and event-free.",
+    "A later retry reused the existing attempt-2 run-state/recoveryCleanup and completed the SQLite bootstrap.",
+    "The normal implementation cannot leave the W20 split-brain through the DB transaction path.",
+  ];
+}
+
+async function runResumeRaceOrStaleGuard(dir: string): Promise<string[]> {
+  const jobId = "resume-race-or-stale-guard";
+  seedRunningTranslateFixture(dir, jobId);
+  const attempt = prepareReportRunAttempt({
+    jobId,
+    locales: ["en", "zh"],
+    cwd: dir,
+    resume: true,
+  });
+  setJobState(dir, jobId, 3, "running", Stage.TRANSLATE_ZH);
+
+  let stale: unknown;
+  try {
+    recordRecoveryCleanupAudit({
+      cwd: dir,
+      jobId,
+      attemptNumber: attempt.attemptNumber,
+      recoveryCleanup: attempt.recoveryCleanup,
+    });
+  } catch (err) {
+    stale = err;
+  }
+  assert(stale instanceof LifecyclePersistenceError, "expected lifecycle stale guard error");
+  assert(formatError(stale).includes("resume bootstrap stale attempt guard missed"), "unexpected stale error");
+  assert(recoveryCleanupEvents(dir, jobId, 2).length === 0, "rolled-back stale bootstrap left cleanup event");
+  assert(findAttemptEvents(dir, jobId, 2, "stage_enter").length === 0, "stale resume left stage history");
+
+  return [
+    "A stale resume whose jobs row had already moved to another attempt failed with LIFECYCLE_PERSISTENCE_FAILED.",
+    "The transaction rolled back recovery_cleanup insertion and produced no successful stage history for the losing attempt.",
+  ];
+}
+
+async function runRecoveryCleanupIdempotenceAndDivergence(dir: string): Promise<string[]> {
+  const matchingJobId = "recovery-cleanup-idempotent";
+  seedRunningTranslateFixture(dir, matchingJobId);
+  const matching = prepareReportRunAttempt({
+    jobId: matchingJobId,
+    locales: ["en", "zh"],
+    cwd: dir,
+    resume: true,
+  });
+  recordRecoveryCleanupAudit({
+    cwd: dir,
+    jobId: matchingJobId,
+    attemptNumber: matching.attemptNumber,
+    recoveryCleanup: matching.recoveryCleanup,
+  });
+  recordRecoveryCleanupAudit({
+    cwd: dir,
+    jobId: matchingJobId,
+    attemptNumber: matching.attemptNumber,
+    recoveryCleanup: matching.recoveryCleanup,
+  });
+  assert(recoveryCleanupEvents(dir, matchingJobId, 2).length === 1, "matching duplicate created extra cleanup");
+
+  const divergentJobId = "recovery-cleanup-divergent";
+  seedRunningTranslateFixture(dir, divergentJobId);
+  const divergent = prepareReportRunAttempt({
+    jobId: divergentJobId,
+    locales: ["en", "zh"],
+    cwd: dir,
+    resume: true,
+  });
+  const db = openDb(resolve(dir, ".data", "content.db"));
+  try {
+    insertEvent(db, {
+      job_id: divergentJobId,
+      attempt_number: divergent.attemptNumber,
+      type: "recovery_cleanup",
+      payload: JSON.stringify({
+        ...divergent.recoveryCleanup,
+        deletedFiles: ["different.md"],
+      }),
+      created_at: unixNow(),
+    });
+  } finally {
+    db.close();
+  }
+
+  let rejected: unknown;
+  try {
+    recordRecoveryCleanupAudit({
+      cwd: dir,
+      jobId: divergentJobId,
+      attemptNumber: divergent.attemptNumber,
+      recoveryCleanup: divergent.recoveryCleanup,
+    });
+  } catch (err) {
+    rejected = err;
+  }
+  assert(rejected instanceof LifecyclePersistenceError, "expected divergent lifecycle rejection");
+  assert(formatError(rejected).includes("divergent recovery_cleanup"), "unexpected divergent error");
+  assert(readJob(dir, divergentJobId)?.attempt_number === 1, "divergent cleanup advanced jobs row");
+
+  return [
+    "A matching duplicate recovery_cleanup bootstrap was idempotent and kept exactly one row.",
+    "A divergent pre-existing cleanup payload was rejected with LIFECYCLE_PERSISTENCE_FAILED before jobs.attempt_number advanced.",
+  ];
+}
+
+async function runResumeHalfBootstrapReconciliation(dir: string): Promise<string[]> {
+  const jobId = "resume-half-bootstrap-reconciliation";
+  seedRunningTranslateFixture(dir, jobId);
+  const prepared = prepareReportRunAttempt({
+    jobId,
+    locales: ["en", "zh"],
+    cwd: dir,
+    resume: true,
+  });
+  assert(prepared.recoveryCleanup !== undefined, "expected prepared cleanup");
+  const db = openDb(resolve(dir, ".data", "content.db"));
+  try {
+    recordRecoveryCleanup(db, {
+      jobId,
+      attemptNumber: prepared.attemptNumber,
+      recoveryCleanup: prepared.recoveryCleanup,
+    });
+  } finally {
+    db.close();
+  }
+  assert(readJob(dir, jobId)?.attempt_number === 1, "fixture must keep DB at prior attempt");
+
+  const result = runReportRunCli(dir, [jobId, "--locales=en,zh", "--resume"]);
+  assert(result.exitCode === 0, `expected half-bootstrap resume success, got ${result.exitCode}: ${result.stderr}`);
+  assert(!existsSync(resolve(dir, ".runs", jobId, "attempt-3")), "half-bootstrap retry created attempt-3");
+  assert(readJob(dir, jobId)?.attempt_number === 2, "half-bootstrap retry did not reconcile jobs row");
+  assert(recoveryCleanupEvents(dir, jobId, 2).length === 1, "half-bootstrap retry duplicated cleanup event");
+
+  return [
+    "The fixture approximated the Phase 4.35 half-bootstrap class: attempt-2 run-state plus cleanup event, jobs.attempt_number still 1.",
+    "CLI --resume safely reused attempt-2, reconciled the jobs row, and did not create attempt-3.",
+  ];
+}
+
+async function runResumeStateConsistencyClassification(dir: string): Promise<string[]> {
+  const invalidAttempt = resolve(dir, ".runs", "bad-attempt", "attempt-1");
+  mkdirSync(invalidAttempt, { recursive: true });
+  writeState(invalidAttempt, {
+    schemaVersion: 1,
+    jobId: "bad-attempt",
+    attemptNumber: 0,
+    lastStage: Stage.RESEARCH,
+    status: "running",
+    startedAt: new Date().toISOString(),
+  } as RunState);
+  await expectResumeError(dir, "bad-attempt", "resume precondition failed: invalid attemptNumber");
+
+  const badCleanup = resolve(dir, ".runs", "bad-cleanup", "attempt-2");
+  mkdirSync(badCleanup, { recursive: true });
+  writeCarryForwardFiles(badCleanup);
+  writeState(badCleanup, {
+    schemaVersion: 1,
+    jobId: "bad-cleanup",
+    attemptNumber: 2,
+    lastStage: Stage.TRANSLATE_ZH,
+    status: "running",
+    startedAt: new Date().toISOString(),
+    recoveryCleanup: {
+      fromAttempt: 99,
+      copiedFromAttempt: 1,
+      deletedFiles: [],
+      restartStage: Stage.TRANSLATE_ZH,
+      carryForward: ["report.en.md"],
+    },
+  });
+  await expectResumeError(dir, "bad-cleanup", "resume precondition failed: invalid recoveryCleanup");
+
+  const staleJobId = "bad-job-row";
+  seedRunningTranslateFixture(dir, staleJobId);
+  const prepared = prepareReportRunAttempt({
+    jobId: staleJobId,
+    locales: ["en", "zh"],
+    cwd: dir,
+    resume: true,
+  });
+  setJobState(dir, staleJobId, 4, "running", Stage.TRANSLATE_ZH);
+  let stale: unknown;
+  try {
+    recordRecoveryCleanupAudit({
+      cwd: dir,
+      jobId: staleJobId,
+      attemptNumber: prepared.attemptNumber,
+      recoveryCleanup: prepared.recoveryCleanup,
+    });
+  } catch (err) {
+    stale = err;
+  }
+  assert(stale instanceof LifecyclePersistenceError, "expected stale job row lifecycle error");
+  assert(!formatError(stale).includes("DB_READ_FAILED"), "stale job row was misclassified as DB_READ_FAILED");
+
+  return [
+    "Invalid attemptNumber and malformed recoveryCleanup failed as resume precondition errors.",
+    "A structurally stale jobs row failed as LIFECYCLE_PERSISTENCE_FAILED, not as generic DB_READ_FAILED.",
+  ];
+}
+
+async function runRecordStageEnterGuardPreserved(): Promise<string[]> {
+  const source = readFileSync(resolve(repoRoot, "src", "db.ts"), "utf8");
+  const recordStart = source.indexOf("export function recordStageEnter");
+  const recordEnd = source.indexOf("export function recordStageComplete");
+  const recordSource = source.slice(recordStart, recordEnd);
+  assert(recordStart >= 0 && recordEnd > recordStart, "could not locate recordStageEnter");
+  assert(recordSource.includes('"id = ? AND attempt_number = ?"'), "recordStageEnter lost attempt guard");
+  const updateStart = recordSource.indexOf("const updated = updateJobWhere");
+  const updateEnd = recordSource.indexOf("assertLifecycleGuard");
+  const updatePatch = recordSource.slice(updateStart, updateEnd);
+  assert(updateStart >= 0 && updateEnd > updateStart, "could not locate recordStageEnter update");
+  assert(!updatePatch.includes("attempt_number:"), "recordStageEnter must not bump attempts");
+  assert(!recordSource.includes("bootstrapResumeAttemptLifecycle"), "recordStageEnter must not call resume bootstrap");
+  assert(source.includes("export function bootstrapResumeAttemptLifecycle"), "missing separate resume bootstrap helper");
+  assert(source.includes("resume bootstrap guard missed"), "bootstrap helper lacks explicit lifecycle guard");
+
+  return [
+    "recordStageEnter still updates only where id and attempt_number match.",
+    "Attempt-number bootstrapping lives in bootstrapResumeAttemptLifecycle, not in recordStageEnter.",
+  ];
+}
+
+async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
+  const allowed = new Set([
+    "src/bin/report-run.ts",
+    "src/db.ts",
+    "scripts/report-run-smoke.ts",
+    "docs/preflight/report-run-smoke.md",
+    "scripts/db-smoke.ts",
+    "docs/preflight/db-smoke.md",
+  ]);
+  const anchor = "3016a52b94cacf4cd9f8a42ce47bea19fe7873cd";
+  const committed = gitLines(["diff", "--name-only", `${anchor}..HEAD`]);
+  const working = gitLines(["diff", "--name-only", anchor]);
+  const names = [...new Set([...committed, ...working])].filter((name) => name.length > 0);
+  assert(names.length > 0, "boundary check was vacuous: no implementation files detected");
+  const unexpected = names.filter((name) => !allowed.has(name));
+  assert(unexpected.length === 0, `unexpected implementation files: ${unexpected.join(",")}`);
+
+  const reportRun = readFileSync(resolve(repoRoot, "src", "bin", "report-run.ts"), "utf8");
+  const dbSource = readFileSync(resolve(repoRoot, "src", "db.ts"), "utf8");
+  assert(reportRun.includes("bootstrapResumeAttemptLifecycle"), "report-run does not call DB bootstrap");
+  assert(dbSource.includes("multi-store") === false, "db.ts should not carry governance prose");
+  for (const hardOut of ["package.json", "bun.lock", "src/lib/report-loop.ts", "src/llm/", "src/prompts/", "src/migrations/", "src/telegram/"]) {
+    assert(!names.some((name) => name === hardOut || name.startsWith(hardOut)), `hard-out touched: ${hardOut}`);
+  }
+
+  return [
+    `Approval-label-anchor diff inspected (${anchor}..HEAD plus working tree): ${names.join(", ")}.`,
+    "Only Slice 4.22 allowed implementation/evidence files were present in the boundary diff.",
+    "Static source inspection found the report-run bootstrap call and no hard-out package/schema/provider/prompt surfaces.",
   ];
 }
 
@@ -903,21 +1332,80 @@ function seedJobRow(cwd: string, jobId: string): void {
   }
 }
 
+function seedRunningTranslateFixture(cwd: string, jobId: string): void {
+  seedJobRow(cwd, jobId);
+  setJobState(cwd, jobId, 1, "running", Stage.TRANSLATE_ZH);
+  writeRunningTranslateAttempt(cwd, jobId);
+}
+
+function writeRunningTranslateAttempt(cwd: string, jobId: string): void {
+  const attempt1 = resolve(cwd, ".runs", jobId, "attempt-1");
+  mkdirSync(attempt1, { recursive: true });
+  writeCarryForwardFiles(attempt1);
+  writeState(attempt1, {
+    schemaVersion: 1,
+    jobId,
+    attemptNumber: 1,
+    lastStage: Stage.TRANSLATE_ZH,
+    status: "running",
+    startedAt: new Date().toISOString(),
+  });
+}
+
+function readJob(cwd: string, jobId: string) {
+  const db = openDb(resolve(cwd, ".data", "content.db"));
+  try {
+    return findJobById(db, jobId);
+  } finally {
+    db.close();
+  }
+}
+
 function setJobAttempt(
   cwd: string,
   jobId: string,
   attemptNumber: number,
   currentStage: Stage,
 ): void {
+  setJobState(cwd, jobId, attemptNumber, "queued", currentStage);
+}
+
+function setJobState(
+  cwd: string,
+  jobId: string,
+  attemptNumber: number,
+  status: string,
+  currentStage: Stage,
+): void {
   const db = openDb(resolve(cwd, ".data", "content.db"));
   try {
     const updated = updateJob(db, jobId, {
       attempt_number: attemptNumber,
-      status: "queued",
+      status,
       current_stage: currentStage,
       updated_at: unixNow(),
     });
     assert(updated.rowsAffected === 1, `expected to update ${jobId} attempt`);
+  } finally {
+    db.close();
+  }
+}
+
+function recoveryCleanupEvents(cwd: string, jobId: string, attemptNumber: number) {
+  return findAttemptEvents(cwd, jobId, attemptNumber, "recovery_cleanup");
+}
+
+function findAttemptEvents(
+  cwd: string,
+  jobId: string,
+  attemptNumber: number,
+  type: string,
+) {
+  const db = openDb(resolve(cwd, ".data", "content.db"));
+  try {
+    return findEventsByJob(db, jobId, type).filter(
+      (event) => event.attempt_number === attemptNumber,
+    );
   } finally {
     db.close();
   }
@@ -1060,6 +1548,22 @@ function grepFiles(
     });
   }
   return hits;
+}
+
+function gitLines(args: readonly string[]): string[] {
+  const proc = Bun.spawnSync({
+    cmd: ["git", ...args],
+    cwd: repoRoot,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const stderr = new TextDecoder().decode(proc.stderr).trim();
+  assert(proc.exitCode === 0, `git ${args.join(" ")} failed: ${stderr}`);
+  return new TextDecoder()
+    .decode(proc.stdout)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {

@@ -203,6 +203,13 @@ export interface RecoveryCleanupParams {
   recoveryCleanup: RecoveryCleanup;
 }
 
+export interface ResumeAttemptLifecycleBootstrapParams extends RecoveryCleanupParams {
+  expectedPreviousAttemptNumber: number;
+  restartStage: Stage;
+  runDir: string;
+  timestamp?: number;
+}
+
 export interface StageLifecycleParams {
   jobId: string;
   attemptNumber: number;
@@ -523,11 +530,91 @@ export function recordRecoveryCleanup(
         )
         .get(params.jobId, params.attemptNumber);
       if (existing) {
+        if (existing.payload !== payload) {
+          throw new LifecyclePersistenceError(
+            `divergent recovery_cleanup for resume bootstrap: job_id=${JSON.stringify(
+              params.jobId,
+            )} attempt_number=${params.attemptNumber}`,
+          );
+        }
         return existing;
       }
     }
     throw err;
   }
+}
+
+export function bootstrapResumeAttemptLifecycle(
+  db: DbClient,
+  params: ResumeAttemptLifecycleBootstrapParams,
+): Event {
+  const timestamp = params.timestamp ?? unixNow();
+  validateResumeAttemptBootstrapParams(params);
+
+  return runLifecycleTransaction(db, () => {
+    const existingJob = findJobById(db, params.jobId);
+    if (!existingJob) {
+      throw new LifecyclePersistenceError(
+        `resume bootstrap missing jobs row: job_id=${JSON.stringify(params.jobId)}`,
+      );
+    }
+
+    const cleanupEvent = recordRecoveryCleanup(db, {
+      jobId: params.jobId,
+      attemptNumber: params.attemptNumber,
+      recoveryCleanup: params.recoveryCleanup,
+    });
+
+    if (existingJob.attempt_number === params.attemptNumber) {
+      if (
+        existingJob.status !== "running" ||
+        existingJob.current_stage !== params.restartStage ||
+        existingJob.run_dir !== params.runDir
+      ) {
+        throw new LifecyclePersistenceError(
+          `resume bootstrap found inconsistent active jobs row: job_id=${JSON.stringify(
+            params.jobId,
+          )} attempt_number=${params.attemptNumber}`,
+        );
+      }
+      return cleanupEvent;
+    }
+
+    if (existingJob.attempt_number !== params.expectedPreviousAttemptNumber) {
+      throw new LifecyclePersistenceError(
+        `resume bootstrap stale attempt guard missed: job_id=${JSON.stringify(
+          params.jobId,
+        )} expected_previous_attempt=${params.expectedPreviousAttemptNumber} attempt_number=${params.attemptNumber} actual_attempt=${existingJob.attempt_number}`,
+      );
+    }
+
+    const updated = updateJobWhere(
+      db,
+      "id = ? AND attempt_number = ?",
+      [params.jobId, params.expectedPreviousAttemptNumber],
+      {
+        attempt_number: params.attemptNumber,
+        status: "running",
+        current_stage: params.restartStage,
+        run_dir: params.runDir,
+        error: null,
+        updated_at: timestamp,
+      },
+    );
+    assertLifecycleGuard(
+      updated.rowsAffected,
+      {
+        jobId: params.jobId,
+        attemptNumber: params.attemptNumber,
+        stage: params.restartStage,
+        runDir: params.runDir,
+        timestamp,
+      },
+      `resume bootstrap guard missed for ${params.restartStage}`,
+    );
+
+    return cleanupEvent;
+  });
 }
 
 export function recordStageEnter(
@@ -666,6 +753,39 @@ function assertLifecycleGuard(
   throw new LifecyclePersistenceError(
     `${message}: job_id=${JSON.stringify(params.jobId)} attempt_number=${params.attemptNumber}`,
   );
+}
+
+function validateResumeAttemptBootstrapParams(
+  params: ResumeAttemptLifecycleBootstrapParams,
+): void {
+  if (!Number.isInteger(params.expectedPreviousAttemptNumber) || params.expectedPreviousAttemptNumber < 1) {
+    throw new LifecyclePersistenceError(
+      `resume bootstrap invalid previous attempt: job_id=${JSON.stringify(params.jobId)}`,
+    );
+  }
+  if (!Number.isInteger(params.attemptNumber) || params.attemptNumber < 2) {
+    throw new LifecyclePersistenceError(
+      `resume bootstrap invalid attempt: job_id=${JSON.stringify(params.jobId)}`,
+    );
+  }
+  if (params.attemptNumber !== params.expectedPreviousAttemptNumber + 1) {
+    throw new LifecyclePersistenceError(
+      `resume bootstrap non-sequential attempt: job_id=${JSON.stringify(
+        params.jobId,
+      )} expected_previous_attempt=${params.expectedPreviousAttemptNumber} attempt_number=${params.attemptNumber}`,
+    );
+  }
+  if (
+    params.recoveryCleanup.fromAttempt !== params.expectedPreviousAttemptNumber ||
+    params.recoveryCleanup.copiedFromAttempt !== params.expectedPreviousAttemptNumber ||
+    params.recoveryCleanup.restartStage !== params.restartStage
+  ) {
+    throw new LifecyclePersistenceError(
+      `resume bootstrap recovery_cleanup mismatch: job_id=${JSON.stringify(
+        params.jobId,
+      )} attempt_number=${params.attemptNumber}`,
+    );
+  }
 }
 
 function updateJobWhere(

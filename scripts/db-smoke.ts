@@ -4,6 +4,7 @@ import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  bootstrapResumeAttemptLifecycle,
   casUpdateJob,
   DbConstraintError,
   DbInitError,
@@ -32,6 +33,7 @@ type ScenarioName =
   | "events-append-fk"
   | "stage-lifecycle"
   | "cas-semantics"
+  | "resume-bootstrap-lifecycle"
   | "recovery-cleanup"
   | "wal-concurrent-reader";
 
@@ -57,6 +59,7 @@ const SCENARIOS: ScenarioName[] = [
   "events-append-fk",
   "stage-lifecycle",
   "cas-semantics",
+  "resume-bootstrap-lifecycle",
   "recovery-cleanup",
   "wal-concurrent-reader",
 ];
@@ -128,6 +131,8 @@ async function scenarioImpl(
       return runStageLifecycle(dir);
     case "cas-semantics":
       return runCasSemantics(dir);
+    case "resume-bootstrap-lifecycle":
+      return runResumeBootstrapLifecycle(dir);
     case "recovery-cleanup":
       return runRecoveryCleanup(dir);
     case "wal-concurrent-reader":
@@ -522,6 +527,153 @@ function runCasSemantics(dir: string): string[] {
   }
 }
 
+function runResumeBootstrapLifecycle(dir: string): string[] {
+  const db = openDb(resolve(dir, "content.db"));
+  try {
+    const now = unixNow();
+    insertJob(db, {
+      id: "job-resume-bootstrap",
+      week_key: "2026-W24",
+      topic: "Resume bootstrap",
+      status: "running",
+      current_stage: Stage.TRANSLATE_ZH,
+      run_dir: ".runs/job-resume-bootstrap",
+      created_at: now,
+      updated_at: now,
+    });
+
+    const recoveryCleanup = {
+      fromAttempt: 1,
+      copiedFromAttempt: 1,
+      deletedFiles: [],
+      restartStage: Stage.TRANSLATE_ZH,
+      carryForward: ["research", "sources.json", "report.en.md"],
+    };
+    const cleanup = bootstrapResumeAttemptLifecycle(db, {
+      jobId: "job-resume-bootstrap",
+      expectedPreviousAttemptNumber: 1,
+      attemptNumber: 2,
+      restartStage: Stage.TRANSLATE_ZH,
+      runDir: ".runs/job-resume-bootstrap",
+      recoveryCleanup,
+      timestamp: now + 1,
+    });
+    assert(cleanup.type === "recovery_cleanup", "expected recovery_cleanup event");
+    const afterBootstrap = findJobById(db, "job-resume-bootstrap");
+    assert(afterBootstrap?.attempt_number === 2, "bootstrap did not advance attempt");
+    assert(afterBootstrap.status === "running", "bootstrap did not preserve running status");
+    assert(afterBootstrap.current_stage === Stage.TRANSLATE_ZH, "bootstrap stage mismatch");
+
+    const duplicate = bootstrapResumeAttemptLifecycle(db, {
+      jobId: "job-resume-bootstrap",
+      expectedPreviousAttemptNumber: 1,
+      attemptNumber: 2,
+      restartStage: Stage.TRANSLATE_ZH,
+      runDir: ".runs/job-resume-bootstrap",
+      recoveryCleanup,
+      timestamp: now + 2,
+    });
+    assert(duplicate.id === cleanup.id, "matching duplicate did not return existing cleanup");
+    assert(
+      scalar<number>(
+        db,
+        "SELECT COUNT(*) AS value FROM events WHERE job_id = 'job-resume-bootstrap' AND type = 'recovery_cleanup'",
+      ) === 1,
+      "matching duplicate created another cleanup row",
+    );
+
+    const enter = recordStageEnter(db, {
+      jobId: "job-resume-bootstrap",
+      attemptNumber: 2,
+      stage: Stage.TRANSLATE_ZH,
+      runDir: ".runs/job-resume-bootstrap/attempt-2",
+      timestamp: now + 3,
+    });
+    assert(enter.type === "stage_enter", "strict stage_enter did not succeed after bootstrap");
+
+    insertJob(db, {
+      id: "job-resume-stale",
+      week_key: "2026-W25",
+      topic: "Resume stale",
+      status: "running",
+      current_stage: Stage.TRANSLATE_ZH,
+      attempt_number: 3,
+      created_at: now,
+      updated_at: now,
+    });
+    let stale: unknown;
+    try {
+      bootstrapResumeAttemptLifecycle(db, {
+        jobId: "job-resume-stale",
+        expectedPreviousAttemptNumber: 1,
+        attemptNumber: 2,
+        restartStage: Stage.TRANSLATE_ZH,
+        runDir: ".runs/job-resume-stale",
+        recoveryCleanup,
+        timestamp: now + 4,
+      });
+    } catch (err) {
+      stale = err;
+    }
+    assert(stale instanceof LifecyclePersistenceError, "expected stale bootstrap lifecycle error");
+    assert(
+      scalar<number>(
+        db,
+        "SELECT COUNT(*) AS value FROM events WHERE job_id = 'job-resume-stale'",
+      ) === 0,
+      "stale bootstrap left an event after rollback",
+    );
+
+    insertJob(db, {
+      id: "job-resume-divergent",
+      week_key: "2026-W26",
+      topic: "Resume divergent",
+      status: "running",
+      current_stage: Stage.TRANSLATE_ZH,
+      created_at: now,
+      updated_at: now,
+    });
+    insertEvent(db, {
+      job_id: "job-resume-divergent",
+      attempt_number: 2,
+      type: "recovery_cleanup",
+      payload: JSON.stringify({
+        ...recoveryCleanup,
+        deletedFiles: ["different.md"],
+      }),
+      created_at: now + 5,
+    });
+    let divergent: unknown;
+    try {
+      bootstrapResumeAttemptLifecycle(db, {
+        jobId: "job-resume-divergent",
+        expectedPreviousAttemptNumber: 1,
+        attemptNumber: 2,
+        restartStage: Stage.TRANSLATE_ZH,
+        runDir: ".runs/job-resume-divergent",
+        recoveryCleanup,
+        timestamp: now + 6,
+      });
+    } catch (err) {
+      divergent = err;
+    }
+    assert(divergent instanceof LifecyclePersistenceError, "expected divergent cleanup lifecycle error");
+    assert(
+      findJobById(db, "job-resume-divergent")?.attempt_number === 1,
+      "divergent cleanup advanced jobs row",
+    );
+
+    return [
+      "bootstrapResumeAttemptLifecycle atomically advanced jobs.attempt_number/current_stage/status and wrote recovery_cleanup.",
+      "A matching duplicate bootstrap returned the existing cleanup row and did not duplicate events.",
+      "recordStageEnter remained a strict post-bootstrap guard for attempt-2.",
+      "Stale bootstrap rollback left no event, and divergent cleanup was rejected before jobs row transition.",
+    ];
+  } finally {
+    db.close();
+  }
+}
+
 async function runRecoveryCleanup(dir: string): Promise<string[]> {
   const dbPath = resolve(dir, "content.db");
   const db = openDb(dbPath);
@@ -553,14 +705,44 @@ async function runRecoveryCleanup(dir: string): Promise<string[]> {
     const duplicate = recordRecoveryCleanup(db, {
       jobId: "job-recovery",
       attemptNumber: 2,
-      recoveryCleanup: {
-        ...recoveryCleanup,
-        deletedFiles: ["other.md"],
-      },
+      recoveryCleanup,
     });
+    let divergent: unknown;
+    try {
+      recordRecoveryCleanup(db, {
+        jobId: "job-recovery",
+        attemptNumber: 2,
+        recoveryCleanup: {
+          ...recoveryCleanup,
+          deletedFiles: ["other.md"],
+        },
+      });
+    } catch (err) {
+      divergent = err;
+    }
 
+    assert(divergent instanceof LifecyclePersistenceError, "expected divergent cleanup rejection");
+    assert(
+      formatError(divergent).includes("divergent recovery_cleanup"),
+      "unexpected divergent cleanup error",
+    );
     assert(first.id === duplicate.id, "F4 duplicate did not return existing event");
     assert(duplicate.payload === payload, "duplicate recovery_cleanup changed payload");
+    assert(
+      scalar<number>(
+        db,
+        "SELECT COUNT(*) AS value FROM events WHERE type = 'recovery_cleanup'",
+      ) === 1,
+      "expected one recovery_cleanup row",
+    );
+
+    const matchingAgain = recordRecoveryCleanup(db, {
+      jobId: "job-recovery",
+      attemptNumber: 2,
+      recoveryCleanup,
+    });
+
+    assert(matchingAgain.id === first.id, "matching retry did not return existing event");
     assert(
       scalar<number>(
         db,
@@ -590,8 +772,8 @@ async function runRecoveryCleanup(dir: string): Promise<string[]> {
       "expected concurrent duplicate callers to return the same event id",
     );
     assert(
-      raceResults.some((result) => result.observedExisting),
-      "expected one concurrent caller to report handled UNIQUE duplicate path",
+      raceResults.every((result) => result.payload === payloadForRace()),
+      "expected concurrent duplicate callers to observe the matching payload",
     );
 
     const source = readFileSync(resolve(repoRoot, "src", "db.ts"), "utf8");
@@ -599,8 +781,9 @@ async function runRecoveryCleanup(dir: string): Promise<string[]> {
 
     return [
       "recordRecoveryCleanup serialized the Slice 3.5 recoveryCleanup object into events only.",
-      "F4 sequential duplicate recovery_cleanup returned the existing row and did not change the payload.",
-      "F6 Test #7(b) launched two separate connections/processes; partial UNIQUE enforcement left exactly one row and the duplicate path returned the existing row.",
+      "F4 sequential duplicate recovery_cleanup returned the existing row only when the payload matched.",
+      "Divergent recovery_cleanup for the same job/attempt was rejected with LIFECYCLE_PERSISTENCE_FAILED.",
+      "F6 Test #7(b) launched two separate connections/processes with matching payloads; partial UNIQUE enforcement left exactly one row and both callers returned it.",
     ];
   } finally {
     db.close();
@@ -663,7 +846,7 @@ async function runRecoveryCleanupRace(
     const recoveryCleanup = {
       fromAttempt: 2,
       copiedFromAttempt: 2,
-      deletedFiles: [\`\${label}.md\`],
+      deletedFiles: ["shared.md"],
       restartStage: "draft_en",
       carryForward: ["research/"],
     };
@@ -715,6 +898,16 @@ async function runRecoveryCleanupRace(
   );
 
   return outputs;
+}
+
+function payloadForRace(): string {
+  return JSON.stringify({
+    fromAttempt: 2,
+    copiedFromAttempt: 2,
+    deletedFiles: ["shared.md"],
+    restartStage: Stage.DRAFT_EN,
+    carryForward: ["research/"],
+  });
 }
 
 function scalar<T>(db: { query: (sql: string) => { get: () => Record<string, T> | null } }, sql: string): T {
