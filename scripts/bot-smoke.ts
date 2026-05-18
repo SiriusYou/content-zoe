@@ -1,10 +1,14 @@
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
+  readlinkSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -103,6 +107,14 @@ type ScenarioName =
   | "approve-status-mismatch"
   | "approve-source-validation"
   | "approve-success-publishes-bundle"
+  | "approve-without-source-material-optional"
+  | "approve-missing-sources-json"
+  | "approve-malformed-sources-json"
+  | "approve-missing-report-en"
+  | "approve-source-material-present-missing-manifest"
+  | "approve-source-material-manifest-shape-invalid"
+  | "approve-source-material-operator-hash-mismatch"
+  | "approve-status-attempt-mismatch"
   | "approve-idempotent-repromote"
   | "approve-rename-before-db-recovery"
   | "approve-rename-succeeded-cas-lost"
@@ -173,6 +185,14 @@ const SCENARIOS: readonly ScenarioName[] = [
   "approve-status-mismatch",
   "approve-source-validation",
   "approve-success-publishes-bundle",
+  "approve-without-source-material-optional",
+  "approve-missing-sources-json",
+  "approve-malformed-sources-json",
+  "approve-missing-report-en",
+  "approve-source-material-present-missing-manifest",
+  "approve-source-material-manifest-shape-invalid",
+  "approve-source-material-operator-hash-mismatch",
+  "approve-status-attempt-mismatch",
   "approve-idempotent-repromote",
   "approve-rename-before-db-recovery",
   "approve-rename-succeeded-cas-lost",
@@ -213,57 +233,52 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
-const slice416Scope = new Set([
-  "src/db.ts",
-  "src/lib/report-loop.ts",
-  "src/bin/report-run.ts",
-  "scripts/db-smoke.ts",
-  "docs/preflight/db-smoke.md",
-  "scripts/report-run-smoke.ts",
-  "docs/preflight/report-run-smoke.md",
-  "src/bin/report-list.ts",
-  "scripts/report-list-smoke.ts",
-  "docs/preflight/report-list-smoke.md",
-  "src/lib/publish-destination.ts",
-  "src/bin/report-deliver-local.ts",
-  "scripts/report-deliver-local-smoke.ts",
-  "docs/preflight/report-deliver-local-smoke.md",
-  "src/bin/report-show.ts",
-  "scripts/report-show-smoke.ts",
-  "docs/preflight/report-show-smoke.md",
-  "package.json",
-  "scripts/report-status-smoke.ts",
-  "docs/preflight/report-status-smoke.md",
-  "scripts/report-remind-smoke.ts",
-  "docs/preflight/report-remind-smoke.md",
+const slice424Scope = new Set([
+  "src/promote.ts",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
-  "scripts/report-create-smoke.ts",
-  "docs/preflight/report-create-smoke.md",
+  "src/lib/readme-publish-destination.ts",
+  "src/bin/report-publish-readme.ts",
+  "scripts/report-publish-readme-smoke.ts",
+  "docs/preflight/report-publish-readme-smoke.md",
 ]);
 const botSmokeActiveTriggers = new Set([
-  "src/telegram/bot.ts",
-  "src/telegram/commands.ts",
-  "src/telegram/notifier.ts",
-  "src/telegram/allowlist.ts",
   "src/promote.ts",
-  "scripts/lib/static-guardrails.ts",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
+  "src/lib/readme-publish-destination.ts",
+  "src/bin/report-publish-readme.ts",
+  "scripts/report-publish-readme-smoke.ts",
+  "docs/preflight/report-publish-readme-smoke.md",
 ]);
 const botSmokeActiveFrozenFiles = [
   "bun.lock",
   "bun.lockb",
+  "package.json",
+  "README.md",
+  "AGENTS.md",
+  "CLAUDE.md",
+  "ROLE_POSITIONING.md",
+  "TODOS.md",
+  "PLAN.md",
+  "src/db.ts",
   "src/telegram/bot.ts",
   "src/telegram/commands.ts",
   "src/telegram/notifier.ts",
   "src/telegram/allowlist.ts",
+  "src/lib/report-loop.ts",
   "src/lib/report-run-fake-provider.ts",
   "src/lib/runtime-config.ts",
+  "src/lib/publish-destination.ts",
   "src/bin/report-create.ts",
   "src/bin/report-remind.ts",
   "src/bin/report-status.ts",
-  "src/promote.ts",
+  "src/bin/report-show.ts",
+  "src/bin/report-list.ts",
+  "src/bin/report-events.ts",
+  "src/bin/report-deliver-local.ts",
+  "src/bin/report-delivery-status.ts",
+  "src/bin/report-run.ts",
   "src/preflight.ts",
 ];
 const botSmokeActiveFrozenDirectories = [
@@ -271,6 +286,8 @@ const botSmokeActiveFrozenDirectories = [
   "src/migrations/",
   "src/llm/",
   "src/prompts/",
+  "docs/process/",
+  ".omx/memory-edit/",
 ];
 const botSmokeInheritedFrozenFiles = [
   "src/telegram/bot.ts",
@@ -437,6 +454,22 @@ async function scenarioImpl(
       return runApproveSourceValidation(dir);
     case "approve-success-publishes-bundle":
       return runApproveSuccessPublishesBundle(dir);
+    case "approve-without-source-material-optional":
+      return runApproveWithoutSourceMaterialOptional(dir);
+    case "approve-missing-sources-json":
+      return runApproveMissingSourcesJson(dir);
+    case "approve-malformed-sources-json":
+      return runApproveMalformedSourcesJson(dir);
+    case "approve-missing-report-en":
+      return runApproveMissingReportEn(dir);
+    case "approve-source-material-present-missing-manifest":
+      return runApproveSourceMaterialPresentMissingManifest(dir);
+    case "approve-source-material-manifest-shape-invalid":
+      return runApproveSourceMaterialManifestShapeInvalid(dir);
+    case "approve-source-material-operator-hash-mismatch":
+      return runApproveSourceMaterialOperatorHashMismatch(dir);
+    case "approve-status-attempt-mismatch":
+      return runApproveStatusAttemptMismatch(dir);
     case "approve-idempotent-repromote":
       return runApproveIdempotentRepromote(dir);
     case "approve-rename-before-db-recovery":
@@ -1544,8 +1577,16 @@ async function runApproveSuccessPublishesBundle(dir: string): Promise<string[]> 
       translated_report_path: ".runs/approve-success/attempt-1/report.zh.md",
       sources_path: ".runs/approve-success/attempt-1/sources.json",
     });
-    writeAttemptBundle(dir, "approve-success", 1);
+    writeAttemptBundle(dir, "approve-success", 1, { sourceMaterial: true, weekKey: "2026-W47" });
     writeAttemptBundle(dir, "approve-success", 0);
+    const sourceMaterialManifestSha = shaFile(resolve(
+      dir,
+      ".runs",
+      "approve-success",
+      "attempt-1",
+      "source-material",
+      "manifest.json",
+    ));
     const replies: string[] = [];
     const plans: GitCommitPlan[] = [];
 
@@ -1577,22 +1618,247 @@ async function runApproveSuccessPublishesBundle(dir: string): Promise<string[]> 
     assert(manifest.attempt_number === 1, "manifest attempt missing");
     assertArrayEqualsString(
       manifest.files,
-      ["report.en.md", "report.zh.md", "research/brief.md", "research/notes.md", "sources.json"],
+      [
+        "report.en.md",
+        "report.zh.md",
+        "research/brief.md",
+        "research/notes.md",
+        "source-material/context.md",
+        "source-material/manifest.json",
+        "source-material/operator/facts.md",
+        "sources.json",
+      ],
       "manifest file list",
     );
     assert(manifest.sha256["report.en.md"]?.length === 64, "manifest per-file sha missing");
+    assert(
+      manifest.sha256["source-material/manifest.json"] === sourceMaterialManifestSha,
+      "source-material manifest hash was not preserved",
+    );
     assert(manifest.aggregate_sha256.length === 64, "manifest aggregate sha missing");
     assert(readFileSync(resolve(dir, "reports", "2026-W47-ai-trends", "report.en.md"), "utf8").includes("approve-success"), "final EN report content missing");
     assert(readFileSync(resolve(dir, "reports", "2026-W47-ai-trends", "report.zh.md"), "utf8").includes("Synthetic zh"), "final ZH report content missing");
     assert(JSON.parse(readFileSync(resolve(dir, "reports", "2026-W47-ai-trends", "sources.json"), "utf8")).length === 1, "final sources not parseable");
+    assert(
+      shaFile(resolve(dir, "reports", "2026-W47-ai-trends", "source-material", "manifest.json")) === sourceMaterialManifestSha,
+      "final source-material manifest bytes changed",
+    );
+    assert(
+      readFileSync(resolve(dir, "reports", "2026-W47-ai-trends", "source-material", "operator", "facts.md"), "utf8").includes("Operator fact"),
+      "final operator source missing",
+    );
     assert(!existsSync(resolve(dir, ".runs", "approve-success", "attempt-1")), "approved attempt was not cleaned up");
     assert(existsSync(resolve(dir, ".runs", "approve-success", "attempt-0")), "other attempt was removed");
     assert(plans.length === 1, "fake committer did not receive one plan");
 
     return [
-      "Allowed approve staged and atomically published reports, research, and sources into reports/2026-W47-ai-trends.",
-      "DB row is published with preserved report metadata and exactly one promoted event carrying the authoritative publish_manifest.",
+      "Allowed approve staged and atomically published reports, research, sources, and source-material into reports/2026-W47-ai-trends.",
+      "DB row is published with preserved report metadata and exactly one promoted event carrying the authoritative publish_manifest with source-material/manifest.json.",
       "Only the approved attempt was cleaned up and fake git received a path-bounded plan.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveWithoutSourceMaterialOptional(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "approve-no-source-material", {
+      week_key: "2026-W63",
+      run_dir: ".runs/approve-no-source-material",
+    });
+    writeAttemptBundle(dir, "approve-no-source-material", 1);
+    const replies: string[] = [];
+
+    const result = await handleApproveCommand({
+      db,
+      text: "/approve approve-no-source-material 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 10_500_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    const manifest = promotedManifest(findEventsByJob(db, "approve-no-source-material", "promoted")[0]);
+    assert(result.status === "published", "optional no-source-material approve did not publish");
+    assert(replies[0]?.startsWith("Approved attempt 1."), "optional no-source-material reply did not succeed");
+    assert(!manifest.files.some((file) => file.startsWith("source-material/")), "optional source-material absence added manifest entries");
+    assert(!existsSync(resolve(dir, "reports", "2026-W63-ai-trends", "source-material")), "optional source-material absence published a source-material directory");
+    assert(!existsSync(resolve(dir, ".runs", "approve-no-source-material", "attempt-1")), "optional no-source-material source was not cleaned");
+
+    return [
+      "Attempt without source-material/ still publishes successfully.",
+      "The promoted manifest and final reports directory contain no source-material entries when staging is absent.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runApproveMissingSourcesJson(dir: string): Promise<string[]> {
+  return runApprovePreconditionFailureCase(dir, {
+    jobId: "approve-missing-sources",
+    weekKey: "2026-W64",
+    expectedCode: "PUBLISH_SOURCE_MISSING",
+    mutate(attemptDir) {
+      rmSync(resolve(attemptDir, "sources.json"), { force: true });
+    },
+    detail: "Valid cloned attempt with sources.json removed fails before reports/DB/events mutation.",
+  });
+}
+
+async function runApproveMalformedSourcesJson(dir: string): Promise<string[]> {
+  return runApprovePreconditionFailureCase(dir, {
+    jobId: "approve-malformed-sources",
+    weekKey: "2026-W65",
+    expectedCode: "PUBLISH_SOURCE_MISSING",
+    mutate(attemptDir) {
+      writeFileSync(resolve(attemptDir, "sources.json"), "{not json\n", "utf8");
+    },
+    detail: "Valid cloned attempt with malformed sources.json fails before reports/DB/events mutation.",
+  });
+}
+
+async function runApproveMissingReportEn(dir: string): Promise<string[]> {
+  return runApprovePreconditionFailureCase(dir, {
+    jobId: "approve-missing-en",
+    weekKey: "2026-W66",
+    expectedCode: "PUBLISH_SOURCE_MISSING",
+    mutate(attemptDir) {
+      rmSync(resolve(attemptDir, "report.en.md"), { force: true });
+    },
+    detail: "Valid cloned attempt with report.en.md removed fails before reports/DB/events mutation.",
+  });
+}
+
+async function runApproveSourceMaterialPresentMissingManifest(dir: string): Promise<string[]> {
+  return runApprovePreconditionFailureCase(dir, {
+    jobId: "approve-source-material-missing-manifest",
+    weekKey: "2026-W67",
+    expectedCode: "PUBLISH_SOURCE_MISSING",
+    mutate(attemptDir) {
+      rmSync(resolve(attemptDir, "source-material", "manifest.json"), { force: true });
+    },
+    detail: "Valid cloned attempt with source-material/ present but manifest.json removed fails before reports/DB/events mutation.",
+  });
+}
+
+async function runApproveSourceMaterialManifestShapeInvalid(dir: string): Promise<string[]> {
+  return runApprovePreconditionFailureCase(dir, {
+    jobId: "approve-source-material-shape-invalid",
+    weekKey: "2026-W68",
+    expectedCode: "PUBLISH_SOURCE_MISSING",
+    mutate(attemptDir) {
+      const manifestPath = resolve(attemptDir, "source-material", "manifest.json");
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+        operatorSource: { present: unknown };
+      };
+      manifest.operatorSource.present = "yes";
+      writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    },
+    detail: "Valid cloned attempt with shape-invalid source-material manifest fails before reports/DB/events mutation.",
+  });
+}
+
+async function runApproveSourceMaterialOperatorHashMismatch(dir: string): Promise<string[]> {
+  return runApprovePreconditionFailureCase(dir, {
+    jobId: "approve-source-material-hash-mismatch",
+    weekKey: "2026-W69",
+    expectedCode: "PUBLISH_SOURCE_MISSING",
+    mutate(attemptDir) {
+      const manifestPath = resolve(attemptDir, "source-material", "manifest.json");
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+        entries: Array<{ kind?: string; sha256?: string }>;
+      };
+      const operatorEntry = manifest.entries.find((entry) => entry.kind === "operator_source");
+      assert(operatorEntry !== undefined, "missing operator_source entry in fixture");
+      operatorEntry.sha256 = "0".repeat(64);
+      writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    },
+    detail: "Valid cloned attempt with operator_source sha256 mismatch fails before reports/DB/events mutation.",
+  });
+}
+
+async function runApproveStatusAttemptMismatch(dir: string): Promise<string[]> {
+  const stale = await runApprovePreconditionFailureCase(resolve(dir, "stale-attempt"), {
+    jobId: "approve-status-attempt-stale",
+    weekKey: "2026-W70",
+    approveAttempt: 1,
+    jobPatch: { attempt_number: 2 },
+    expectedCode: "STALE_ATTEMPT",
+    mutate() {
+      // The cloned source remains valid; the job row is the mismatched input.
+    },
+    detail: "Attempt mismatch fails before source/files/events mutation.",
+  });
+  const status = await runApprovePreconditionFailureCase(resolve(dir, "status-mismatch"), {
+    jobId: "approve-status-attempt-status",
+    weekKey: "2026-W71",
+    jobPatch: { status: "queued" },
+    expectedCode: "STATUS_MISMATCH",
+    mutate() {
+      // The cloned source remains valid; the job status is the mismatched input.
+    },
+    detail: "Status mismatch fails before source/files/events mutation.",
+  });
+  return [...stale, ...status];
+}
+
+async function runApprovePreconditionFailureCase(
+  dir: string,
+  params: {
+    readonly jobId: string;
+    readonly weekKey: string;
+    readonly approveAttempt?: number;
+    readonly expectedCode: string;
+    readonly jobPatch?: Partial<Job>;
+    readonly detail: string;
+    readonly mutate: (attemptDir: string) => void;
+  },
+): Promise<string[]> {
+  mkdirSync(dir, { recursive: true });
+  const { db, close } = openScenarioDb(dir);
+  try {
+    const approveAttempt = params.approveAttempt ?? 1;
+    seedAwaitingJob(db, params.jobId, {
+      week_key: params.weekKey,
+      run_dir: `.runs/${params.jobId}`,
+      ...params.jobPatch,
+    });
+    writeAttemptBundle(dir, params.jobId, approveAttempt, {
+      sourceMaterial: true,
+      weekKey: params.weekKey,
+    });
+
+    const attemptDir = resolve(dir, ".runs", params.jobId, `attempt-${approveAttempt}`);
+    params.mutate(attemptDir);
+    const beforeJob = stableJobSnapshot(requireJob(db, params.jobId));
+    const beforePromotedEvents = findEventsByJob(db, params.jobId, "promoted").length;
+    const beforeSourceTree = treeSnapshot(attemptDir);
+    const replies: string[] = [];
+
+    await handleApproveCommand({
+      db,
+      text: `/approve ${params.jobId} ${approveAttempt}`,
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 10_510_000_000,
+      reply: (text) => replies.push(text),
+    });
+
+    assert(replies[0]?.includes(params.expectedCode), `${params.jobId} reply omitted ${params.expectedCode}`);
+    assert(stableJobSnapshot(requireJob(db, params.jobId)) === beforeJob, `${params.jobId} mutated job row`);
+    assert(findEventsByJob(db, params.jobId, "promoted").length === beforePromotedEvents, `${params.jobId} wrote promoted event`);
+    assert(!existsSync(resolve(dir, "reports", `${params.weekKey}-ai-trends`)), `${params.jobId} created final reports dir`);
+    assert(existsSync(attemptDir), `${params.jobId} deleted source attempt`);
+    assert(treeSnapshot(attemptDir) === beforeSourceTree, `${params.jobId} mutated source attempt`);
+
+    return [
+      params.detail,
+      "The failed approve left the job row unchanged, wrote no events.promoted, created no final reports dir, and preserved the source attempt.",
     ];
   } finally {
     close();
@@ -2074,7 +2340,7 @@ async function runApproveGitCommitFailureNonblocking(dir: string): Promise<strin
       week_key: "2026-W56",
       run_dir: ".runs/approve-git-fail",
     });
-    writeAttemptBundle(dir, "approve-git-fail", 1);
+    writeAttemptBundle(dir, "approve-git-fail", 1, { sourceMaterial: true, weekKey: "2026-W56" });
     const replies: string[] = [];
     const plans: GitCommitPlan[] = [];
 
@@ -2094,16 +2360,18 @@ async function runApproveGitCommitFailureNonblocking(dir: string): Promise<strin
     });
 
     const gitEvents = findEventsByJob(db, "approve-git-fail", "git_commit_failed");
+    const manifest = promotedManifest(findEventsByJob(db, "approve-git-fail", "promoted")[0]);
     assert(result.status === "published", "git failure blocked publish");
     assert(requireJob(db, "approve-git-fail").status === "published", "git failure prevented published row");
     assert(findEventsByJob(db, "approve-git-fail", "promoted").length === 1, "git failure skipped promoted event");
+    assert(manifest.files.includes("source-material/manifest.json"), "git failure promoted manifest omitted source-material");
     assert(gitEvents.length === 1, "git failure did not write one git_commit_failed event");
     assert(replies[0]?.includes("Git post-step failed non-blocking"), "git failure note missing from reply");
     assert(plans.length === 1, "fake committer was not called once");
     assertPathBoundedGitPlan(buildGitCommitPlan("reports/2026-W56-ai-trends", "2026-W56"), "reports/2026-W56-ai-trends");
 
     return [
-      "Fake git committer failure was non-blocking: job stayed published and promoted event remained authoritative.",
+      "Fake git committer failure was non-blocking: job stayed published and promoted event remained authoritative with source-material files.",
       "A git_commit_failed event captured diagnostics and fake plan assertions proved path-bounded argv semantics.",
     ];
   } finally {
@@ -2804,7 +3072,7 @@ function runBoundaryStaticCheck(): string[] {
   const scopeMode = assertCycleScopePolicy({
     changed,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice416Scope,
+    activeScope: slice424Scope,
     activeFrozenFiles: botSmokeActiveFrozenFiles,
     activeFrozenDirectories: botSmokeActiveFrozenDirectories,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
@@ -2813,7 +3081,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice412Mode = assertCycleScopePolicy({
     changed: slice412ReportCreateFiles,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice416Scope,
+    activeScope: slice424Scope,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
     inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
   });
@@ -2821,7 +3089,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice413Mode = assertCycleScopePolicy({
     changed: slice413ReportRemindFiles,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice416Scope,
+    activeScope: slice424Scope,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
     inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
   });
@@ -2829,7 +3097,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice414Mode = assertCycleScopePolicy({
     changed: slice414ReportStatusFiles,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice416Scope,
+    activeScope: slice424Scope,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
     inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
   });
@@ -2837,7 +3105,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice415Mode = assertCycleScopePolicy({
     changed: slice415ReportShowFiles,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice416Scope,
+    activeScope: slice424Scope,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
     inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
   });
@@ -2845,7 +3113,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice416Mode = assertCycleScopePolicy({
     changed: slice416ReportListFiles,
     activeTriggerFiles: botSmokeActiveTriggers,
-    activeScope: slice416Scope,
+    activeScope: slice424Scope,
     inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
     inheritedFrozenDirectories: botSmokeInheritedFrozenDirectories,
   });
@@ -2855,7 +3123,7 @@ function runBoundaryStaticCheck(): string[] {
     assertCycleScopePolicy({
       changed: ["scripts/bot-smoke.ts", "src/prompts/bot.md"],
       activeTriggerFiles: botSmokeActiveTriggers,
-      activeScope: slice416Scope,
+      activeScope: slice424Scope,
       activeFrozenFiles: botSmokeActiveFrozenFiles,
       activeFrozenDirectories: botSmokeActiveFrozenDirectories,
       inheritedFrozenFiles: botSmokeInheritedFrozenFiles,
@@ -2868,7 +3136,9 @@ function runBoundaryStaticCheck(): string[] {
 
   const changedSources = changed
     .filter((file) =>
-      file === "src/telegram/bot.ts"
+      file === "src/promote.ts" ||
+      file === "src/lib/readme-publish-destination.ts" ||
+      file === "src/bin/report-publish-readme.ts"
     )
     .map((file) => [file, readChangedSource(file)] as const);
   const forbiddenRuntimePatterns: readonly ForbiddenPattern[] = [
@@ -2894,6 +3164,7 @@ function runBoundaryStaticCheck(): string[] {
 
   return [
     `Cycle-scope boundary check ran in ${scopeMode} mode and saw changed files: ${changed.join(", ") || "<none>"}.`,
+    "Active Slice 4.24 scope admits only promote, bot-smoke evidence, and report-publish-readme implementation/smoke files.",
     "Synthetic Slice 4.12 report:create files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic Slice 4.13 report:remind files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic Slice 4.14 report:status files resolve to inherited-surface mode without a bot-smoke exemption.",
@@ -3038,7 +3309,11 @@ function writeAttemptBundle(
   cwd: string,
   jobId: string,
   attemptNumber: number,
-  options: { omit?: "report.en.md" | "report.zh.md" | "sources.json" | "research" } = {},
+  options: {
+    omit?: "report.en.md" | "report.zh.md" | "sources.json" | "research";
+    sourceMaterial?: boolean;
+    weekKey?: string;
+  } = {},
 ): void {
   const attemptDir = resolve(cwd, ".runs", jobId, `attempt-${attemptNumber}`);
   mkdirSync(attemptDir, { recursive: true });
@@ -3065,6 +3340,77 @@ function writeAttemptBundle(
     writeFileSync(resolve(attemptDir, "research", "brief.md"), `Brief for ${jobId}\n`);
     writeFileSync(resolve(attemptDir, "research", "notes.md"), `Notes for ${jobId}\n`);
   }
+  if (options.sourceMaterial === true) {
+    writeSourceMaterialBundle(attemptDir, jobId, options.weekKey ?? "2026-W18", attemptNumber);
+  }
+}
+
+function writeSourceMaterialBundle(
+  attemptDir: string,
+  jobId: string,
+  weekKey: string,
+  attemptNumber: number,
+): void {
+  const sourceMaterialDir = resolve(attemptDir, "source-material");
+  const operatorDir = resolve(sourceMaterialDir, "operator");
+  mkdirSync(operatorDir, { recursive: true });
+  const operatorPath = resolve(operatorDir, "facts.md");
+  const operatorContent = `Operator fact for ${jobId} attempt ${attemptNumber}.\n`;
+  writeFileSync(operatorPath, operatorContent, "utf8");
+
+  const contextPath = resolve(sourceMaterialDir, "context.md");
+  const context = [
+    `job_id: ${jobId}`,
+    `week_key: ${weekKey}`,
+    `attempt_number: ${attemptNumber}`,
+    "",
+    "Operator fact: source-material promotion smoke copied fact.",
+    "",
+  ].join("\n");
+  writeFileSync(contextPath, context, "utf8");
+
+  const operatorLocalPath = "source-material/operator/facts.md";
+  const contextLocalPath = "source-material/context.md";
+  const manifest = {
+    schemaVersion: 1,
+    kind: "research_source_material",
+    jobId,
+    weekKey,
+    topic: "Topic",
+    locales: ["en", "zh"],
+    attemptNumber,
+    generatedAt: "2026-05-18T00:00:00.000Z",
+    sourceMaterialDir: "source-material",
+    contextPath: contextLocalPath,
+    operatorSource: {
+      present: true,
+      rootPath: `.data/source-material/${jobId}`,
+      totalByteCount: Buffer.byteLength(operatorContent, "utf8"),
+      entries: [operatorLocalPath],
+    },
+    entries: [
+      {
+        id: "generated-job-context",
+        kind: "generated_job_context",
+        localPath: contextLocalPath,
+        byteCount: Buffer.byteLength(context, "utf8"),
+        sha256: shaText(context),
+      },
+      {
+        id: "operator:facts.md",
+        kind: "operator_source",
+        sourcePath: `.data/source-material/${jobId}/facts.md`,
+        localPath: operatorLocalPath,
+        byteCount: Buffer.byteLength(operatorContent, "utf8"),
+        sha256: shaText(operatorContent),
+      },
+    ],
+  };
+  writeFileSync(
+    resolve(sourceMaterialDir, "manifest.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    "utf8",
+  );
 }
 
 function promotedManifest(event: ReturnType<typeof findEventsByJob>[number] | undefined) {
@@ -3115,6 +3461,36 @@ function requireJob(db: DbClient, id: string): Job {
 
 function stableJobSnapshot(job: Job): string {
   return JSON.stringify(job);
+}
+
+function treeSnapshot(root: string): string {
+  if (!existsSync(root)) return "<missing>";
+  const rows: string[] = [];
+  const walk = (current: string, relative: string): void => {
+    const stat = lstatSync(current);
+    if (stat.isSymbolicLink()) {
+      rows.push(`${relative}:symlink:${readlinkSync(current)}`);
+      return;
+    }
+    if (stat.isDirectory()) {
+      rows.push(`${relative}:dir`);
+      for (const entry of readdirSync(current).sort()) {
+        walk(resolve(current, entry), relative.length === 0 ? entry : `${relative}/${entry}`);
+      }
+      return;
+    }
+    rows.push(`${relative}:file:${shaFile(current)}`);
+  };
+  walk(root, "");
+  return rows.join("\n");
+}
+
+function shaFile(filePath: string): string {
+  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+function shaText(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function eventCount(db: DbClient): number {

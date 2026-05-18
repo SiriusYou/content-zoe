@@ -32,6 +32,7 @@ export interface ReadmePublishEntry {
   readonly jobId: string;
   readonly reportPath: string;
   readonly sourcesPath: string;
+  readonly sourceMaterialPath: string;
   readonly aggregateSha256: string;
   readonly updatedAt: string;
 }
@@ -68,6 +69,7 @@ const endMarker = "<!-- content-zoe:published-reports:end -->";
 const safePathPattern = /^[A-Za-z0-9._~/-]+$/;
 const lowercaseSha256Pattern = /^[0-9a-f]{64}$/;
 const aggregatePrefixPattern = /^[0-9a-f]{12}$/;
+const sourceMaterialManifestPath = "source-material/manifest.json";
 
 export function buildReadmePublishEntry(input: {
   readonly cwd: string;
@@ -77,9 +79,11 @@ export function buildReadmePublishEntry(input: {
   const cwd = realpathSync(input.cwd);
   assertManifestShape(input.job, input.manifest);
   const artifactRoot = validateArtifactRoot(cwd, input.manifest.artifact_dir);
+  const sha256 = input.manifest.sha256 as Readonly<Record<string, string>>;
   for (const file of input.manifest.files) {
-    assertSourceFile(cwd, artifactRoot, file);
+    assertSourceFile(cwd, artifactRoot, file, sha256[file]);
   }
+  const sourceMaterialPath = selectSourceMaterialManifestPath(input.manifest);
 
   return {
     weekKey: sanitizeText(input.job.week_key),
@@ -103,6 +107,7 @@ export function buildReadmePublishEntry(input: {
       translated: null,
       fieldName: "sources",
     }),
+    sourceMaterialPath,
     aggregateSha256: input.manifest.aggregate_sha256,
     updatedAt: formatUpdatedAt(input.job.updated_at),
   };
@@ -237,7 +242,12 @@ function validateArtifactRoot(cwd: string, artifactDir: string): string {
   return artifactRoot;
 }
 
-function assertSourceFile(cwd: string, artifactRoot: string, relativePath: string): string {
+function assertSourceFile(
+  cwd: string,
+  artifactRoot: string,
+  relativePath: string,
+  expectedSha256?: string,
+): string {
   if (!isSafeManifestRelativePath(relativePath)) {
     throw new ReadmePublishDestinationError("PUBLISH_MANIFEST_INVALID", "unsafe manifest path");
   }
@@ -254,11 +264,36 @@ function assertSourceFile(cwd: string, artifactRoot: string, relativePath: strin
     if (!stat.isFile()) {
       throw new ReadmePublishDestinationError("PUBLISH_SOURCE_MISSING", "source path is not a file");
     }
+    if (expectedSha256 !== undefined) {
+      const actualSha256 = createHash("sha256").update(readFileSync(absolutePath)).digest("hex");
+      if (actualSha256 !== expectedSha256) {
+        throw new ReadmePublishDestinationError(
+          "PUBLISH_MANIFEST_INVALID",
+          "source path hash mismatch",
+        );
+      }
+    }
   } catch (err) {
     if (err instanceof ReadmePublishDestinationError) throw err;
     throw new ReadmePublishDestinationError("PUBLISH_SOURCE_MISSING", "source path missing", err);
   }
   return absolutePath;
+}
+
+function selectSourceMaterialManifestPath(manifest: PublishManifest): string {
+  const hasSourceMaterialFiles = manifest.files.some(
+    (file) => file === sourceMaterialManifestPath || file.startsWith("source-material/"),
+  );
+  if (!hasSourceMaterialFiles) {
+    return "-";
+  }
+  if (!manifest.files.includes(sourceMaterialManifestPath)) {
+    throw new ReadmePublishDestinationError(
+      "PUBLISH_MANIFEST_INVALID",
+      "source-material manifest missing from promoted manifest",
+    );
+  }
+  return `${manifest.artifact_dir}/${sourceMaterialManifestPath}`;
 }
 
 function selectManifestBackedPath(input: {
@@ -404,7 +439,7 @@ function parseManagedRow(line: string): ReadmePublishEntry | null {
   const trimmed = line.trim();
   if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) return null;
   const cells = splitMarkdownRow(trimmed);
-  if (cells.length !== 7) return null;
+  if (cells.length !== 7 && cells.length !== 8) return null;
   if (cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()))) return null;
   if (cells[0] === "Week" && cells[1] === "Topic") return null;
   if (!isFormatValidJobId(cells[2])) return null;
@@ -414,17 +449,21 @@ function parseManagedRow(line: string): ReadmePublishEntry | null {
   const reportPath = parseLinkCell(cells[3]);
   const sourcesPath = parseLinkCell(cells[4]);
   if (reportPath === null || sourcesPath === null) return null;
-  const aggregate = cells[5].trim();
+  const sourceMaterialPath = cells.length === 8 ? parseOptionalLinkCell(cells[5]) : "-";
+  if (sourceMaterialPath === null) return null;
+  const aggregate = cells[cells.length === 8 ? 6 : 5].trim();
   if (!aggregatePrefixPattern.test(aggregate)) return null;
-  if (!textCellIsSafe(cells[6])) return null;
+  const updatedAt = cells[cells.length === 8 ? 7 : 6];
+  if (!textCellIsSafe(updatedAt)) return null;
   return {
     weekKey: sanitizeText(cells[0]),
     topic: sanitizeText(cells[1]),
     jobId: sanitizeText(cells[2]),
     reportPath,
     sourcesPath,
+    sourceMaterialPath,
     aggregateSha256: aggregate.padEnd(64, "0"),
-    updatedAt: sanitizeText(cells[6]),
+    updatedAt: sanitizeText(updatedAt),
   };
 }
 
@@ -454,6 +493,12 @@ function parseLinkCell(cell: string): string | null {
   return isSafeRepoRelativePath(linkPath) ? linkPath : null;
 }
 
+function parseOptionalLinkCell(cell: string): string | null {
+  const trimmed = cell.trim().toLowerCase();
+  if (trimmed.length === 0 || trimmed === "-" || trimmed === "n/a") return "-";
+  return parseLinkCell(cell);
+}
+
 function renderTable(rows: readonly ReadmePublishEntry[]): string {
   const ordered = [...rows].sort((a, b) => {
     const week = b.weekKey.localeCompare(a.weekKey);
@@ -461,8 +506,8 @@ function renderTable(rows: readonly ReadmePublishEntry[]): string {
     return a.jobId.localeCompare(b.jobId);
   });
   const lines = [
-    "| Week | Topic | Job | Report | Sources | Aggregate | Updated |",
-    "|---|---|---|---|---|---|---|",
+    "| Week | Topic | Job | Report | Sources | Source Material | Aggregate | Updated |",
+    "|---|---|---|---|---|---|---|---|",
     ...ordered.map((row) =>
       `| ${[
         markdownText(row.weekKey),
@@ -470,6 +515,7 @@ function renderTable(rows: readonly ReadmePublishEntry[]): string {
         markdownText(row.jobId),
         renderLinkCell(row.reportPath),
         renderLinkCell(row.sourcesPath),
+        renderLinkCell(row.sourceMaterialPath),
         row.aggregateSha256.slice(0, 12).toLowerCase(),
         markdownText(row.updatedAt),
       ].join(" | ")} |`,

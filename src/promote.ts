@@ -103,6 +103,11 @@ const promotedEventType = "promoted";
 const gitCommitFailedEventType = "git_commit_failed";
 const cleanupFailedEventType = "cleanup_failed";
 const requiredSourceMissingMessage = "publish source bundle is missing or invalid";
+const sourceMaterialDirName = "source-material";
+const sourceMaterialManifestFile = "source-material/manifest.json";
+const sourceMaterialContextFile = "source-material/context.md";
+const sourceMaterialOperatorDir = "source-material/operator";
+const lowercaseSha256Pattern = /^[0-9a-f]{64}$/;
 
 export async function promoteJob(
   options: PromoteJobOptions,
@@ -225,6 +230,8 @@ function readSourceManifest(
     if (listFilesRecursive(cwd, researchDir).length === 0) {
       throw new Error("research directory is empty");
     }
+
+    validateSourceMaterialManifest(cwd, job, sourceAttemptDir);
 
     const files = bundleFilesForSource(cwd, sourceAttemptDir);
     return manifestFromFiles({
@@ -660,7 +667,148 @@ function bundleFilesForSource(cwd: string, sourceAttemptDir: string): string[] {
   for (const file of listFilesRecursive(cwd, resolveUnderDirectory(cwd, sourceAttemptDir, "research"))) {
     files.push(`research/${file}`);
   }
+  const sourceMaterialDir = resolveUnderDirectory(cwd, sourceAttemptDir, sourceMaterialDirName);
+  if (existsSync(sourceMaterialDir)) {
+    for (const file of listFilesRecursive(cwd, sourceMaterialDir)) {
+      files.push(`${sourceMaterialDirName}/${file}`);
+    }
+  }
   return files.sort();
+}
+
+function validateSourceMaterialManifest(
+  cwd: string,
+  job: Job,
+  sourceAttemptDir: string,
+): void {
+  const sourceMaterialDir = resolveUnderDirectory(cwd, sourceAttemptDir, sourceMaterialDirName);
+  if (!existsSync(sourceMaterialDir)) {
+    return;
+  }
+
+  const sourceMaterialStat = lstatSync(sourceMaterialDir);
+  if (sourceMaterialStat.isSymbolicLink() || !sourceMaterialStat.isDirectory()) {
+    throw new Error("source-material is not a directory");
+  }
+
+  const manifestPath = assertRegularSourceMaterialFile(
+    cwd,
+    sourceAttemptDir,
+    sourceMaterialManifestFile,
+    sourceMaterialDirName,
+  );
+  const manifest = readSourceMaterialManifestJson(manifestPath);
+
+  if (manifest.schemaVersion !== 1) {
+    throw new Error("source-material manifest schemaVersion mismatch");
+  }
+  if (manifest.kind !== "research_source_material") {
+    throw new Error("source-material manifest kind mismatch");
+  }
+  if (
+    manifest.jobId !== job.id ||
+    manifest.weekKey !== job.week_key ||
+    manifest.attemptNumber !== job.attempt_number
+  ) {
+    throw new Error("source-material manifest identity mismatch");
+  }
+
+  if (typeof manifest.contextPath !== "string") {
+    throw new Error("source-material manifest contextPath missing");
+  }
+  assertRegularSourceMaterialFile(cwd, sourceAttemptDir, manifest.contextPath, sourceMaterialDirName);
+  assertRegularSourceMaterialFile(cwd, sourceAttemptDir, sourceMaterialContextFile, sourceMaterialDirName);
+
+  const operatorSource = readPlainRecord(
+    manifest.operatorSource,
+    "source-material manifest operatorSource missing",
+  );
+  if (typeof operatorSource.present !== "boolean") {
+    throw new Error("source-material manifest operatorSource.present invalid");
+  }
+  if (!Array.isArray(operatorSource.entries)) {
+    throw new Error("source-material manifest operatorSource.entries invalid");
+  }
+  for (const entryPath of operatorSource.entries) {
+    if (typeof entryPath !== "string") {
+      throw new Error("source-material manifest operatorSource.entries invalid");
+    }
+    assertRegularSourceMaterialFile(cwd, sourceAttemptDir, entryPath, sourceMaterialOperatorDir);
+  }
+
+  if (!Array.isArray(manifest.entries)) {
+    throw new Error("source-material manifest entries invalid");
+  }
+  for (const entry of manifest.entries) {
+    const record = readPlainRecord(entry, "source-material manifest entry invalid");
+    if (record.kind !== "operator_source") {
+      continue;
+    }
+    if (typeof record.localPath !== "string") {
+      throw new Error("source-material manifest operator_source localPath invalid");
+    }
+    if (typeof record.sha256 !== "string" || !lowercaseSha256Pattern.test(record.sha256)) {
+      throw new Error("source-material manifest operator_source sha256 invalid");
+    }
+    const filePath = assertRegularSourceMaterialFile(
+      cwd,
+      sourceAttemptDir,
+      record.localPath,
+      sourceMaterialOperatorDir,
+    );
+    const actualSha = createHash("sha256").update(readFileSync(filePath)).digest("hex");
+    if (actualSha !== record.sha256) {
+      throw new Error("source-material manifest operator_source sha256 mismatch");
+    }
+  }
+}
+
+function readSourceMaterialManifestJson(manifestPath: string): Record<string, unknown> {
+  const parsed = JSON.parse(readFileSync(manifestPath, "utf8"));
+  return readPlainRecord(parsed, "source-material manifest invalid");
+}
+
+function readPlainRecord(value: unknown, message: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(message);
+  }
+  return value as Record<string, unknown>;
+}
+
+function assertRegularSourceMaterialFile(
+  cwd: string,
+  sourceAttemptDir: string,
+  relativePath: string,
+  requiredRoot: string,
+): string {
+  if (!isSafeBundleRelativePath(relativePath) || !isPathInsidePosix(requiredRoot, relativePath)) {
+    throw new Error(`unsafe source-material path: ${relativePath}`);
+  }
+  const filePath = resolveUnderDirectory(cwd, sourceAttemptDir, relativePath);
+  const fileStat = lstatSync(filePath);
+  if (fileStat.isSymbolicLink() || !fileStat.isFile()) {
+    throw new Error(`source-material file is not a regular file: ${relativePath}`);
+  }
+  return filePath;
+}
+
+function isSafeBundleRelativePath(value: string): boolean {
+  if (
+    value.length === 0 ||
+    path.posix.isAbsolute(value) ||
+    value.includes("\\") ||
+    value.includes("://") ||
+    /[\r\n\t]/.test(value)
+  ) {
+    return false;
+  }
+  const segments = value.split("/");
+  return !segments.some((segment) => segment.length === 0 || segment === "." || segment === "..");
+}
+
+function isPathInsidePosix(root: string, candidate: string): boolean {
+  const relative = path.posix.relative(root, candidate);
+  return relative !== "" && !relative.startsWith("../") && relative !== "..";
 }
 
 function manifestFromDirectory(

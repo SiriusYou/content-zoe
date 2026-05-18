@@ -44,9 +44,10 @@ type ScenarioName =
   | "report-publish-readme-invalid-promoted-manifest"
   | "report-publish-readme-source-missing-or-unsafe"
   | "report-publish-readme-append-section"
+  | "report-publish-readme-migrates-existing-rows"
   | "report-publish-readme-replace-section"
   | "report-publish-readme-idempotent"
-  | "report-publish-readme-multi-row-sort-update"
+  | "report-publish-readme-multi-row-preservation"
   | "report-publish-readme-malformed-markers"
   | "report-publish-readme-readme-path-safety"
   | "report-publish-readme-field-safety"
@@ -100,9 +101,10 @@ const SCENARIOS: readonly ScenarioName[] = [
   "report-publish-readme-invalid-promoted-manifest",
   "report-publish-readme-source-missing-or-unsafe",
   "report-publish-readme-append-section",
+  "report-publish-readme-migrates-existing-rows",
   "report-publish-readme-replace-section",
   "report-publish-readme-idempotent",
-  "report-publish-readme-multi-row-sort-update",
+  "report-publish-readme-multi-row-preservation",
   "report-publish-readme-malformed-markers",
   "report-publish-readme-readme-path-safety",
   "report-publish-readme-field-safety",
@@ -119,12 +121,11 @@ const docPath = resolve(repoRoot, "docs", "preflight", "report-publish-readme-sm
 const fixedNow = 1_779_300_000;
 const startMarker = "<!-- content-zoe:published-reports:start -->";
 const endMarker = "<!-- content-zoe:published-reports:end -->";
-const slice420Scope = new Set([
+const slice424ReadmeScope = new Set([
   "src/bin/report-publish-readme.ts",
   "src/lib/readme-publish-destination.ts",
   "scripts/report-publish-readme-smoke.ts",
   "docs/preflight/report-publish-readme-smoke.md",
-  "package.json",
 ]);
 
 async function main(): Promise<number> {
@@ -185,12 +186,14 @@ async function scenarioImpl(name: ScenarioName, dir: string): Promise<string[]> 
       return sourceMissingOrUnsafe(dir);
     case "report-publish-readme-append-section":
       return appendSection(dir);
+    case "report-publish-readme-migrates-existing-rows":
+      return migratesExistingRows(dir);
     case "report-publish-readme-replace-section":
       return replaceSection(dir);
     case "report-publish-readme-idempotent":
       return idempotent(dir);
-    case "report-publish-readme-multi-row-sort-update":
-      return multiRowSortUpdate(dir);
+    case "report-publish-readme-multi-row-preservation":
+      return multiRowPreservation(dir);
     case "report-publish-readme-malformed-markers":
       return malformedMarkers(dir);
     case "report-publish-readme-readme-path-safety":
@@ -291,6 +294,39 @@ async function invalidPromotedManifest(dir: string): Promise<string[]> {
     ["unsafe report path", { primaryReportPath: "../outside.md" }],
     ["report outside artifact_dir", { primaryReportPath: "reports/other/report.en.md" }],
     ["report absent from manifest", { primaryReportPath: "reports/2026-W47-ai-trends/missing.md" }],
+    ["source-material files without manifest", {
+      files: ["report.en.md", "sources.json", "source-material/context.md"],
+    }],
+    ["source-material manifest path mismatch", {
+      files: ["report.en.md", "sources.json", "source-material/manifest-v2.json"],
+    }],
+    ["source-material manifest hash mismatch", {
+      manifestPatch: malformedManifestPatch({
+        sha256: {
+          "report.en.md": "0".repeat(64),
+          "sources.json": "0".repeat(64),
+          "source-material/context.md": "0".repeat(64),
+          "source-material/manifest.json": "0".repeat(64),
+          "source-material/operator/facts.md": "0".repeat(64),
+        },
+        aggregate_sha256: aggregateFor(
+          [
+            "report.en.md",
+            "source-material/context.md",
+            "source-material/manifest.json",
+            "source-material/operator/facts.md",
+            "sources.json",
+          ],
+          {
+            "report.en.md": "0".repeat(64),
+            "sources.json": "0".repeat(64),
+            "source-material/context.md": "0".repeat(64),
+            "source-material/manifest.json": "0".repeat(64),
+            "source-material/operator/facts.md": "0".repeat(64),
+          },
+        ),
+      }),
+    }],
   ];
   const details: string[] = [];
   for (const [label, opts] of variants) {
@@ -383,8 +419,46 @@ async function appendSection(dir: string): Promise<string[]> {
     const readme = readFileSync(resolve(dir, "README.md"), "utf8");
     assert(readme.includes("## Published Reports"), "heading missing");
     assert(readme.includes(startMarker) && readme.includes(endMarker), "markers missing");
+    assert(
+      readme.includes("| Week | Topic | Job | Report | Sources | Source Material | Aggregate | Updated |"),
+      "8-column header missing",
+    );
     assert(readme.includes("| 2026-W47 | AI trends | publish-readme-1 |"), "published row missing");
-    return ["README without markers gets heading, managed section, one row, and byte-exact stdout shape."];
+    assert(
+      readme.includes("[reports/2026-W47-ai-trends/source-material/manifest.json](reports/2026-W47-ai-trends/source-material/manifest.json)"),
+      "source-material manifest link missing",
+    );
+    return ["README without markers gets heading, managed 8-column section, one source-material manifest-backed row, and byte-exact stdout shape."];
+  } finally {
+    fixture.close();
+  }
+}
+
+async function migratesExistingRows(dir: string): Promise<string[]> {
+  const fixture = createPublishedFixture(dir, {});
+  try {
+    writeFileSync(
+      resolve(dir, "README.md"),
+      [
+        "Intro",
+        startMarker,
+        "| Week | Topic | Job | Report | Sources | Aggregate | Updated |",
+        "|---|---|---|---|---|---|---|",
+        "| 2025-W01 | Historical item | old-job | [reports/old/report.en.md](reports/old/report.en.md) | [reports/old/sources.json](reports/old/sources.json) | abcdefabcdef | 2025-01-01T00:00:00.000Z |",
+        endMarker,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const result = await runCli(dir, [fixture.jobId]);
+    assertSuccess(result, "published");
+    const readme = readFileSync(resolve(dir, "README.md"), "utf8");
+    assert(readme.includes("| Week | Topic | Job | Report | Sources | Source Material | Aggregate | Updated |"), "8-column header missing");
+    assert(
+      readme.includes("| 2025-W01 | Historical item | old-job | [reports/old/report.en.md](reports/old/report.en.md) | [reports/old/sources.json](reports/old/sources.json) | - | abcdefabcdef | 2025-01-01T00:00:00.000Z |"),
+      "7-column historical row was not deterministically migrated with empty source material",
+    );
+    return ["Existing 7-column managed rows are deterministically migrated to 8 columns with an empty source-material cell."];
   } finally {
     fixture.close();
   }
@@ -427,7 +501,7 @@ async function idempotent(dir: string): Promise<string[]> {
   }
 }
 
-async function multiRowSortUpdate(dir: string): Promise<string[]> {
+async function multiRowPreservation(dir: string): Promise<string[]> {
   const fixture = createPublishedFixture(dir, {});
   try {
     writeFileSync(
@@ -435,9 +509,9 @@ async function multiRowSortUpdate(dir: string): Promise<string[]> {
       [
         "Intro",
         startMarker,
-        "| Week | Topic | Job | Report | Sources | Aggregate | Updated |",
-        "|---|---|---|---|---|---|---|",
-        "| 2027-W01 | Future item | old-job | [reports/old/report.en.md](reports/old/report.en.md) | - | abcdefabcdef | 2027-01-01T00:00:00.000Z |",
+        "| Week | Topic | Job | Report | Sources | Source Material | Aggregate | Updated |",
+        "|---|---|---|---|---|---|---|---|",
+        "| 2027-W01 | Future item | old-job | [reports/old/report.en.md](reports/old/report.en.md) | - | - | abcdefabcdef | 2027-01-01T00:00:00.000Z |",
         endMarker,
         "",
       ].join("\n"),
@@ -449,8 +523,9 @@ async function multiRowSortUpdate(dir: string): Promise<string[]> {
     assertSuccess(second, "idempotent");
     const readme = readFileSync(resolve(dir, "README.md"), "utf8");
     assert(countOccurrences(readme, "publish-readme-1") === 1, "current job duplicated");
+    assert(countOccurrences(readme, "old-job") === 1, "unrelated historical row was not preserved");
     assert(readme.indexOf("2027-W01") < readme.indexOf("2026-W47"), "week sort order drifted");
-    return ["Historical row is normalized/preserved, current row updates without duplication, and rows sort by week desc/job asc."];
+    return ["Unrelated historical row is preserved, current row updates without duplication, and rows sort by week desc/job asc."];
   } finally {
     fixture.close();
   }
@@ -530,11 +605,11 @@ async function fieldSafety(dir: string): Promise<string[]> {
   try {
     writeFileSync(
       resolve(dir, "README.md"),
-      [
-        startMarker,
-        "| Week | Topic | Job | Report | Sources | Aggregate | Updated |",
-        "|---|---|---|---|---|---|---|",
-        "| 2025-W01 | hostile | hostile-job | [x](https://evil.example/a|b) | [x](../escape.md) | abcdefabcdef | now |",
+        [
+          startMarker,
+        "| Week | Topic | Job | Report | Sources | Source Material | Aggregate | Updated |",
+        "|---|---|---|---|---|---|---|---|",
+        "| 2025-W01 | hostile | hostile-job | [x](https://evil.example/a|b) | [x](../escape.md) | [x](../escape-source-material.json) | abcdefabcdef | now |",
         endMarker,
         "",
       ].join("\n"),
@@ -548,7 +623,7 @@ async function fieldSafety(dir: string): Promise<string[]> {
     assert(!readme.includes("a|b"), "raw hostile pipe survived");
     assert(readme.includes("AI \\| trends with \\[bad\\]\\(evil\\)"), "current topic was not escaped");
     for (const row of readme.split("\n").filter((line) => line.startsWith("| 2026-W47"))) {
-      assert(splitUnescapedPipes(row).length === 9, `current row column count drifted: ${row}`);
+      assert(splitUnescapedPipes(row).length === 10, `current row column count drifted: ${row}`);
     }
     return ["Current fields are escaped and a hostile pre-existing managed row is dropped/normalized, not preserved raw."];
   } finally {
@@ -589,10 +664,11 @@ async function noMutation(dir: string): Promise<string[]> {
 
 function boundaryStaticCheck(): string[] {
   const changed = changedFilesForCurrentCycle(repoRoot);
+  const readmeChanged = changed.filter((file) => slice424ReadmeScope.has(file));
   const scopeMode = assertCycleScopePolicy({
-    changed,
-    activeTriggerFiles: slice420Scope,
-    activeScope: slice420Scope,
+    changed: readmeChanged,
+    activeTriggerFiles: slice424ReadmeScope,
+    activeScope: slice424ReadmeScope,
     activeFrozenFiles: [
       "README.md",
       "PLAN.md",
@@ -672,8 +748,8 @@ function boundaryStaticCheck(): string[] {
   try {
     assertCycleScopePolicy({
       changed: ["src/bin/report-publish-readme.ts", "README.md"],
-      activeTriggerFiles: slice420Scope,
-      activeScope: slice420Scope,
+      activeTriggerFiles: slice424ReadmeScope,
+      activeScope: slice424ReadmeScope,
     });
   } catch (err) {
     syntheticOutOfScopeRejected = String(err).includes("changed files outside declared scope");
@@ -681,7 +757,8 @@ function boundaryStaticCheck(): string[] {
   assert(syntheticOutOfScopeRejected, "synthetic README implementation diff was not rejected");
 
   return [
-    `Cycle-scope boundary check ran in ${scopeMode} mode and saw changed files: ${changed.join(", ") || "<none>"}.`,
+    `README boundary check ran in ${scopeMode} mode over changed README-publish files: ${readmeChanged.join(", ") || "<none>"}.`,
+    `Full cycle changed files were observed separately for the authoritative bot-smoke boundary: ${changed.join(", ") || "<none>"}.`,
     "Synthetic active-slice scope check rejects a real README.md implementation diff.",
     "report-publish-readme.ts has no mutating DB helpers, DB write SQL, other CLI imports, network, Telegram, prompt/LLM, process, git, or preflight/Codex surface.",
     "readme-publish-destination.ts has no DB write SQL, network, Telegram, prompt/LLM, git post-step, or local-delivery receipt/write surface.",
@@ -734,7 +811,13 @@ function createPublishedFixture(
   const attemptNumber = opts.attemptNumber ?? 1;
   const artifactDir = opts.artifactDir ?? "reports/2026-W47-ai-trends";
   const sourceRoot = resolve(dir, artifactDir);
-  const files = opts.files ?? ["report.en.md", "sources.json"];
+  const files = opts.files ?? [
+    "report.en.md",
+    "sources.json",
+    "source-material/context.md",
+    "source-material/manifest.json",
+    "source-material/operator/facts.md",
+  ];
   for (const file of files) {
     const sourceFile = resolve(sourceRoot, file);
     mkdirSync(dirname(sourceFile), { recursive: true });
