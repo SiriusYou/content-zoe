@@ -1,9 +1,9 @@
 # report-run smoke evidence
 
 - Command: `bun run report-run-smoke`
-- Started: 2026-05-17T04:43:10.207Z
-- Finished: 2026-05-17T04:43:10.734Z
-- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-17T04-43-10.207Z (removed by finally-cleanup)
+- Started: 2026-05-18T02:29:37.978Z
+- Finished: 2026-05-18T02:29:38.745Z
+- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-18T02-29-37.978Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
@@ -29,4 +29,13 @@
 | resume-half-bootstrap-reconciliation | PASS | The fixture approximated the Phase 4.35 half-bootstrap class: attempt-2 run-state plus cleanup event, jobs.attempt_number still 1.<br>CLI --resume safely reused attempt-2, reconciled the jobs row, and did not create attempt-3. |
 | resume-state-consistency-classification | PASS | Invalid attemptNumber, malformed recoveryCleanup, and attempt-directory/run-state mismatch failed as resume precondition errors.<br>The attempt-directory/run-state mismatch left jobs.attempt_number and recovery_cleanup events unchanged.<br>A structurally stale jobs row failed as LIFECYCLE_PERSISTENCE_FAILED, not as generic DB_READ_FAILED. |
 | record-stage-enter-guard-preserved | PASS | recordStageEnter still updates only where id and attempt_number match.<br>Attempt-number bootstrapping lives in bootstrapResumeAttemptLifecycle, not in recordStageEnter. |
-| report-run-boundary-static-check | PASS | Approval-label-anchor diff inspected (3016a52b94cacf4cd9f8a42ce47bea19fe7873cd..HEAD plus working tree): docs/preflight/db-smoke.md, docs/preflight/report-run-smoke.md, scripts/db-smoke.ts, scripts/report-run-smoke.ts, src/bin/report-run.ts, src/db.ts.<br>Only Slice 4.22 allowed implementation/evidence files were present in the boundary diff.<br>Static source inspection found the report-run bootstrap call and no hard-out package/schema/provider/prompt surfaces. |
+| report-run-fake-provider-research-match | PASS | DB-backed CLI run staged source-material before research and still matched the fake provider by RESEARCH_PROMPT prefix.<br>The fake provider wrote the same synthetic research/brief.md artifact for the dynamic prompt. |
+| report-run-source-context-staged | PASS | DB-backed report:run created source-material/context.md and parseable manifest.json in attempt-1.<br>Staged context recorded job id, week key, sanitized topic, locales, attempt number, no operator source, and repo context fixtures.<br>Manifest listed generated job context plus CLAUDE.md and PLAN.md repo-context entries before the run completed. |
+| report-run-operator-source-copy | PASS | .data/source-material/<job-id>/nested/facts.md was copied to source-material/operator/nested/facts.md.<br>Manifest listed the copied operator source, and the original operator source file remained unchanged. |
+| report-run-no-operator-source | PASS | Missing optional .data/source-material/<job-id>/ was recorded as absent.<br>The DB-backed fake-provider run completed normally with generated job/repo context only. |
+| report-run-source-file-count-bound | PASS | More than 20 operator source files failed before provider invocation.<br>Failure happened before fake-provider research artifacts, lifecycle stage_enter, or stage_complete.<br>The DB job status/current_stage/attempt_number remained unchanged. |
+| report-run-source-per-file-bound | PASS | A single operator source file over 256 KiB failed before provider invocation.<br>Failure happened before fake-provider research artifacts, lifecycle stage_enter, or stage_complete.<br>The DB job status/current_stage/attempt_number remained unchanged. |
+| report-run-source-total-bound | PASS | Aggregate operator source content over 1 MiB failed before provider invocation.<br>Failure happened before fake-provider research artifacts, lifecycle stage_enter, or stage_complete.<br>The DB job status/current_stage/attempt_number remained unchanged. |
+| report-run-source-symlink-escape | PASS | Symlink escape in operator source material failed before provider invocation.<br>Failure happened before fake-provider research artifacts, lifecycle stage_enter, or stage_complete.<br>The DB job status/current_stage/attempt_number remained unchanged. |
+| report-run-source-carry-forward | PASS | Resume from completed research carried source-material alongside research/ and sources.json.<br>Missing research prompt was never called, preserving Slice 4.22 downstream resume behavior. |
+| report-run-boundary-static-check | PASS | Approval-label-anchor diff inspected (7ace892edc0eec55829cb50391a8b29671f9f788..HEAD plus working tree): docs/preflight/report-run-smoke.md, docs/preflight/research-stage-smoke.md, scripts/report-run-smoke.ts, scripts/research-stage-smoke.ts, src/bin/report-run.ts, src/lib/report-run-fake-provider.ts, src/pipeline/research.ts.<br>Only Slice 4.23 allowed implementation/evidence files were present in the boundary diff.<br>Static source inspection found research buildPrompt, RESEARCH_PROMPT strict-prefix behavior, the bounded fake-provider matcher change, local report-run source staging, and the .data/source-material/<job-id> convention.<br>Static hard-out scan found no package/schema/runtime/provider/downstream prompt/publish/Telegram/governance surfaces in the implementation range. |

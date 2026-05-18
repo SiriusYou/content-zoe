@@ -6,6 +6,7 @@ import {
   readFileSync,
   rmSync,
   rmdirSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import path, { dirname, resolve } from "node:path";
@@ -63,6 +64,15 @@ type ScenarioName =
   | "resume-half-bootstrap-reconciliation"
   | "resume-state-consistency-classification"
   | "record-stage-enter-guard-preserved"
+  | "report-run-fake-provider-research-match"
+  | "report-run-source-context-staged"
+  | "report-run-operator-source-copy"
+  | "report-run-no-operator-source"
+  | "report-run-source-file-count-bound"
+  | "report-run-source-per-file-bound"
+  | "report-run-source-total-bound"
+  | "report-run-source-symlink-escape"
+  | "report-run-source-carry-forward"
   | "report-run-boundary-static-check";
 
 interface ScenarioOutcome {
@@ -96,6 +106,15 @@ const SCENARIOS: ScenarioName[] = [
   "resume-half-bootstrap-reconciliation",
   "resume-state-consistency-classification",
   "record-stage-enter-guard-preserved",
+  "report-run-fake-provider-research-match",
+  "report-run-source-context-staged",
+  "report-run-operator-source-copy",
+  "report-run-no-operator-source",
+  "report-run-source-file-count-bound",
+  "report-run-source-per-file-bound",
+  "report-run-source-total-bound",
+  "report-run-source-symlink-escape",
+  "report-run-source-carry-forward",
   "report-run-boundary-static-check",
 ];
 
@@ -203,6 +222,24 @@ async function scenarioImpl(
       return runResumeStateConsistencyClassification(dir);
     case "record-stage-enter-guard-preserved":
       return runRecordStageEnterGuardPreserved();
+    case "report-run-fake-provider-research-match":
+      return runReportRunFakeProviderResearchMatch(dir);
+    case "report-run-source-context-staged":
+      return runReportRunSourceContextStaged(dir);
+    case "report-run-operator-source-copy":
+      return runReportRunOperatorSourceCopy(dir);
+    case "report-run-no-operator-source":
+      return runReportRunNoOperatorSource(dir);
+    case "report-run-source-file-count-bound":
+      return runReportRunSourceFileCountBound(dir);
+    case "report-run-source-per-file-bound":
+      return runReportRunSourcePerFileBound(dir);
+    case "report-run-source-total-bound":
+      return runReportRunSourceTotalBound(dir);
+    case "report-run-source-symlink-escape":
+      return runReportRunSourceSymlinkEscape(dir);
+    case "report-run-source-carry-forward":
+      return runReportRunSourceCarryForward(dir);
     case "report-run-boundary-static-check":
       return runReportRunBoundaryStaticCheck();
   }
@@ -1160,16 +1197,233 @@ async function runRecordStageEnterGuardPreserved(): Promise<string[]> {
   ];
 }
 
+async function runReportRunFakeProviderResearchMatch(dir: string): Promise<string[]> {
+  const jobId = "source-fake-match";
+  seedJobRow(dir, jobId);
+  writeOperatorSource(dir, jobId, "facts.md", "Operator fact for dynamic fake research prompt.\n");
+
+  const result = runReportRunCli(dir, [jobId, "--locales=en"]);
+  assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
+  const brief = readFileSync(resolve(attemptDir(dir, jobId, 1), "research", "brief.md"), "utf8");
+  assert(brief.includes("Synthetic fake-provider research brief"), "fake provider did not write research brief");
+  assert(existsSync(resolve(attemptDir(dir, jobId, 1), "source-material", "manifest.json")), "missing staged manifest");
+
+  return [
+    "DB-backed CLI run staged source-material before research and still matched the fake provider by RESEARCH_PROMPT prefix.",
+    "The fake provider wrote the same synthetic research/brief.md artifact for the dynamic prompt.",
+  ];
+}
+
+async function runReportRunSourceContextStaged(dir: string): Promise<string[]> {
+  const jobId = "source-context-staged";
+  seedJobRow(dir, jobId);
+
+  const result = runReportRunCli(dir, [jobId, "--locales=en"]);
+  assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
+
+  const sourceDir = resolve(attemptDir(dir, jobId, 1), "source-material");
+  const context = readFileSync(resolve(sourceDir, "context.md"), "utf8");
+  const manifest = readSourceManifest(dir, jobId, 1);
+  assert(context.includes(`job_id: ${jobId}`), "context.md missing job id");
+  assert(context.includes(`week_key: smoke-${jobId}`), "context.md missing week key");
+  assert(context.includes(`topic: Smoke ${jobId}`), "context.md missing sanitized topic");
+  assert(context.includes("locales: en"), "context.md missing locales");
+  assert(context.includes("attempt_number: 1"), "context.md missing attempt number");
+  assert(context.includes("operator_source_directory_present: false"), "context.md missing operator absence");
+  assert(context.includes("CLAUDE.md fixture"), "context.md missing repo CLAUDE fixture");
+  assert(context.includes("PLAN.md fixture"), "context.md missing repo PLAN fixture");
+  assert(Array.isArray(manifest.entries), "manifest entries must be an array");
+  assert(
+    manifest.entries.some((entry) => entry.kind === "generated_job_context"),
+    "manifest missing generated job context entry",
+  );
+  assert(
+    manifest.entries.some((entry) => entry.kind === "repo_context" && entry.sourcePath === "CLAUDE.md"),
+    "manifest missing CLAUDE.md repo context entry",
+  );
+  assert(
+    manifest.entries.some((entry) => entry.kind === "repo_context" && entry.sourcePath === "PLAN.md"),
+    "manifest missing PLAN.md repo context entry",
+  );
+  assert(findAttemptEvents(dir, jobId, 1, "stage_enter").length >= 1, "missing lifecycle stage_enter");
+
+  return [
+    "DB-backed report:run created source-material/context.md and parseable manifest.json in attempt-1.",
+    "Staged context recorded job id, week key, sanitized topic, locales, attempt number, no operator source, and repo context fixtures.",
+    "Manifest listed generated job context plus CLAUDE.md and PLAN.md repo-context entries before the run completed.",
+  ];
+}
+
+async function runReportRunOperatorSourceCopy(dir: string): Promise<string[]> {
+  const jobId = "source-copy";
+  seedJobRow(dir, jobId);
+  const sourcePath = writeOperatorSource(
+    dir,
+    jobId,
+    "nested/facts.md",
+    "Operator source fact remains unchanged.\n",
+  );
+  const before = readFileSync(sourcePath, "utf8");
+
+  const result = runReportRunCli(dir, [jobId, "--locales=en"]);
+  assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
+  const copied = resolve(attemptDir(dir, jobId, 1), "source-material", "operator", "nested", "facts.md");
+  assert(readFileSync(copied, "utf8") === before, "copied operator source content mismatch");
+  assert(readFileSync(sourcePath, "utf8") === before, "operator source file was mutated");
+  const manifest = readSourceManifest(dir, jobId, 1);
+  assert(
+    manifest.operatorSource.present === true,
+    "manifest did not record operator source presence",
+  );
+  assert(
+    manifest.entries.some(
+      (entry) =>
+        entry.kind === "operator_source" &&
+        entry.localPath === "source-material/operator/nested/facts.md",
+    ),
+    "manifest missing copied operator source entry",
+  );
+
+  return [
+    ".data/source-material/<job-id>/nested/facts.md was copied to source-material/operator/nested/facts.md.",
+    "Manifest listed the copied operator source, and the original operator source file remained unchanged.",
+  ];
+}
+
+async function runReportRunNoOperatorSource(dir: string): Promise<string[]> {
+  const jobId = "source-no-operator";
+  seedJobRow(dir, jobId);
+  const result = runReportRunCli(dir, [jobId, "--locales=en"]);
+  assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
+  const manifest = readSourceManifest(dir, jobId, 1);
+  const context = readFileSync(resolve(attemptDir(dir, jobId, 1), "source-material", "context.md"), "utf8");
+  assert(manifest.operatorSource.present === false, "manifest did not record operator source absence");
+  assert(context.includes("operator_source_directory_present: false"), "context did not record operator source absence");
+
+  return [
+    "Missing optional .data/source-material/<job-id>/ was recorded as absent.",
+    "The DB-backed fake-provider run completed normally with generated job/repo context only.",
+  ];
+}
+
+async function runReportRunSourceFileCountBound(dir: string): Promise<string[]> {
+  const jobId = "source-count-bound";
+  seedJobRow(dir, jobId);
+  for (let index = 0; index < 21; index++) {
+    writeOperatorSource(dir, jobId, `file-${index}.md`, `file ${index}\n`);
+  }
+
+  return expectSourceStagingFailure(
+    dir,
+    jobId,
+    "operator source file count exceeds 20",
+    "More than 20 operator source files failed before provider invocation.",
+  );
+}
+
+async function runReportRunSourcePerFileBound(dir: string): Promise<string[]> {
+  const jobId = "source-per-file-bound";
+  seedJobRow(dir, jobId);
+  writeOperatorSource(dir, jobId, "too-large.md", "x".repeat(256 * 1024 + 1));
+
+  return expectSourceStagingFailure(
+    dir,
+    jobId,
+    "operator source file exceeds 262144 bytes",
+    "A single operator source file over 256 KiB failed before provider invocation.",
+  );
+}
+
+async function runReportRunSourceTotalBound(dir: string): Promise<string[]> {
+  const jobId = "source-total-bound";
+  seedJobRow(dir, jobId);
+  for (let index = 0; index < 5; index++) {
+    writeOperatorSource(dir, jobId, `chunk-${index}.md`, "x".repeat(220 * 1024));
+  }
+
+  return expectSourceStagingFailure(
+    dir,
+    jobId,
+    "operator source total exceeds 1048576 bytes",
+    "Aggregate operator source content over 1 MiB failed before provider invocation.",
+  );
+}
+
+async function runReportRunSourceSymlinkEscape(dir: string): Promise<string[]> {
+  const jobId = "source-symlink-escape";
+  seedJobRow(dir, jobId);
+  const sourceRoot = resolve(dir, ".data", "source-material", jobId);
+  mkdirSync(sourceRoot, { recursive: true });
+  const outside = resolve(dir, "outside-source.md");
+  writeFileSync(outside, "outside\n");
+  symlinkSync(outside, resolve(sourceRoot, "escape.md"));
+
+  return expectSourceStagingFailure(
+    dir,
+    jobId,
+    "operator source path must not be a symlink",
+    "Symlink escape in operator source material failed before provider invocation.",
+  );
+}
+
+async function runReportRunSourceCarryForward(dir: string): Promise<string[]> {
+  const jobId = "source-carry-forward";
+  seedJobRow(dir, jobId);
+  const attempt1 = resolve(dir, ".runs", jobId, "attempt-1");
+  mkdirSync(resolve(attempt1, "research"), { recursive: true });
+  mkdirSync(resolve(attempt1, "source-material", "operator"), { recursive: true });
+  writeFileSync(resolve(attempt1, "research", "brief.md"), "brief\n");
+  writeFileSync(resolve(attempt1, "sources.json"), "[]\n");
+  writeFileSync(resolve(attempt1, "source-material", "context.md"), "job_id: source-carry-forward\n");
+  writeFileSync(
+    resolve(attempt1, "source-material", "manifest.json"),
+    `${JSON.stringify({ schemaVersion: 1, entries: [] })}\n`,
+  );
+  writeFileSync(resolve(attempt1, "source-material", "operator", "facts.md"), "carried source\n");
+  writeState(attempt1, {
+    schemaVersion: 1,
+    jobId,
+    attemptNumber: 1,
+    lastStage: Stage.RESEARCH,
+    status: "ok",
+    startedAt: new Date().toISOString(),
+  });
+
+  const result = await runPreparedReportLoop({
+    jobId,
+    locales: ["en", "zh"],
+    provider: providerOmitting([Stage.RESEARCH]),
+    cwd: dir,
+    resume: true,
+  });
+  assert(result.status === "awaiting_approval", `expected awaiting_approval, got ${result.status}`);
+  const state = readState(dir, jobId, 2);
+  assert(
+    state.recoveryCleanup?.carryForward.join(",") === "research,sources.json,source-material",
+    `unexpected carryForward ${state.recoveryCleanup?.carryForward.join(",")}`,
+  );
+  assert(
+    readFileSync(resolve(dir, ".runs", jobId, "attempt-2", "source-material", "operator", "facts.md"), "utf8") === "carried source\n",
+    "source-material was not carried forward",
+  );
+
+  return [
+    "Resume from completed research carried source-material alongside research/ and sources.json.",
+    "Missing research prompt was never called, preserving Slice 4.22 downstream resume behavior.",
+  ];
+}
+
 async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
   const allowed = new Set([
     "src/bin/report-run.ts",
-    "src/db.ts",
+    "src/lib/report-run-fake-provider.ts",
+    "src/pipeline/research.ts",
+    "scripts/research-stage-smoke.ts",
+    "docs/preflight/research-stage-smoke.md",
     "scripts/report-run-smoke.ts",
     "docs/preflight/report-run-smoke.md",
-    "scripts/db-smoke.ts",
-    "docs/preflight/db-smoke.md",
   ]);
-  const anchor = "3016a52b94cacf4cd9f8a42ce47bea19fe7873cd";
+  const anchor = "7ace892edc0eec55829cb50391a8b29671f9f788";
   const committed = gitLines(["diff", "--name-only", `${anchor}..HEAD`]);
   const working = gitLines(["diff", "--name-only", anchor]);
   const names = [...new Set([...committed, ...working])].filter((name) => name.length > 0);
@@ -1178,17 +1432,52 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
   assert(unexpected.length === 0, `unexpected implementation files: ${unexpected.join(",")}`);
 
   const reportRun = readFileSync(resolve(repoRoot, "src", "bin", "report-run.ts"), "utf8");
-  const dbSource = readFileSync(resolve(repoRoot, "src", "db.ts"), "utf8");
-  assert(reportRun.includes("bootstrapResumeAttemptLifecycle"), "report-run does not call DB bootstrap");
-  assert(dbSource.includes("multi-store") === false, "db.ts should not carry governance prose");
-  for (const hardOut of ["package.json", "bun.lock", "src/lib/report-loop.ts", "src/llm/", "src/prompts/", "src/migrations/", "src/telegram/"]) {
+  const research = readFileSync(resolve(repoRoot, "src", "pipeline", "research.ts"), "utf8");
+  const fakeProvider = readFileSync(resolve(repoRoot, "src", "lib", "report-run-fake-provider.ts"), "utf8");
+  assert(reportRun.includes("stageResearchSourceMaterial"), "report-run lacks source staging helper");
+  assert(reportRun.includes('".data",\n    SOURCE_MATERIAL_DIR'), "operator source convention is not .data/source-material/<job-id>");
+  assert(reportRun.includes("attempt.startStage === Stage.RESEARCH"), "source staging is not limited to research starts");
+  assert(research.includes("export function buildResearchPrompt"), "research prompt lacks buildPrompt path");
+  assert(research.includes("return `${RESEARCH_PROMPT}"), "research buildPrompt does not begin with RESEARCH_PROMPT");
+  assert(
+    fakeProvider.includes("prompt.startsWith(STAGES[Stage.RESEARCH].prompt)"),
+    "fake provider research matcher is not strict-prefix compatible",
+  );
+  assert(!fakeProvider.includes("prompt === STAGES[Stage.RESEARCH].prompt"), "fake provider still uses exact research prompt equality");
+  for (const hardOut of [
+    "package.json",
+    "bun.lock",
+    "bun.lockb",
+    "src/db.ts",
+    "src/lib/runtime-config.ts",
+    "src/lib/report-loop.ts",
+    "src/llm/",
+    "src/prompts/",
+    "src/migrations/",
+    "src/telegram/",
+    "src/bin/report-create.ts",
+    "src/bin/report-show.ts",
+    "src/bin/report-events.ts",
+    "src/bin/report-publish-readme.ts",
+    "src/bin/report-deliver-local.ts",
+    "src/pipeline/draft-en.ts",
+    "src/pipeline/edit-en.ts",
+    "src/pipeline/translate-zh.ts",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "PLAN.md",
+    "ROLE_POSITIONING.md",
+    "docs/process/",
+    ".omx/memory-edit/",
+  ]) {
     assert(!names.some((name) => name === hardOut || name.startsWith(hardOut)), `hard-out touched: ${hardOut}`);
   }
 
   return [
     `Approval-label-anchor diff inspected (${anchor}..HEAD plus working tree): ${names.join(", ")}.`,
-    "Only Slice 4.22 allowed implementation/evidence files were present in the boundary diff.",
-    "Static source inspection found the report-run bootstrap call and no hard-out package/schema/provider/prompt surfaces.",
+    "Only Slice 4.23 allowed implementation/evidence files were present in the boundary diff.",
+    "Static source inspection found research buildPrompt, RESEARCH_PROMPT strict-prefix behavior, the bounded fake-provider matcher change, local report-run source staging, and the .data/source-material/<job-id> convention.",
+    "Static hard-out scan found no package/schema/runtime/provider/downstream prompt/publish/Telegram/governance surfaces in the implementation range.",
   ];
 }
 
@@ -1314,6 +1603,80 @@ function writeCarryForwardFiles(attemptDir: string): void {
   writeFileSync(resolve(attemptDir, "report.en.md"), "English report\n");
 }
 
+function writeRepoContextFixture(cwd: string): void {
+  writeFileSync(
+    resolve(cwd, "CLAUDE.md"),
+    "# CLAUDE.md fixture\n\nCLAUDE.md fixture content design context for report-run smoke.\n",
+  );
+  writeFileSync(
+    resolve(cwd, "PLAN.md"),
+    "# PLAN.md fixture\n\nPLAN.md fixture roadmap context for report-run smoke.\n",
+  );
+}
+
+function attemptDir(cwd: string, jobId: string, attemptNumber: number): string {
+  return resolve(cwd, ".runs", jobId, `attempt-${attemptNumber}`);
+}
+
+function writeOperatorSource(
+  cwd: string,
+  jobId: string,
+  relPath: string,
+  content: string,
+): string {
+  const target = resolve(cwd, ".data", "source-material", jobId, relPath);
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, content);
+  return target;
+}
+
+function readSourceManifest(
+  cwd: string,
+  jobId: string,
+  attemptNumber: number,
+): {
+  operatorSource: { present: boolean; entries: string[] };
+  entries: Array<Record<string, string | number | boolean>>;
+} {
+  return JSON.parse(
+    readFileSync(
+      resolve(attemptDir(cwd, jobId, attemptNumber), "source-material", "manifest.json"),
+      "utf8",
+    ),
+  );
+}
+
+function expectSourceStagingFailure(
+  cwd: string,
+  jobId: string,
+  expected: string,
+  detail: string,
+): string[] {
+  const before = readJob(cwd, jobId);
+  const beforeEventCount = allEvents(cwd, jobId).length;
+  const result = runReportRunCli(cwd, [jobId, "--locales=en"]);
+  assert(result.exitCode === 1, `expected source-staging exit 1, got ${result.exitCode}: ${result.stderr}`);
+  assert(
+    result.stderr.includes("source-staging precondition failed") &&
+      result.stderr.includes(expected),
+    `expected source-staging error ${JSON.stringify(expected)}, got ${result.stderr}`,
+  );
+  assert(!existsSync(resolve(attemptDir(cwd, jobId, 1), "research", "brief.md")), "provider was invoked despite source-staging failure");
+  assert(findAttemptEvents(cwd, jobId, 1, "stage_enter").length === 0, "source-staging failure wrote stage_enter event");
+  assert(findAttemptEvents(cwd, jobId, 1, "stage_complete").length === 0, "source-staging failure wrote stage_complete event");
+  assert(allEvents(cwd, jobId).length === beforeEventCount, "source-staging failure wrote DB events");
+  const after = readJob(cwd, jobId);
+  assert(before !== null && after !== null, "missing DB job around source-staging failure");
+  assert(after.status === before.status, "source-staging failure changed job status");
+  assert(after.current_stage === before.current_stage, "source-staging failure changed current stage");
+  assert(after.attempt_number === before.attempt_number, "source-staging failure changed attempt number");
+  return [
+    detail,
+    "Failure happened before fake-provider research artifacts, lifecycle stage_enter, or stage_complete.",
+    "The DB job status/current_stage/attempt_number remained unchanged.",
+  ];
+}
+
 function assertEditedReportMarker(
   cwd: string,
   jobId: string,
@@ -1346,6 +1709,7 @@ function assertTranslatedReportMarker(
 }
 
 function seedJobRow(cwd: string, jobId: string): void {
+  writeRepoContextFixture(cwd);
   const db = openDb(resolve(cwd, ".data", "content.db"));
   try {
     if (findJobById(db, jobId)) return;
@@ -1438,6 +1802,15 @@ function findAttemptEvents(
     return findEventsByJob(db, jobId, type).filter(
       (event) => event.attempt_number === attemptNumber,
     );
+  } finally {
+    db.close();
+  }
+}
+
+function allEvents(cwd: string, jobId: string) {
+  const db = openDb(resolve(cwd, ".data", "content.db"));
+  try {
+    return findEventsByJob(db, jobId);
   } finally {
     db.close();
   }

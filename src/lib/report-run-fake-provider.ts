@@ -41,9 +41,10 @@ class ReportRunFakeProvider extends FakeProvider {
   ): Promise<string> {
     if (
       this.enabledStages.has(Stage.RESEARCH) &&
-      prompt === STAGES[Stage.RESEARCH].prompt
+      prompt.startsWith(STAGES[Stage.RESEARCH].prompt)
     ) {
       writeResearchArtifacts(cwd);
+      return `fake output for ${Stage.RESEARCH}`;
     }
 
     if (
