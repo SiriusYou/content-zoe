@@ -23,7 +23,7 @@ import {
   type DbClient,
 } from "../src/db.ts";
 import { runReportPublishReadmeCli } from "../src/bin/report-publish-readme.ts";
-import type { PublishManifest } from "../src/promote.ts";
+import { promoteJob, type PublishManifest } from "../src/promote.ts";
 import {
   assertCycleScopePolicy,
   assertNoForbiddenPatterns,
@@ -43,6 +43,7 @@ type ScenarioName =
   | "report-publish-readme-missing-promoted-manifest"
   | "report-publish-readme-invalid-promoted-manifest"
   | "report-publish-readme-source-missing-or-unsafe"
+  | "report-publish-readme-promote-composition"
   | "report-publish-readme-append-section"
   | "report-publish-readme-migrates-existing-rows"
   | "report-publish-readme-replace-section"
@@ -100,6 +101,7 @@ const SCENARIOS: readonly ScenarioName[] = [
   "report-publish-readme-missing-promoted-manifest",
   "report-publish-readme-invalid-promoted-manifest",
   "report-publish-readme-source-missing-or-unsafe",
+  "report-publish-readme-promote-composition",
   "report-publish-readme-append-section",
   "report-publish-readme-migrates-existing-rows",
   "report-publish-readme-replace-section",
@@ -184,6 +186,8 @@ async function scenarioImpl(name: ScenarioName, dir: string): Promise<string[]> 
       return invalidPromotedManifest(dir);
     case "report-publish-readme-source-missing-or-unsafe":
       return sourceMissingOrUnsafe(dir);
+    case "report-publish-readme-promote-composition":
+      return promoteComposition(dir);
     case "report-publish-readme-append-section":
       return appendSection(dir);
     case "report-publish-readme-migrates-existing-rows":
@@ -292,8 +296,11 @@ async function invalidPromotedManifest(dir: string): Promise<string[]> {
     }],
     ["aggregate mismatch", { manifestPatch: { aggregate_sha256: "a".repeat(64) } }],
     ["unsafe report path", { primaryReportPath: "../outside.md" }],
-    ["report outside artifact_dir", { primaryReportPath: "reports/other/report.en.md" }],
+    ["report outside artifact-or-attempt roots", { primaryReportPath: "reports/other/report.en.md" }],
     ["report absent from manifest", { primaryReportPath: "reports/2026-W47-ai-trends/missing.md" }],
+    ["attempt-local report absent from manifest", {
+      primaryReportPath: ".runs/publish-readme-1/attempt-1/missing.md",
+    }],
     ["source-material files without manifest", {
       files: ["report.en.md", "sources.json", "source-material/context.md"],
     }],
@@ -404,6 +411,102 @@ async function sourceMissingOrUnsafe(dir: string): Promise<string[]> {
     }
   }
   return details;
+}
+
+async function promoteComposition(dir: string): Promise<string[]> {
+  const db = openDb(resolve(dir, ".data", "content.db"));
+  const jobId = "2026-W52-ai-trends";
+  const weekKey = "2026-W52";
+  const attemptNumber = 1;
+  const runDir = `.runs/${jobId}`;
+  const attemptRoot = `${runDir}/attempt-${attemptNumber}`;
+  const artifactDir = `reports/${weekKey}-ai-trends`;
+  try {
+    insertJob(db, {
+      id: jobId,
+      week_key: weekKey,
+      topic: "AI trends composition",
+      locales: "en,zh",
+      attempt_number: attemptNumber,
+      status: "awaiting_approval",
+      current_stage: "approval",
+      run_dir: runDir,
+      artifact_dir: null,
+      primary_report_path: `${attemptRoot}/report.en.md`,
+      translated_report_path: `${attemptRoot}/report.zh.md`,
+      sources_path: `${attemptRoot}/sources.json`,
+      approval_summary: "approve manifest-authority composition",
+      created_at: fixedNow,
+      updated_at: fixedNow,
+    });
+    writePromoteAttemptBundle(dir, {
+      attemptNumber,
+      jobId,
+      weekKey,
+    });
+
+    let now = fixedNow + 10;
+    const promoted = await promoteJob({
+      db,
+      cwd: dir,
+      jobId,
+      attemptNumber,
+      now: () => now++,
+    });
+    assert(promoted.status === "published", "real promote did not publish composition fixture");
+    assert(promoted.artifactDir === artifactDir, "promote artifact_dir drifted");
+
+    const job = findJobById(db, jobId);
+    assert(job !== null, "published job row missing");
+    assert(job.status === "published", "job row was not published");
+    assert(job.artifact_dir === artifactDir, "job artifact_dir was not committed");
+    assert(job.primary_report_path === `${attemptRoot}/report.en.md`, "primary report metadata was not preserved as attempt-local");
+    assert(job.translated_report_path === `${attemptRoot}/report.zh.md`, "translated report metadata was not preserved as attempt-local");
+    assert(job.sources_path === `${attemptRoot}/sources.json`, "sources metadata was not preserved as attempt-local");
+
+    const promotedEvents = findEventsByJob(db, jobId, "promoted");
+    assert(promotedEvents.length === 1, "real promote did not write exactly one promoted event");
+    const manifest = promotedManifestFromPayload(promotedEvents[0]?.payload);
+    assert(manifest.artifact_dir === artifactDir, "promoted manifest artifact_dir drifted");
+    assert(manifest.files.includes("report.zh.md"), "promoted manifest missing translated report");
+    assert(manifest.files.includes("sources.json"), "promoted manifest missing sources");
+    assert(manifest.files.includes("source-material/manifest.json"), "promoted manifest missing source-material manifest");
+    assertManifestHashes(dir, manifest);
+
+    const first = await runCli(dir, [jobId]);
+    assertSuccess(first, "published");
+    const firstRecord = parseRecord(first.stdout);
+    assert(firstRecord.report === `${artifactDir}/report.zh.md`, `README report link was not manifest-backed translated report: ${firstRecord.report}`);
+    assert(firstRecord.sources === `${artifactDir}/sources.json`, `README sources link was not manifest-backed: ${firstRecord.sources}`);
+    const before = readFileSync(resolve(dir, "README.md"), "utf8");
+    const row = before.split("\n").find((line) => line.includes(`| ${weekKey} |`) && line.includes(`| ${jobId} |`));
+    assert(row !== undefined, "README managed row missing promoted composition job");
+    assert(splitUnescapedPipes(row).length === 10, `composition row is not 8-column: ${row}`);
+    assert(
+      row.includes(`[${artifactDir}/report.zh.md](${artifactDir}/report.zh.md)`),
+      "README row did not link manifest-backed translated report",
+    );
+    assert(
+      row.includes(`[${artifactDir}/sources.json](${artifactDir}/sources.json)`),
+      "README row did not link manifest-backed sources",
+    );
+    assert(
+      row.includes(`[${artifactDir}/source-material/manifest.json](${artifactDir}/source-material/manifest.json)`),
+      "README row did not link manifest-backed source-material manifest",
+    );
+
+    const second = await runCli(dir, [jobId]);
+    assertSuccess(second, "idempotent");
+    assert(readFileSync(resolve(dir, "README.md"), "utf8") === before, "composition publish was not idempotent");
+
+    return [
+      "Real promote output preserved .runs/... job-row report/source metadata while committing a published row and promoted manifest.",
+      "report:publish-readme normalized attempt-local hints to manifest-relative tails and emitted 8-column manifest-backed report, sources, and source-material links.",
+      "Promoted manifest hashes matched final bundle bytes and the second README publish was byte-idempotent, closing unit-fixtures-passing-while-cross-cli-composition-fails at N=1.",
+    ];
+  } finally {
+    db.close();
+  }
 }
 
 async function appendSection(dir: string): Promise<string[]> {
@@ -894,6 +997,124 @@ function manifestFor(opts: {
   };
 }
 
+function promotedManifestFromPayload(payload: string | null | undefined): PublishManifest {
+  assert(payload !== null && payload !== undefined, "promoted event payload missing");
+  const parsed = JSON.parse(payload) as { publish_manifest?: PublishManifest };
+  assert(parsed.publish_manifest !== undefined, "promoted event payload missing publish_manifest");
+  return parsed.publish_manifest;
+}
+
+function assertManifestHashes(cwd: string, manifest: PublishManifest): void {
+  for (const file of manifest.files) {
+    const actual = shaFile(resolve(cwd, manifest.artifact_dir, file));
+    assert(manifest.sha256[file] === actual, `manifest hash mismatch for ${file}`);
+  }
+  assert(
+    aggregateFor(manifest.files, manifest.sha256) === manifest.aggregate_sha256,
+    "manifest aggregate digest mismatch",
+  );
+}
+
+function writePromoteAttemptBundle(
+  cwd: string,
+  opts: {
+    readonly attemptNumber: number;
+    readonly jobId: string;
+    readonly weekKey: string;
+  },
+): void {
+  const attemptDir = resolve(cwd, ".runs", opts.jobId, `attempt-${opts.attemptNumber}`);
+  mkdirSync(attemptDir, { recursive: true });
+  writeFileSync(
+    resolve(attemptDir, "report.en.md"),
+    `# Report EN\n\nSynthetic en report for ${opts.jobId} attempt ${opts.attemptNumber}.\n`,
+    "utf8",
+  );
+  writeFileSync(
+    resolve(attemptDir, "report.zh.md"),
+    `# Report ZH\n\nSynthetic zh report for ${opts.jobId} attempt ${opts.attemptNumber}.\n`,
+    "utf8",
+  );
+  writeFileSync(
+    resolve(attemptDir, "sources.json"),
+    `${JSON.stringify([{ title: "Local source", jobId: opts.jobId, attemptNumber: opts.attemptNumber }])}\n`,
+    "utf8",
+  );
+  mkdirSync(resolve(attemptDir, "research"), { recursive: true });
+  writeFileSync(resolve(attemptDir, "research", "brief.md"), `Brief for ${opts.jobId}\n`, "utf8");
+  writeFileSync(resolve(attemptDir, "research", "notes.md"), `Notes for ${opts.jobId}\n`, "utf8");
+  writePromoteSourceMaterialBundle(attemptDir, opts);
+}
+
+function writePromoteSourceMaterialBundle(
+  attemptDir: string,
+  opts: {
+    readonly attemptNumber: number;
+    readonly jobId: string;
+    readonly weekKey: string;
+  },
+): void {
+  const sourceMaterialDir = resolve(attemptDir, "source-material");
+  const operatorDir = resolve(sourceMaterialDir, "operator");
+  mkdirSync(operatorDir, { recursive: true });
+
+  const operatorLocalPath = "source-material/operator/facts.md";
+  const operatorContent = `Operator fact for ${opts.jobId} attempt ${opts.attemptNumber}.\n`;
+  writeFileSync(resolve(operatorDir, "facts.md"), operatorContent, "utf8");
+
+  const contextLocalPath = "source-material/context.md";
+  const context = [
+    `job_id: ${opts.jobId}`,
+    `week_key: ${opts.weekKey}`,
+    `attempt_number: ${opts.attemptNumber}`,
+    "",
+    "Operator fact: README publish composition smoke copied source material.",
+    "",
+  ].join("\n");
+  writeFileSync(resolve(sourceMaterialDir, "context.md"), context, "utf8");
+
+  const manifest = {
+    schemaVersion: 1,
+    kind: "research_source_material",
+    jobId: opts.jobId,
+    weekKey: opts.weekKey,
+    topic: "AI trends composition",
+    locales: ["en", "zh"],
+    attemptNumber: opts.attemptNumber,
+    generatedAt: "2026-05-19T00:00:00.000Z",
+    sourceMaterialDir: "source-material",
+    contextPath: contextLocalPath,
+    operatorSource: {
+      present: true,
+      rootPath: `.data/source-material/${opts.jobId}`,
+      totalByteCount: Buffer.byteLength(operatorContent, "utf8"),
+      entries: [operatorLocalPath],
+    },
+    entries: [
+      {
+        id: "generated-job-context",
+        kind: "generated_job_context",
+        localPath: contextLocalPath,
+        byteCount: Buffer.byteLength(context, "utf8"),
+        sha256: shaText(context),
+      },
+      {
+        id: "operator:facts.md",
+        kind: "operator_source",
+        sourcePath: `.data/source-material/${opts.jobId}/facts.md`,
+        localPath: operatorLocalPath,
+        byteCount: Buffer.byteLength(operatorContent, "utf8"),
+        sha256: shaText(operatorContent),
+      },
+    ],
+  };
+  writeFileSync(
+    resolve(sourceMaterialDir, "manifest.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    "utf8",
+  );
+}
+
 function assertSuccess(result: CliResult, status: "published" | "idempotent"): void {
   assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
   assert(result.stderr === "", `success wrote stderr: ${result.stderr}`);
@@ -998,6 +1219,10 @@ function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {
 
 function shaFile(filePath: string): string {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+function shaText(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function aggregateFor(

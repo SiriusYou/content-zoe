@@ -94,6 +94,8 @@ export function buildReadmePublishEntry(input: {
       artifactRoot,
       artifactDir: input.manifest.artifact_dir,
       files: input.manifest.files,
+      jobId: input.job.id,
+      attemptNumber: input.job.attempt_number,
       primary: input.job.primary_report_path,
       translated: input.job.translated_report_path,
       fieldName: "report",
@@ -103,6 +105,8 @@ export function buildReadmePublishEntry(input: {
       artifactRoot,
       artifactDir: input.manifest.artifact_dir,
       files: input.manifest.files,
+      jobId: input.job.id,
+      attemptNumber: input.job.attempt_number,
       primary: input.job.sources_path,
       translated: null,
       fieldName: "sources",
@@ -301,6 +305,8 @@ function selectManifestBackedPath(input: {
   readonly artifactRoot: string;
   readonly artifactDir: string;
   readonly files: readonly string[];
+  readonly jobId: string;
+  readonly attemptNumber: number;
   readonly primary: string | null;
   readonly translated: string | null;
   readonly fieldName: string;
@@ -313,13 +319,19 @@ function selectManifestBackedPath(input: {
       `${input.fieldName} path is unsafe`,
     );
   }
-  if (!isInsidePosix(input.artifactDir, selected)) {
+  const manifestRelative = manifestRelativePathFromHint({
+    artifactDir: input.artifactDir,
+    attemptNumber: input.attemptNumber,
+    fieldName: input.fieldName,
+    jobId: input.jobId,
+    selected,
+  });
+  if (!isSafeManifestRelativePath(manifestRelative)) {
     throw new ReadmePublishDestinationError(
       "PUBLISH_MANIFEST_INVALID",
-      `${input.fieldName} path is outside artifact_dir`,
+      `${input.fieldName} path is unsafe`,
     );
   }
-  const manifestRelative = path.posix.relative(input.artifactDir, selected);
   if (!input.files.includes(manifestRelative)) {
     throw new ReadmePublishDestinationError(
       "PUBLISH_MANIFEST_INVALID",
@@ -327,7 +339,35 @@ function selectManifestBackedPath(input: {
     );
   }
   assertSourceFile(input.cwd, input.artifactRoot, manifestRelative);
-  return selected;
+  return `${input.artifactDir}/${manifestRelative}`;
+}
+
+function manifestRelativePathFromHint(input: {
+  readonly artifactDir: string;
+  readonly attemptNumber: number;
+  readonly fieldName: string;
+  readonly jobId: string;
+  readonly selected: string;
+}): string {
+  if (isInsidePosix(input.artifactDir, input.selected)) {
+    return path.posix.relative(input.artifactDir, input.selected);
+  }
+
+  const attemptRoot = canonicalAttemptRoot(input.jobId, input.attemptNumber);
+  if (attemptRoot !== null && isInsidePosix(attemptRoot, input.selected)) {
+    return path.posix.relative(attemptRoot, input.selected);
+  }
+
+  throw new ReadmePublishDestinationError(
+    "PUBLISH_MANIFEST_INVALID",
+    `${input.fieldName} path is outside artifact_dir or attempt root`,
+  );
+}
+
+function canonicalAttemptRoot(jobId: string, attemptNumber: number): string | null {
+  if (!Number.isSafeInteger(attemptNumber) || attemptNumber < 1) return null;
+  const attemptRoot = `.runs/${jobId}/attempt-${attemptNumber}`;
+  return isSafeRepoRelativePath(attemptRoot) ? attemptRoot : null;
 }
 
 function resolveReadmePath(cwd: string, readmePath: string | undefined): string {
