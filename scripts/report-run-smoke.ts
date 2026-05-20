@@ -1230,27 +1230,25 @@ async function runReportRunSourceContextStaged(dir: string): Promise<string[]> {
   assert(context.includes("locales: en"), "context.md missing locales");
   assert(context.includes("attempt_number: 1"), "context.md missing attempt number");
   assert(context.includes("operator_source_directory_present: false"), "context.md missing operator absence");
-  assert(context.includes("CLAUDE.md fixture"), "context.md missing repo CLAUDE fixture");
-  assert(context.includes("PLAN.md fixture"), "context.md missing repo PLAN fixture");
+  assert(!context.includes("CLAUDE.md fixture"), "context.md leaked repo CLAUDE fixture");
+  assert(!context.includes("PLAN.md fixture"), "context.md leaked repo PLAN fixture");
+  assert(!context.includes("## Repo Context"), "context.md leaked repo context section");
+  assert(!context.includes("APPROVE-WITH"), "context.md leaked review verdict language");
   assert(Array.isArray(manifest.entries), "manifest entries must be an array");
   assert(
     manifest.entries.some((entry) => entry.kind === "generated_job_context"),
     "manifest missing generated job context entry",
   );
   assert(
-    manifest.entries.some((entry) => entry.kind === "repo_context" && entry.sourcePath === "CLAUDE.md"),
-    "manifest missing CLAUDE.md repo context entry",
-  );
-  assert(
-    manifest.entries.some((entry) => entry.kind === "repo_context" && entry.sourcePath === "PLAN.md"),
-    "manifest missing PLAN.md repo context entry",
+    !manifest.entries.some((entry) => entry.kind === "repo_context"),
+    "manifest must not include repo_context entries",
   );
   assert(findAttemptEvents(dir, jobId, 1, "stage_enter").length >= 1, "missing lifecycle stage_enter");
 
   return [
     "DB-backed report:run created source-material/context.md and parseable manifest.json in attempt-1.",
-    "Staged context recorded job id, week key, sanitized topic, locales, attempt number, no operator source, and repo context fixtures.",
-    "Manifest listed generated job context plus CLAUDE.md and PLAN.md repo-context entries before the run completed.",
+    "Staged context recorded job id, week key, sanitized topic, locales, attempt number, and no operator source, while excluding repo context fixtures.",
+    "Manifest listed generated job context and no repo_context entries before the run completed.",
   ];
 }
 
@@ -1302,7 +1300,7 @@ async function runReportRunNoOperatorSource(dir: string): Promise<string[]> {
 
   return [
     "Missing optional .data/source-material/<job-id>/ was recorded as absent.",
-    "The DB-backed fake-provider run completed normally with generated job/repo context only.",
+    "The DB-backed fake-provider run completed normally with generated job context only.",
   ];
 }
 
@@ -1423,9 +1421,11 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
     "scripts/report-run-smoke.ts",
     "docs/preflight/report-run-smoke.md",
   ]);
-  const anchor = "7ace892edc0eec55829cb50391a8b29671f9f788";
+  const anchor = "32ad4486cd2cb3b88db4f782abc38d231ffe9b70";
   const committed = gitLines(["diff", "--name-only", `${anchor}..HEAD`]);
-  const working = gitLines(["diff", "--name-only", anchor]);
+  const working = gitLines(["diff", "--name-only", anchor]).filter(
+    (name) => name !== "README.md" && !name.startsWith("reports/"),
+  );
   const names = [...new Set([...committed, ...working])].filter((name) => name.length > 0);
   assert(names.length > 0, "boundary check was vacuous: no implementation files detected");
   const unexpected = names.filter((name) => !allowed.has(name));
@@ -1437,6 +1437,9 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
   assert(reportRun.includes("stageResearchSourceMaterial"), "report-run lacks source staging helper");
   assert(reportRun.includes('".data",\n    SOURCE_MATERIAL_DIR'), "operator source convention is not .data/source-material/<job-id>");
   assert(reportRun.includes("attempt.startStage === Stage.RESEARCH"), "source staging is not limited to research starts");
+  assert(!reportRun.includes("REPO_CONTEXT_FILES"), "report-run still has repo context allowlist");
+  assert(!reportRun.includes("readRepoContextEntries"), "report-run still has repo context staging helper");
+  assert(!reportRun.includes('kind: "repo_context"'), "report-run still emits repo_context manifest entries");
   assert(research.includes("export function buildResearchPrompt"), "research prompt lacks buildPrompt path");
   assert(research.includes("return `${RESEARCH_PROMPT}"), "research buildPrompt does not begin with RESEARCH_PROMPT");
   assert(
@@ -1474,9 +1477,9 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
   }
 
   return [
-    `Approval-label-anchor diff inspected (${anchor}..HEAD plus working tree): ${names.join(", ")}.`,
-    "Only Slice 4.23 allowed implementation/evidence files were present in the boundary diff.",
-    "Static source inspection found research buildPrompt, RESEARCH_PROMPT strict-prefix behavior, the bounded fake-provider matcher change, local report-run source staging, and the .data/source-material/<job-id> convention.",
+    `Approval-label-anchor diff inspected (${anchor}..HEAD plus implementation working files, excluding pre-existing README/reports runtime evidence): ${names.join(", ")}.`,
+    "Only Slice 4.26 allowed implementation/evidence files were present in the boundary diff.",
+    "Static source inspection found local report-run source staging, the .data/source-material/<job-id> convention, and no automatic repo-context code path.",
     "Static hard-out scan found no package/schema/runtime/provider/downstream prompt/publish/Telegram/governance surfaces in the implementation range.",
   ];
 }

@@ -116,8 +116,6 @@ const OPERATOR_SOURCE_SUBDIR = "operator";
 const OPERATOR_SOURCE_FILE_MAX = 20;
 const OPERATOR_SOURCE_PER_FILE_MAX_BYTES = 256 * 1024;
 const OPERATOR_SOURCE_TOTAL_MAX_BYTES = 1024 * 1024;
-const REPO_CONTEXT_TOTAL_MAX_BYTES = 256 * 1024;
-const REPO_CONTEXT_FILES = ["CLAUDE.md", "PLAN.md"] as const;
 const defaultFsOps: FileSystemOps = {
   cpSync,
   mkdirSync,
@@ -306,16 +304,6 @@ export interface StageResearchSourceMaterialOptions {
   attemptNumber: number;
 }
 
-interface RepoContextEntry {
-  sourcePath: string;
-  localPath: string;
-  content: string;
-  byteCount: number;
-  originalByteCount: number;
-  sha256: string;
-  excerptPolicy: "full" | string;
-}
-
 interface OperatorSourceEntry {
   sourcePath: string;
   localPath: string;
@@ -340,16 +328,6 @@ type SourceManifestEntry =
       localPath: string;
       byteCount: number;
       sha256: string;
-    }
-  | {
-      id: string;
-      kind: "repo_context";
-      sourcePath: string;
-      localPath: string;
-      byteCount: number;
-      originalByteCount: number;
-      sha256: string;
-      excerptPolicy: string;
     }
   | {
       id: string;
@@ -381,7 +359,6 @@ export function stageResearchSourceMaterial(
   );
   assertPathInsideRoot(operatorSourceRoot, cwd, "operator source root");
 
-  const repoContextEntries = readRepoContextEntries(cwd);
   const operatorSource = collectOperatorSourceFiles({
     cwd,
     operatorSourceRoot,
@@ -401,16 +378,6 @@ export function stageResearchSourceMaterial(
   const manifestPath = path.resolve(sourceMaterialDir, SOURCE_MATERIAL_MANIFEST);
   const contextLocalPath = `${SOURCE_MATERIAL_DIR}/${SOURCE_MATERIAL_CONTEXT}`;
   const manifestEntriesWithoutContext: SourceManifestEntry[] = [
-    ...repoContextEntries.map<SourceManifestEntry>((entry) => ({
-      id: `repo-context:${entry.sourcePath}`,
-      kind: "repo_context",
-      sourcePath: entry.sourcePath,
-      localPath: entry.localPath,
-      byteCount: entry.byteCount,
-      originalByteCount: entry.originalByteCount,
-      sha256: entry.sha256,
-      excerptPolicy: entry.excerptPolicy,
-    })),
     ...operatorSource.entries.map<SourceManifestEntry>((entry) => ({
       id: `operator:${entry.relativePath}`,
       kind: "operator_source",
@@ -427,7 +394,6 @@ export function stageResearchSourceMaterial(
     locales: opts.locales,
     attemptNumber: opts.attemptNumber,
     operatorSource,
-    repoContextEntries,
     entries: manifestEntriesWithoutContext,
   });
   writeFileSync(contextPath, context);
@@ -460,58 +426,6 @@ export function stageResearchSourceMaterial(
     entries: [contextEntry, ...manifestEntriesWithoutContext],
   };
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-}
-
-function readRepoContextEntries(cwd: string): RepoContextEntry[] {
-  let remaining = REPO_CONTEXT_TOTAL_MAX_BYTES;
-  const entries: RepoContextEntry[] = [];
-
-  REPO_CONTEXT_FILES.forEach((sourcePath, index) => {
-    const absPath = path.resolve(cwd, sourcePath);
-    if (!existsSync(absPath)) {
-      entries.push({
-        sourcePath,
-        localPath: `${SOURCE_MATERIAL_DIR}/${SOURCE_MATERIAL_CONTEXT}`,
-        content: `[repo context file missing: ${sourcePath}]\n`,
-        byteCount: Buffer.byteLength(`[repo context file missing: ${sourcePath}]\n`),
-        originalByteCount: 0,
-        sha256: sha256Text(`[repo context file missing: ${sourcePath}]\n`),
-        excerptPolicy: "missing-file-recorded",
-      });
-      return;
-    }
-
-    const realPath = realpathSync(absPath);
-    assertPathInsideRoot(realPath, cwd, `repo context ${sourcePath}`);
-    const stat = lstatSync(absPath);
-    if (!stat.isFile()) {
-      throw sourceStagingPrecondition(
-        `repo context path is not a regular file: ${sourcePath}`,
-      );
-    }
-
-    const buffer = readFileSync(realPath);
-    const filesLeft = REPO_CONTEXT_FILES.length - index;
-    const allowance = Math.max(0, Math.floor(remaining / filesLeft));
-    const selected =
-      buffer.byteLength <= allowance ? buffer : buffer.subarray(0, allowance);
-    remaining -= selected.byteLength;
-    const content = selected.toString("utf8");
-    entries.push({
-      sourcePath,
-      localPath: `${SOURCE_MATERIAL_DIR}/${SOURCE_MATERIAL_CONTEXT}`,
-      content,
-      byteCount: selected.byteLength,
-      originalByteCount: buffer.byteLength,
-      sha256: sha256Buffer(selected),
-      excerptPolicy:
-        selected.byteLength === buffer.byteLength
-          ? "full"
-          : `first ${selected.byteLength} bytes of ${buffer.byteLength}`,
-    });
-  });
-
-  return entries;
 }
 
 function collectOperatorSourceFiles(params: {
@@ -667,7 +581,6 @@ function buildSourceMaterialContext(params: {
   locales: readonly Locale[];
   attemptNumber: number;
   operatorSource: OperatorSourceCollection;
-  repoContextEntries: readonly RepoContextEntry[];
   entries: readonly SourceManifestEntry[];
 }): string {
   const operatorEntries =
@@ -685,17 +598,6 @@ function buildSourceMaterialContext(params: {
       : params.entries
           .map((entry) => `- ${entry.kind}: ${entry.localPath}`)
           .join("\n") + "\n";
-  const repoSections = params.repoContextEntries
-    .map(
-      (entry) => `## Repo Context: ${entry.sourcePath}
-
-Source path: ${entry.sourcePath}
-Attempt-local path: ${entry.localPath}
-Excerpt policy: ${entry.excerptPolicy}
-
-${entry.content}`,
-    )
-    .join("\n\n");
 
   return `# Research Source Material
 
@@ -717,7 +619,6 @@ ${stagedEntries}
 ## Operator Source Files
 
 ${operatorEntries}
-${repoSections}
 `;
 }
 
