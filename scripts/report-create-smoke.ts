@@ -32,6 +32,9 @@ import {
 
 type ScenarioName =
   | "report-create-parse-success"
+  | "report-create-purpose-production"
+  | "report-create-purpose-validation"
+  | "report-create-purpose-invalid-or-missing"
   | "report-create-default-locales"
   | "report-create-en-only-locales"
   | "report-create-week-validation"
@@ -58,6 +61,9 @@ interface CliResult {
 
 const SCENARIOS: ScenarioName[] = [
   "report-create-parse-success",
+  "report-create-purpose-production",
+  "report-create-purpose-validation",
+  "report-create-purpose-invalid-or-missing",
   "report-create-default-locales",
   "report-create-en-only-locales",
   "report-create-week-validation",
@@ -73,56 +79,61 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const isoStamp = new Date().toISOString().replaceAll(":", "-");
 const smokeRoot = resolve(tmpdir(), `cz-report-create-smoke-${isoStamp}`);
 const docPath = resolve(repoRoot, "docs", "preflight", "report-create-smoke.md");
-const slice416Scope = new Set([
+const slice427Scope = new Set([
   "src/db.ts",
-  "src/lib/report-loop.ts",
-  "src/bin/report-run.ts",
-  "scripts/db-smoke.ts",
-  "docs/preflight/db-smoke.md",
-  "scripts/report-run-smoke.ts",
-  "docs/preflight/report-run-smoke.md",
-  "src/bin/report-list.ts",
-  "scripts/report-list-smoke.ts",
-  "docs/preflight/report-list-smoke.md",
-  "src/bin/report-show.ts",
-  "scripts/report-show-smoke.ts",
-  "docs/preflight/report-show-smoke.md",
-  "package.json",
-  "scripts/report-status-smoke.ts",
-  "docs/preflight/report-status-smoke.md",
-  "scripts/report-remind-smoke.ts",
-  "docs/preflight/report-remind-smoke.md",
-  "scripts/bot-smoke.ts",
-  "docs/preflight/bot-smoke.md",
+  "src/migrations/0002_jobs_purpose.sql",
+  "src/bin/report-create.ts",
   "scripts/report-create-smoke.ts",
   "docs/preflight/report-create-smoke.md",
+  "src/bin/report-publish-readme.ts",
+  "src/lib/readme-publish-destination.ts",
+  "scripts/report-publish-readme-smoke.ts",
+  "docs/preflight/report-publish-readme-smoke.md",
+  "scripts/db-smoke.ts",
+  "docs/preflight/db-smoke.md",
 ]);
 const reportCreateActiveTriggers = new Set([
+  "src/db.ts",
+  "src/migrations/0002_jobs_purpose.sql",
   "src/bin/report-create.ts",
-  "src/security/sanitize.ts",
-  "scripts/lib/static-guardrails.ts",
   "scripts/report-create-smoke.ts",
   "docs/preflight/report-create-smoke.md",
 ]);
 const reportCreateActiveFrozenFiles = [
+  "README.md",
+  "AGENTS.md",
+  "CLAUDE.md",
+  "PLAN.md",
+  "ROLE_POSITIONING.md",
+  "TODOS.md",
   "bun.lock",
   "bun.lockb",
-  "src/bin/report-create.ts",
+  "package.json",
+  "src/migrations/0001_initial.sql",
+  "src/bin/report-run.ts",
   "src/bin/report-remind.ts",
   "src/bin/report-status.ts",
+  "src/bin/report-show.ts",
+  "src/bin/report-list.ts",
+  "src/bin/report-events.ts",
+  "src/bin/report-deliver-local.ts",
+  "src/bin/report-delivery-status.ts",
   "src/security/sanitize.ts",
   "src/promote.ts",
   "src/preflight.ts",
+  "src/lib/report-loop.ts",
+  "src/lib/runtime-config.ts",
+  "src/lib/report-run-fake-provider.ts",
 ];
 const reportCreateActiveFrozenDirectories = [
   "src/telegram/",
-  "src/migrations/",
   "src/pipeline/",
   "src/llm/",
   "src/prompts/",
+  "docs/process/",
+  ".omx/memory-edit/",
 ];
 const reportCreateInheritedFrozenFiles = [
-  "src/bin/report-create.ts",
   "src/security/sanitize.ts",
 ];
 const reportCreateStaticCheckTokens = [
@@ -190,6 +201,12 @@ async function scenarioImpl(
   switch (name) {
     case "report-create-parse-success":
       return runParseSuccess(dir);
+    case "report-create-purpose-production":
+      return runPurposeProduction(dir);
+    case "report-create-purpose-validation":
+      return runPurposeValidation(dir);
+    case "report-create-purpose-invalid-or-missing":
+      return runPurposeInvalidOrMissing(dir);
     case "report-create-default-locales":
       return runDefaultLocales(dir);
     case "report-create-en-only-locales":
@@ -217,10 +234,13 @@ async function runParseSuccess(dir: string): Promise<string[]> {
     "2026-W17",
     "--topic",
     "AI trends",
+    "--purpose",
+    "production",
   ]);
   assert(parsed.weekKey === "2026-W17", "week key parse drifted");
   assert(parsed.rawTopic === "AI trends", "topic parse drifted");
   assert(parsed.locales === "en,zh", "default locales parse drifted");
+  assert(parsed.purpose === "production", "purpose parse drifted");
   assert(buildReportJobId(parsed.weekKey) === "2026-W17-ai-trends", "job ID drifted");
 
   const result = await runCli(dir, [
@@ -228,6 +248,8 @@ async function runParseSuccess(dir: string): Promise<string[]> {
     "2026-W17",
     "--topic",
     "AI trends",
+    "--purpose",
+    "production",
   ]);
   assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
   assert(result.stdout === "2026-W17-ai-trends\n", `unexpected stdout ${JSON.stringify(result.stdout)}`);
@@ -237,6 +259,7 @@ async function runParseSuccess(dir: string): Promise<string[]> {
   assert(job.week_key === "2026-W17", "stored week_key drifted");
   assert(job.topic === "AI trends", "stored topic drifted");
   assert(job.status === "queued", "status was not queued");
+  assert(job.purpose === "production", "purpose was not production");
   assert(job.current_stage === "research", "current_stage was not research");
   assert(job.attempt_number === 1, "attempt_number was not 1");
   assert(job.run_dir === ".runs/2026-W17-ai-trends", "run_dir future path drifted");
@@ -246,7 +269,74 @@ async function runParseSuccess(dir: string): Promise<string[]> {
   return [
     "Space-separated CLI grammar parsed --week and --topic with default locales.",
     "CLI stdout was exactly the deterministic job ID.",
-    "DB row stored queued/research attempt-1 with run_dir as a future path string.",
+    "DB row stored purpose=production plus queued/research attempt-1 with run_dir as a future path string.",
+  ];
+}
+
+async function runPurposeProduction(dir: string): Promise<string[]> {
+  const result = await runCli(dir, [
+    "--week",
+    "2026-W27",
+    "--topic",
+    "Production purpose",
+    "--purpose",
+    "production",
+  ]);
+  assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
+  const job = requireJob(dir, "2026-W27-ai-trends");
+  assert(job.purpose === "production", `expected production, got ${job.purpose}`);
+  return ["--purpose production created a row with jobs.purpose=production."];
+}
+
+async function runPurposeValidation(dir: string): Promise<string[]> {
+  const result = await runCli(dir, [
+    "--week",
+    "2026-W28",
+    "--topic",
+    "Validation purpose",
+    "--purpose",
+    "validation",
+  ]);
+  assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
+  const job = requireJob(dir, "2026-W28-ai-trends");
+  assert(job.purpose === "validation", `expected validation, got ${job.purpose}`);
+  return ["--purpose validation created a row with jobs.purpose=validation."];
+}
+
+async function runPurposeInvalidOrMissing(dir: string): Promise<string[]> {
+  const missing = await runCli(dir, [
+    "--week",
+    "2026-W29",
+    "--topic",
+    "Missing purpose",
+  ]);
+  assert(missing.exitCode !== 0, "missing purpose exited 0");
+  assert(missing.stdout === "", "missing purpose wrote stdout");
+  assert(
+    missing.stderr === "INVALID_PURPOSE: --purpose required\n",
+    `missing purpose stderr drifted: ${JSON.stringify(missing.stderr)}`,
+  );
+  assert(!existsSync(resolve(dir, ".data")), "missing purpose created .data");
+
+  const invalid = await runCli(dir, [
+    "--week",
+    "2026-W30",
+    "--topic",
+    "Invalid purpose",
+    "--purpose",
+    "staging",
+  ]);
+  assert(invalid.exitCode !== 0, "invalid purpose exited 0");
+  assert(invalid.stdout === "", "invalid purpose wrote stdout");
+  assert(
+    invalid.stderr === "INVALID_PURPOSE: staging\n",
+    `invalid purpose stderr drifted: ${JSON.stringify(invalid.stderr)}`,
+  );
+  assert(!existsSync(resolve(dir, ".data")), "invalid purpose created .data");
+
+  return [
+    "Omitting --purpose failed with INVALID_PURPOSE before DB creation.",
+    "Invalid purpose values failed with INVALID_PURPOSE before DB creation.",
   ];
 }
 
@@ -256,6 +346,8 @@ async function runDefaultLocales(dir: string): Promise<string[]> {
     "2026-W18",
     "--topic",
     "Default locales",
+    "--purpose",
+    "production",
   ]);
   assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
   const job = requireJob(dir, "2026-W18-ai-trends");
@@ -273,6 +365,8 @@ async function runEnOnlyLocales(dir: string): Promise<string[]> {
     "English only",
     "--locales",
     "en",
+    "--purpose",
+    "production",
   ]);
   assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
   const job = requireJob(dir, "2026-W19-ai-trends");
@@ -285,6 +379,8 @@ async function runEnOnlyLocales(dir: string): Promise<string[]> {
     "Bad locales",
     "--locales",
     "zh",
+    "--purpose",
+    "production",
   ]);
   assert(badLocales.exitCode !== 0, "invalid locales exited 0");
   assert(badLocales.stdout === "", "invalid locales wrote stdout");
@@ -299,19 +395,19 @@ async function runEnOnlyLocales(dir: string): Promise<string[]> {
 async function runWeekValidation(dir: string): Promise<string[]> {
   const valid = ["2026-W01", "2026-W17", "2026-W53"];
   for (const week of valid) {
-    const parsed = parseReportCreateArgs(["--week", week, "--topic", "Topic"]);
+    const parsed = parseReportCreateArgs(["--week", week, "--topic", "Topic", "--purpose", "production"]);
     assert(parsed.weekKey === week, `valid week failed: ${week}`);
   }
 
   const invalid = ["2026-W00", "2026-W54", "2026-w17", "26-W17", "2026-W1"];
   for (const week of invalid) {
-    const result = await runCli(dir, ["--week", week, "--topic", "Topic"]);
+    const result = await runCli(dir, ["--week", week, "--topic", "Topic", "--purpose", "production"]);
     assert(result.exitCode !== 0, `${week} unexpectedly passed`);
     assert(result.stdout === "", `${week} wrote stdout`);
     assert(result.stderr.includes(`INVALID_WEEK: ${week}`), `${week} stderr drifted: ${result.stderr}`);
   }
 
-  const equalsForm = await runCli(dir, ["--week=2026-W17", "--topic", "Topic"]);
+  const equalsForm = await runCli(dir, ["--week=2026-W17", "--topic", "Topic", "--purpose", "production"]);
   assert(equalsForm.exitCode !== 0, "equals-form week unexpectedly passed");
   assert(
     equalsForm.stderr.includes("UNKNOWN_FLAG: --week=2026-W17"),
@@ -336,6 +432,8 @@ async function runTopicSanitization(dir: string): Promise<string[]> {
     "2026-W21",
     "--topic",
     "  system prompt\nAI | trends <now>  ",
+    "--purpose",
+    "production",
   ]);
   assert(result.exitCode === 0, `expected exit 0, got ${result.exitCode}: ${result.stderr}`);
   const job = requireJob(dir, "2026-W21-ai-trends");
@@ -348,7 +446,7 @@ async function runTopicSanitization(dir: string): Promise<string[]> {
 }
 
 async function runInvalidTopic(dir: string): Promise<string[]> {
-  const empty = await runCli(dir, ["--week", "2026-W22", "--topic", "<<< system prompt >>>"]);
+  const empty = await runCli(dir, ["--week", "2026-W22", "--topic", "<<< system prompt >>>", "--purpose", "production"]);
   assert(empty.exitCode !== 0, "empty sanitized topic exited 0");
   assert(empty.stdout === "", "empty sanitized topic wrote stdout");
   assert(empty.stderr.includes("INVALID_TOPIC: empty"), `unexpected empty stderr ${empty.stderr}`);
@@ -358,6 +456,8 @@ async function runInvalidTopic(dir: string): Promise<string[]> {
     "2026-W23",
     "--topic",
     "a".repeat(161),
+    "--purpose",
+    "production",
   ]);
   assert(tooLong.exitCode !== 0, "too-long topic exited 0");
   assert(tooLong.stderr.includes("INVALID_TOPIC: too_long"), `unexpected too-long stderr ${tooLong.stderr}`);
@@ -375,6 +475,8 @@ async function runDuplicateWeek(dir: string): Promise<string[]> {
     "2026-W24",
     "--topic",
     "Original",
+    "--purpose",
+    "production",
   ]);
   assert(first.exitCode === 0, `initial create failed: ${first.stderr}`);
   const before = requireJob(dir, "2026-W24-ai-trends");
@@ -384,6 +486,8 @@ async function runDuplicateWeek(dir: string): Promise<string[]> {
     "2026-W24",
     "--topic",
     "Replacement",
+    "--purpose",
+    "validation",
   ]);
   assert(second.exitCode !== 0, "duplicate create exited 0");
   assert(second.stdout === "", "duplicate create wrote stdout");
@@ -417,6 +521,8 @@ async function runForceRejected(dir: string): Promise<string[]> {
     "2026-W25",
     "--topic",
     "Force",
+    "--purpose",
+    "production",
     "--force",
   ]);
   assert(result.exitCode !== 0, "--force exited 0");
@@ -435,12 +541,15 @@ async function runNoFilesystemTouch(dir: string): Promise<string[]> {
     "2026-W26",
     "--topic",
     "No filesystem touch",
+    "--purpose",
+    "production",
   ]);
   assert(result.exitCode === 0, `create failed: ${result.stderr}`);
   assert(existsSync(resolve(dir, ".data", "content.db")), ".data/content.db was not created");
   assert(!existsSync(resolve(dir, ".runs")), "report:create created .runs");
   assert(!existsSync(resolve(dir, "reports")), "report:create created reports");
   const job = requireJob(dir, "2026-W26-ai-trends");
+  assert(job.purpose === "production", "purpose was not stored on no-filesystem-touch create");
   assert(job.run_dir === ".runs/2026-W26-ai-trends", "run_dir future path missing");
 
   return [
@@ -450,11 +559,13 @@ async function runNoFilesystemTouch(dir: string): Promise<string[]> {
 }
 
 function runBoundaryStaticCheck(): string[] {
-  const changed = changedFilesForCurrentCycle(repoRoot);
+  const changed = changedFilesForCurrentCycle(repoRoot).filter(
+    (file) => !isFrozenValidationEvidence(file),
+  );
   const scopeMode = assertCycleScopePolicy({
     changed,
     activeTriggerFiles: reportCreateActiveTriggers,
-    activeScope: slice416Scope,
+    activeScope: slice427Scope,
     activeFrozenFiles: reportCreateActiveFrozenFiles,
     activeFrozenDirectories: reportCreateActiveFrozenDirectories,
     inheritedFrozenFiles: reportCreateInheritedFrozenFiles,
@@ -464,7 +575,7 @@ function runBoundaryStaticCheck(): string[] {
     assertCycleScopePolicy({
       changed: ["scripts/report-create-smoke.ts", "src/telegram/bot.ts"],
       activeTriggerFiles: reportCreateActiveTriggers,
-      activeScope: slice416Scope,
+      activeScope: slice427Scope,
       activeFrozenFiles: reportCreateActiveFrozenFiles,
       activeFrozenDirectories: reportCreateActiveFrozenDirectories,
       inheritedFrozenFiles: reportCreateInheritedFrozenFiles,
@@ -483,7 +594,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice413ReportRemindMode = assertCycleScopePolicy({
     changed: slice413ReportRemindFiles,
     activeTriggerFiles: reportCreateActiveTriggers,
-    activeScope: slice416Scope,
+    activeScope: slice427Scope,
     activeFrozenFiles: reportCreateActiveFrozenFiles,
     activeFrozenDirectories: reportCreateActiveFrozenDirectories,
     inheritedFrozenFiles: reportCreateInheritedFrozenFiles,
@@ -499,7 +610,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice414ReportStatusMode = assertCycleScopePolicy({
     changed: slice414ReportStatusFiles,
     activeTriggerFiles: reportCreateActiveTriggers,
-    activeScope: slice416Scope,
+    activeScope: slice427Scope,
     activeFrozenFiles: reportCreateActiveFrozenFiles,
     activeFrozenDirectories: reportCreateActiveFrozenDirectories,
     inheritedFrozenFiles: reportCreateInheritedFrozenFiles,
@@ -515,7 +626,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice415ReportShowMode = assertCycleScopePolicy({
     changed: slice415ReportShowFiles,
     activeTriggerFiles: reportCreateActiveTriggers,
-    activeScope: slice416Scope,
+    activeScope: slice427Scope,
     activeFrozenFiles: reportCreateActiveFrozenFiles,
     activeFrozenDirectories: reportCreateActiveFrozenDirectories,
     inheritedFrozenFiles: reportCreateInheritedFrozenFiles,
@@ -531,7 +642,7 @@ function runBoundaryStaticCheck(): string[] {
   const slice416ReportListMode = assertCycleScopePolicy({
     changed: slice416ReportListFiles,
     activeTriggerFiles: reportCreateActiveTriggers,
-    activeScope: slice416Scope,
+    activeScope: slice427Scope,
     activeFrozenFiles: reportCreateActiveFrozenFiles,
     activeFrozenDirectories: reportCreateActiveFrozenDirectories,
     inheritedFrozenFiles: reportCreateInheritedFrozenFiles,
@@ -558,7 +669,19 @@ function runBoundaryStaticCheck(): string[] {
   assert(packageJson.devDependencies?.["@types/bun"] === "^1.1.13", "@types/bun devDependency drifted");
 
   const createSource = readRepoSource(repoRoot, "src/bin/report-create.ts");
+  const dbSource = readRepoSource(repoRoot, "src/db.ts");
+  const migrationSource = readRepoSource(repoRoot, "src/migrations/0002_jobs_purpose.sql");
   const sanitizerSource = readRepoSource(repoRoot, "src/security/sanitize.ts");
+  assert(
+    !/DEFAULT\s+['"]production['"]/i.test(`${migrationSource}\n${dbSource}\n${createSource}`),
+    "purpose must not default to production",
+  );
+  assert(createSource.includes('"--purpose"'), "report:create must expose --purpose");
+  assert(createSource.includes('"INVALID_PURPOSE"'), "report:create must reject invalid purpose");
+  assert(
+    createSource.indexOf("parseReportCreateArgs(opts.argv)") < createSource.indexOf("createReportJob({ cwd: opts.cwd"),
+    "report:create must parse and validate purpose before createReportJob",
+  );
   assertNoForbiddenPatterns(createSource, [
     ...PROCESS_SPAWN_PATTERNS,
     ...TELEGRAM_SDK_NETWORK_PATTERNS,
@@ -594,6 +717,7 @@ function runBoundaryStaticCheck(): string[] {
     "Synthetic Slice 4.15 report:show files resolve to inherited-surface mode without a report-create-smoke exemption.",
     "Synthetic Slice 4.16 report:list files resolve to inherited-surface mode without a report-create-smoke exemption.",
     "package.json preserves report:create/report-create-smoke, report:remind/report-remind-smoke, report:status/report-status-smoke, and adds report:show/report-show-smoke plus report:list/report-list-smoke with dependency sets unchanged.",
+    "report:create static checks found --purpose parsing, INVALID_PURPOSE rejection, no DEFAULT production, and parse-before-create ordering.",
     "report-create.ts and sanitize.ts avoid report-run/report-show, Telegram, promote, pipeline, LLM, prompt, preflight, process, and network surfaces.",
   ];
 }
@@ -626,6 +750,13 @@ function requireJob(cwd: string, jobId: string): Job {
   } finally {
     db.close();
   }
+}
+
+function isFrozenValidationEvidence(file: string): boolean {
+  return (
+    file.startsWith("reports/2026-W22-ai-trends/") ||
+    file.startsWith("reports/2026-W23-ai-trends/")
+  );
 }
 
 function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {

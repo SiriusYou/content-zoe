@@ -5,6 +5,7 @@ import {
   buildReadmePublishEntry,
   publishReadmeDestination,
   ReadmePublishDestinationError,
+  type ReadmePublishJobPurpose,
   type ReadmePublishJobRow,
   type ReadmePublishResult,
 } from "../lib/readme-publish-destination.ts";
@@ -20,9 +21,15 @@ interface PromotedEventRow {
   readonly payload: string | null;
 }
 
+interface JobPurposeRow {
+  readonly id: string;
+  readonly purpose: string | null;
+}
+
 interface SqliteDatabase {
   query<T, Params extends readonly unknown[]>(sql: string): {
     get(...params: Params): T | null;
+    all(...params: Params): T[];
   };
   close(): void;
 }
@@ -47,6 +54,7 @@ export type ReportPublishReadmeResult =
 export type ReportPublishReadmeErrorCode =
   | "INVALID_COMMAND"
   | "UNKNOWN_JOB"
+  | "JOB_NOT_PRODUCTION"
   | "JOB_NOT_PUBLISHED"
   | "PUBLISH_MANIFEST_MISSING"
   | "PUBLISH_MANIFEST_INVALID"
@@ -90,6 +98,7 @@ export async function getReportPublishReadme(
 
   let job: ReadmePublishJobRow;
   let event: PromotedEventRow | null | undefined;
+  let jobPurposes = new Map<string, ReadmePublishJobPurpose | string | null>();
   let db: SqliteDatabase | undefined;
   try {
     db = await openReadonlyDatabase(dbPath);
@@ -101,6 +110,7 @@ export async function getReportPublishReadme(
           topic,
           attempt_number,
           status,
+          purpose,
           artifact_dir,
           primary_report_path,
           translated_report_path,
@@ -116,6 +126,9 @@ export async function getReportPublishReadme(
       throw new ReportPublishReadmeError("UNKNOWN_JOB", opts.args.jobId);
     }
     job = row;
+    if (job.purpose !== "production") {
+      throw new ReportPublishReadmeError("JOB_NOT_PRODUCTION", job.id);
+    }
     if (job.status !== "published") {
       throw new ReportPublishReadmeError("JOB_NOT_PUBLISHED", job.id);
     }
@@ -135,6 +148,13 @@ export async function getReportPublishReadme(
         LIMIT 1
       `)
       .get(job.id, job.attempt_number);
+
+    jobPurposes = new Map(
+      db
+        .query<JobPurposeRow, []>("SELECT id, purpose FROM jobs")
+        .all()
+        .map((purposeRow) => [purposeRow.id, purposeRow.purpose]),
+    );
   } catch (err) {
     if (err instanceof ReportPublishReadmeError) throw err;
     throw new ReportPublishReadmeError("DB_READ_FAILED", formatThrown(err), err);
@@ -155,6 +175,7 @@ export async function getReportPublishReadme(
       cwd: opts.cwd,
       entry,
       readmePath: opts.readmePath,
+      jobPurposes,
     }),
   };
 }

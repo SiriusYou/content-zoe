@@ -111,6 +111,7 @@ export interface Job {
   locales: "en" | "en,zh";
   attempt_number: number;
   status: string;
+  purpose: JobPurpose | null;
   current_stage: string;
   run_dir: string | null;
   artifact_dir: string | null;
@@ -128,6 +129,8 @@ export interface Job {
   created_at: number;
   updated_at: number;
 }
+
+export type JobPurpose = "production" | "validation";
 
 export interface Event {
   id: number;
@@ -148,6 +151,7 @@ export type NewJob = Pick<
       | "locales"
       | "attempt_number"
       | "run_dir"
+      | "purpose"
       | "artifact_dir"
       | "primary_report_path"
       | "translated_report_path"
@@ -171,6 +175,7 @@ export type JobPatch = Partial<
     | "locales"
     | "attempt_number"
     | "status"
+    | "purpose"
     | "current_stage"
     | "run_dir"
     | "artifact_dir"
@@ -249,6 +254,7 @@ const jobPatchColumns = [
   "locales",
   "attempt_number",
   "status",
+  "purpose",
   "current_stage",
   "run_dir",
   "artifact_dir",
@@ -389,12 +395,12 @@ export function insertJob(db: DbClient, input: NewJob): Job {
     db.query(`
       INSERT INTO jobs (
         id, week_key, topic, locales, attempt_number, status, current_stage,
-        run_dir, artifact_dir, primary_report_path, translated_report_path,
+        purpose, run_dir, artifact_dir, primary_report_path, translated_report_path,
         sources_path, approval_summary, as_of, reject_scope, reject_type,
         reject_reason, notified_at, last_notify_error, error, created_at, updated_at
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?
       )
@@ -406,6 +412,7 @@ export function insertJob(db: DbClient, input: NewJob): Job {
       input.attempt_number ?? 1,
       input.status,
       input.current_stage,
+      input.purpose ?? null,
       input.run_dir ?? null,
       input.artifact_dir ?? null,
       input.primary_report_path ?? null,

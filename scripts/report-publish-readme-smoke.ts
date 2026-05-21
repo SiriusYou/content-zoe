@@ -39,6 +39,8 @@ type ScenarioName =
   | "report-publish-readme-missing-db"
   | "report-publish-readme-invalid-command"
   | "report-publish-readme-unknown-job"
+  | "report-publish-readme-validation-current-rejected"
+  | "report-publish-readme-null-current-rejected"
   | "report-publish-readme-job-not-published"
   | "report-publish-readme-missing-promoted-manifest"
   | "report-publish-readme-invalid-promoted-manifest"
@@ -48,6 +50,9 @@ type ScenarioName =
   | "report-publish-readme-migrates-existing-rows"
   | "report-publish-readme-replace-section"
   | "report-publish-readme-idempotent"
+  | "report-publish-readme-validation-row-self-heal"
+  | "report-publish-readme-unknown-row-hard-hold"
+  | "report-publish-readme-null-row-hard-hold"
   | "report-publish-readme-multi-row-preservation"
   | "report-publish-readme-malformed-markers"
   | "report-publish-readme-readme-path-safety"
@@ -86,6 +91,7 @@ interface FixtureOptions {
   readonly jobId: string;
   readonly manifestPatch: Partial<PublishManifest>;
   readonly primaryReportPath: string | null;
+  readonly purpose: "production" | "validation" | null;
   readonly skipEvent: boolean;
   readonly sourcesPath: string | null;
   readonly status: string;
@@ -97,6 +103,8 @@ const SCENARIOS: readonly ScenarioName[] = [
   "report-publish-readme-missing-db",
   "report-publish-readme-invalid-command",
   "report-publish-readme-unknown-job",
+  "report-publish-readme-validation-current-rejected",
+  "report-publish-readme-null-current-rejected",
   "report-publish-readme-job-not-published",
   "report-publish-readme-missing-promoted-manifest",
   "report-publish-readme-invalid-promoted-manifest",
@@ -106,6 +114,9 @@ const SCENARIOS: readonly ScenarioName[] = [
   "report-publish-readme-migrates-existing-rows",
   "report-publish-readme-replace-section",
   "report-publish-readme-idempotent",
+  "report-publish-readme-validation-row-self-heal",
+  "report-publish-readme-unknown-row-hard-hold",
+  "report-publish-readme-null-row-hard-hold",
   "report-publish-readme-multi-row-preservation",
   "report-publish-readme-malformed-markers",
   "report-publish-readme-readme-path-safety",
@@ -123,11 +134,18 @@ const docPath = resolve(repoRoot, "docs", "preflight", "report-publish-readme-sm
 const fixedNow = 1_779_300_000;
 const startMarker = "<!-- content-zoe:published-reports:start -->";
 const endMarker = "<!-- content-zoe:published-reports:end -->";
-const slice424ReadmeScope = new Set([
+const slice427Scope = new Set([
+  "src/db.ts",
+  "src/migrations/0002_jobs_purpose.sql",
+  "src/bin/report-create.ts",
+  "scripts/report-create-smoke.ts",
+  "docs/preflight/report-create-smoke.md",
   "src/bin/report-publish-readme.ts",
   "src/lib/readme-publish-destination.ts",
   "scripts/report-publish-readme-smoke.ts",
   "docs/preflight/report-publish-readme-smoke.md",
+  "scripts/db-smoke.ts",
+  "docs/preflight/db-smoke.md",
 ]);
 
 async function main(): Promise<number> {
@@ -178,6 +196,10 @@ async function scenarioImpl(name: ScenarioName, dir: string): Promise<string[]> 
       return invalidCommand(dir);
     case "report-publish-readme-unknown-job":
       return unknownJob(dir);
+    case "report-publish-readme-validation-current-rejected":
+      return validationCurrentRejected(dir);
+    case "report-publish-readme-null-current-rejected":
+      return nullCurrentRejected(dir);
     case "report-publish-readme-job-not-published":
       return jobNotPublished(dir);
     case "report-publish-readme-missing-promoted-manifest":
@@ -196,6 +218,12 @@ async function scenarioImpl(name: ScenarioName, dir: string): Promise<string[]> 
       return replaceSection(dir);
     case "report-publish-readme-idempotent":
       return idempotent(dir);
+    case "report-publish-readme-validation-row-self-heal":
+      return validationRowSelfHeal(dir);
+    case "report-publish-readme-unknown-row-hard-hold":
+      return unknownRowHardHold(dir);
+    case "report-publish-readme-null-row-hard-hold":
+      return nullRowHardHold(dir);
     case "report-publish-readme-multi-row-preservation":
       return multiRowPreservation(dir);
     case "report-publish-readme-malformed-markers":
@@ -250,6 +278,36 @@ async function unknownJob(dir: string): Promise<string[]> {
     return ["Unknown job exits 1 with stable UNKNOWN_JOB stderr and no README mutation."];
   } finally {
     db.close();
+  }
+}
+
+async function validationCurrentRejected(dir: string): Promise<string[]> {
+  const fixture = createPublishedFixture(dir, { purpose: "validation" });
+  try {
+    writeFileSync(resolve(dir, "README.md"), "# Existing README\n", "utf8");
+    const before = readFileSync(resolve(dir, "README.md"), "utf8");
+    const result = await runCli(dir, [fixture.jobId]);
+    assertFailurePrefix(result, `JOB_NOT_PRODUCTION: ${fixture.jobId}`);
+    assert(readFileSync(resolve(dir, "README.md"), "utf8") === before, "validation current job mutated README");
+    assert(readmeTempFiles(dir).length === 0, "validation current job left temp README");
+    return ["A published validation job with a valid manifest failed as JOB_NOT_PRODUCTION before README mutation."];
+  } finally {
+    fixture.close();
+  }
+}
+
+async function nullCurrentRejected(dir: string): Promise<string[]> {
+  const fixture = createPublishedFixture(dir, { purpose: null });
+  try {
+    writeFileSync(resolve(dir, "README.md"), "# Existing README\n", "utf8");
+    const before = readFileSync(resolve(dir, "README.md"), "utf8");
+    const result = await runCli(dir, [fixture.jobId]);
+    assertFailurePrefix(result, `JOB_NOT_PRODUCTION: ${fixture.jobId}`);
+    assert(readFileSync(resolve(dir, "README.md"), "utf8") === before, "NULL-purpose current job mutated README");
+    assert(readmeTempFiles(dir).length === 0, "NULL-purpose current job left temp README");
+    return ["A published NULL-purpose job with a valid manifest failed as JOB_NOT_PRODUCTION before README mutation."];
+  } finally {
+    fixture.close();
   }
 }
 
@@ -429,6 +487,7 @@ async function promoteComposition(dir: string): Promise<string[]> {
       locales: "en,zh",
       attempt_number: attemptNumber,
       status: "awaiting_approval",
+      purpose: "production",
       current_stage: "approval",
       run_dir: runDir,
       artifact_dir: null,
@@ -540,6 +599,12 @@ async function appendSection(dir: string): Promise<string[]> {
 async function migratesExistingRows(dir: string): Promise<string[]> {
   const fixture = createPublishedFixture(dir, {});
   try {
+    insertManagedRowJob(fixture.db, {
+      jobId: "old-job",
+      weekKey: "2025-W01",
+      purpose: "production",
+      topic: "Historical item",
+    });
     writeFileSync(
       resolve(dir, "README.md"),
       [
@@ -604,9 +669,157 @@ async function idempotent(dir: string): Promise<string[]> {
   }
 }
 
+async function validationRowSelfHeal(dir: string): Promise<string[]> {
+  const fixture = createPublishedFixture(dir, {});
+  try {
+    insertManagedRowJob(fixture.db, {
+      jobId: "production-sibling",
+      weekKey: "2027-W01",
+      purpose: "production",
+      topic: "Production sibling",
+    });
+    insertManagedRowJob(fixture.db, {
+      jobId: "validation-sibling",
+      weekKey: "2026-W22",
+      purpose: "validation",
+      topic: "Validation sibling",
+    });
+    writeFileSync(
+      resolve(dir, "README.md"),
+      [
+        "Intro",
+        startMarker,
+        "| Week | Topic | Job | Report | Sources | Source Material | Aggregate | Updated |",
+        "|---|---|---|---|---|---|---|---|",
+        managedRow({
+          weekKey: "2027-W01",
+          topic: "Production sibling",
+          jobId: "production-sibling",
+          reportPath: "reports/production/report.en.md",
+          sourcesPath: "reports/production/sources.json",
+          sourceMaterialPath: "-",
+          aggregate: "abcdefabcdef",
+          updatedAt: "2027-01-01T00:00:00.000Z",
+        }),
+        managedRow({
+          weekKey: "2026-W22",
+          topic: "Validation sibling",
+          jobId: "validation-sibling",
+          reportPath: "reports/validation/report.en.md",
+          sourcesPath: "reports/validation/sources.json",
+          sourceMaterialPath: "-",
+          aggregate: "123456789abc",
+          updatedAt: "2026-05-27T00:00:00.000Z",
+        }),
+        endMarker,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const result = await runCli(dir, [fixture.jobId]);
+    assertSuccess(result, "published");
+    const record = parseRecord(result.stdout);
+    assert(record.entries === "2", `expected post-heal entries=2, got ${record.entries}`);
+    const readme = readFileSync(resolve(dir, "README.md"), "utf8");
+    assert(readme.includes("production-sibling"), "production sibling was not preserved");
+    assert(!readme.includes("validation-sibling"), "validation sibling was not removed");
+    assert(readme.includes(fixture.jobId), "current production job row missing");
+    return ["Production publish removed a known validation sibling while preserving a production sibling and reporting post-heal entries=2."];
+  } finally {
+    fixture.close();
+  }
+}
+
+async function unknownRowHardHold(dir: string): Promise<string[]> {
+  const fixture = createPublishedFixture(dir, {});
+  try {
+    writeFileSync(
+      resolve(dir, "README.md"),
+      [
+        "Intro",
+        startMarker,
+        "| Week | Topic | Job | Report | Sources | Source Material | Aggregate | Updated |",
+        "|---|---|---|---|---|---|---|---|",
+        managedRow({
+          weekKey: "2026-W21",
+          topic: "Unknown sibling",
+          jobId: "unknown-sibling",
+          reportPath: "reports/unknown/report.en.md",
+          sourcesPath: "reports/unknown/sources.json",
+          sourceMaterialPath: "-",
+          aggregate: "abcdefabcdef",
+          updatedAt: "2026-05-20T00:00:00.000Z",
+        }),
+        endMarker,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const before = readFileSync(resolve(dir, "README.md"), "utf8");
+    const result = await runCli(dir, [fixture.jobId]);
+    assertFailurePrefix(result, "README_DESTINATION_INVALID:");
+    assert(result.stderr.includes("managed row has no jobs row: unknown-sibling"), `stderr drifted: ${result.stderr}`);
+    assert(readFileSync(resolve(dir, "README.md"), "utf8") === before, "unknown sibling hard-hold mutated README");
+    assert(readmeTempFiles(dir).length === 0, "unknown sibling hard-hold left temp README");
+    return ["A managed row with no DB job aborted before write and left README bytes unchanged."];
+  } finally {
+    fixture.close();
+  }
+}
+
+async function nullRowHardHold(dir: string): Promise<string[]> {
+  const fixture = createPublishedFixture(dir, {});
+  try {
+    insertManagedRowJob(fixture.db, {
+      jobId: "null-sibling",
+      weekKey: "2026-W21",
+      purpose: null,
+      topic: "Null sibling",
+    });
+    writeFileSync(
+      resolve(dir, "README.md"),
+      [
+        "Intro",
+        startMarker,
+        "| Week | Topic | Job | Report | Sources | Source Material | Aggregate | Updated |",
+        "|---|---|---|---|---|---|---|---|",
+        managedRow({
+          weekKey: "2026-W21",
+          topic: "Null sibling",
+          jobId: "null-sibling",
+          reportPath: "reports/null/report.en.md",
+          sourcesPath: "reports/null/sources.json",
+          sourceMaterialPath: "-",
+          aggregate: "abcdefabcdef",
+          updatedAt: "2026-05-20T00:00:00.000Z",
+        }),
+        endMarker,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const before = readFileSync(resolve(dir, "README.md"), "utf8");
+    const result = await runCli(dir, [fixture.jobId]);
+    assertFailurePrefix(result, "README_DESTINATION_INVALID:");
+    assert(result.stderr.includes("managed row has NULL purpose: null-sibling"), `stderr drifted: ${result.stderr}`);
+    assert(readFileSync(resolve(dir, "README.md"), "utf8") === before, "NULL sibling hard-hold mutated README");
+    assert(readmeTempFiles(dir).length === 0, "NULL sibling hard-hold left temp README");
+    return ["A managed row with an existing NULL-purpose DB job aborted before write and left README bytes unchanged."];
+  } finally {
+    fixture.close();
+  }
+}
+
 async function multiRowPreservation(dir: string): Promise<string[]> {
   const fixture = createPublishedFixture(dir, {});
   try {
+    insertManagedRowJob(fixture.db, {
+      jobId: "old-job",
+      weekKey: "2027-W01",
+      purpose: "production",
+      topic: "Future item",
+    });
     writeFileSync(
       resolve(dir, "README.md"),
       [
@@ -766,40 +979,43 @@ async function noMutation(dir: string): Promise<string[]> {
 }
 
 function boundaryStaticCheck(): string[] {
-  const changed = changedFilesForCurrentCycle(repoRoot);
-  const readmeChanged = changed.filter((file) => slice424ReadmeScope.has(file));
+  const changed = changedFilesForCurrentCycle(repoRoot).filter(
+    (file) => !isFrozenValidationEvidence(file),
+  );
   const scopeMode = assertCycleScopePolicy({
-    changed: readmeChanged,
-    activeTriggerFiles: slice424ReadmeScope,
-    activeScope: slice424ReadmeScope,
+    changed,
+    activeTriggerFiles: slice427Scope,
+    activeScope: slice427Scope,
     activeFrozenFiles: [
       "README.md",
+      "AGENTS.md",
+      "CLAUDE.md",
       "PLAN.md",
+      "ROLE_POSITIONING.md",
+      "TODOS.md",
+      "package.json",
+      "bun.lock",
+      "bun.lockb",
+      "src/migrations/0001_initial.sql",
       "src/lib/publish-destination.ts",
       "src/bin/report-deliver-local.ts",
       "src/bin/report-delivery-status.ts",
-      "src/bin/report-create.ts",
       "src/bin/report-remind.ts",
       "src/bin/report-status.ts",
       "src/bin/report-show.ts",
       "src/bin/report-list.ts",
+      "src/bin/report-events.ts",
       "src/bin/report-run.ts",
       "src/promote.ts",
-      "src/db.ts",
       "src/lib/report-loop.ts",
+      "src/lib/runtime-config.ts",
       "src/lib/report-run-fake-provider.ts",
       "scripts/lib/static-guardrails.ts",
-      "bun.lock",
-      "bun.lockb",
-      "AGENTS.md",
-      "ROLE_POSITIONING.md",
-      "TODOS.md",
       "docs/process/operating-model.md",
     ],
     activeFrozenDirectories: [
       "src/pipeline/",
       "src/telegram/",
-      "src/migrations/",
       "src/llm/",
       "src/prompts/",
       "src/preflight.ts",
@@ -820,6 +1036,19 @@ function boundaryStaticCheck(): string[] {
   assert(packageJson.devDependencies?.["@types/bun"] === "^1.1.13", "@types/bun devDependency drifted");
 
   const cliSource = readRepoSource(repoRoot, "src/bin/report-publish-readme.ts");
+  const migrationSource = readRepoSource(repoRoot, "src/migrations/0002_jobs_purpose.sql");
+  const dbSource = readRepoSource(repoRoot, "src/db.ts");
+  const createSource = readRepoSource(repoRoot, "src/bin/report-create.ts");
+  assert(
+    !/DEFAULT\s+['"]production['"]/i.test(`${migrationSource}\n${dbSource}\n${createSource}\n${cliSource}`),
+    "purpose must not default to production",
+  );
+  assert(cliSource.includes('"JOB_NOT_PRODUCTION"'), "publish-readme missing JOB_NOT_PRODUCTION code");
+  assert(
+    cliSource.indexOf('job.purpose !== "production"') !== -1 &&
+      cliSource.indexOf('job.purpose !== "production"') < cliSource.indexOf("readPromotedManifest"),
+    "publish-readme must check purpose before manifest read",
+  );
   assertNoForbiddenPatterns(cliSource, [
     ...PROCESS_SPAWN_PATTERNS,
     ...TELEGRAM_SDK_NETWORK_PATTERNS,
@@ -835,6 +1064,9 @@ function boundaryStaticCheck(): string[] {
   ], "src/bin/report-publish-readme.ts");
 
   const destinationSource = readRepoSource(repoRoot, "src/lib/readme-publish-destination.ts");
+  assert(destinationSource.includes('purpose === "validation"'), "validation self-heal is not explicit");
+  assert(destinationSource.includes("managed row has no jobs row"), "unknown-row hard hold is not explicit");
+  assert(destinationSource.includes("managed row has NULL purpose"), "NULL-row hard hold is not explicit");
   assertNoForbiddenPatterns(destinationSource, [
     ...PROCESS_SPAWN_PATTERNS,
     ...TELEGRAM_SDK_NETWORK_PATTERNS,
@@ -851,8 +1083,8 @@ function boundaryStaticCheck(): string[] {
   try {
     assertCycleScopePolicy({
       changed: ["src/bin/report-publish-readme.ts", "README.md"],
-      activeTriggerFiles: slice424ReadmeScope,
-      activeScope: slice424ReadmeScope,
+      activeTriggerFiles: slice427Scope,
+      activeScope: slice427Scope,
     });
   } catch (err) {
     syntheticOutOfScopeRejected = String(err).includes("changed files outside declared scope");
@@ -860,9 +1092,9 @@ function boundaryStaticCheck(): string[] {
   assert(syntheticOutOfScopeRejected, "synthetic README implementation diff was not rejected");
 
   return [
-    `README boundary check ran in ${scopeMode} mode over changed README-publish files: ${readmeChanged.join(", ") || "<none>"}.`,
-    `Full cycle changed files were observed separately for the authoritative bot-smoke boundary: ${changed.join(", ") || "<none>"}.`,
+    `README boundary check ran in ${scopeMode} mode over changed files: ${changed.join(", ") || "<none>"}.`,
     "Synthetic active-slice scope check rejects a real README.md implementation diff.",
+    "Static isolation checks found no DEFAULT production, current-job purpose gating before manifest read, validation-row self-heal, and unknown/NULL-row hard holds.",
     "report-publish-readme.ts has no mutating DB helpers, DB write SQL, other CLI imports, network, Telegram, prompt/LLM, process, git, or preflight/Codex surface.",
     "readme-publish-destination.ts has no DB write SQL, network, Telegram, prompt/LLM, git post-step, or local-delivery receipt/write surface.",
   ];
@@ -944,6 +1176,7 @@ function createPublishedFixture(
     topic: opts.topic ?? "AI trends",
     attempt_number: attemptNumber,
     status: opts.status ?? "published",
+    purpose: opts.purpose === undefined ? "production" : opts.purpose,
     current_stage: opts.status === "awaiting_approval" ? "edit_en" : "published",
     artifact_dir: artifactDir,
     primary_report_path: opts.primaryReportPath === undefined
@@ -973,6 +1206,40 @@ function createPublishedFixture(
     sourceRoot,
     close: () => db.close(),
   };
+}
+
+function insertManagedRowJob(
+  db: DbClient,
+  input: {
+    readonly jobId: string;
+    readonly weekKey: string;
+    readonly purpose: "production" | "validation" | null;
+    readonly topic: string;
+  },
+): void {
+  insertJob(db, {
+    id: input.jobId,
+    week_key: input.weekKey,
+    topic: input.topic,
+    status: "published",
+    purpose: input.purpose,
+    current_stage: "published",
+    created_at: fixedNow,
+    updated_at: fixedNow + 1,
+  });
+}
+
+function managedRow(input: {
+  readonly weekKey: string;
+  readonly topic: string;
+  readonly jobId: string;
+  readonly reportPath: string;
+  readonly sourcesPath: string;
+  readonly sourceMaterialPath: string;
+  readonly aggregate: string;
+  readonly updatedAt: string;
+}): string {
+  return `| ${input.weekKey} | ${input.topic} | ${input.jobId} | [${input.reportPath}](${input.reportPath}) | [${input.sourcesPath}](${input.sourcesPath}) | ${input.sourceMaterialPath === "-" ? "-" : `[${input.sourceMaterialPath}](${input.sourceMaterialPath})`} | ${input.aggregate} | ${input.updatedAt} |`;
 }
 
 function manifestFor(opts: {
@@ -1174,6 +1441,13 @@ function treeSnapshot(root: string): string {
 
 function readmeTempFiles(dir: string): string[] {
   return readdirSync(dir).filter((entry) => entry.startsWith(".README.md.tmp-")).sort();
+}
+
+function isFrozenValidationEvidence(file: string): boolean {
+  return (
+    file.startsWith("reports/2026-W22-ai-trends/") ||
+    file.startsWith("reports/2026-W23-ai-trends/")
+  );
 }
 
 function splitUnescapedPipes(row: string): string[] {

@@ -18,6 +18,7 @@ export interface ReadmePublishJobRow {
   readonly topic: string;
   readonly attempt_number: number;
   readonly status: string;
+  readonly purpose: ReadmePublishJobPurpose | string | null;
   readonly artifact_dir: string | null;
   readonly primary_report_path: string | null;
   readonly translated_report_path: string | null;
@@ -25,6 +26,8 @@ export interface ReadmePublishJobRow {
   readonly approval_summary: string | null;
   readonly updated_at: number;
 }
+
+export type ReadmePublishJobPurpose = "production" | "validation";
 
 export interface ReadmePublishEntry {
   readonly weekKey: string;
@@ -121,6 +124,7 @@ export function publishReadmeDestination(input: {
   readonly cwd: string;
   readonly entry: ReadmePublishEntry;
   readonly readmePath?: string;
+  readonly jobPurposes?: ReadonlyMap<string, ReadmePublishJobPurpose | string | null>;
 }): ReadmePublishResult {
   const cwd = realpathSync(input.cwd);
   const readmePath = resolveReadmePath(cwd, input.readmePath);
@@ -129,7 +133,7 @@ export function publishReadmeDestination(input: {
   let tempPath: string | undefined;
   try {
     const existing = existsSync(readmePath) ? readFileSync(readmePath, "utf8") : "";
-    const { content, entries } = renderReadme(existing, input.entry);
+    const { content, entries } = renderReadme(existing, input.entry, input.jobPurposes);
     if (content === existing) {
       return {
         status: "idempotent",
@@ -426,10 +430,12 @@ function assertReadmeParentSafe(cwd: string, readmePath: string): void {
 function renderReadme(
   existing: string,
   currentEntry: ReadmePublishEntry,
+  jobPurposes?: ReadonlyMap<string, ReadmePublishJobPurpose | string | null>,
 ): { readonly content: string; readonly entries: number } {
   const startCount = countOccurrences(existing, startMarker);
   const endCount = countOccurrences(existing, endMarker);
   const rows = existingRows(existing);
+  reconcileExistingRows(rows, jobPurposes);
   rows.set(currentEntry.jobId, currentEntry);
   const table = renderTable([...rows.values()]);
 
@@ -457,6 +463,39 @@ function renderReadme(
     content: ensureTrailingNewline(`${before}${startMarker}\n${table}${endMarker}${after}`),
     entries: rows.size,
   };
+}
+
+function reconcileExistingRows(
+  rows: Map<string, ReadmePublishEntry>,
+  jobPurposes: ReadonlyMap<string, ReadmePublishJobPurpose | string | null> | undefined,
+): void {
+  if (jobPurposes === undefined) return;
+
+  for (const jobId of rows.keys()) {
+    if (!jobPurposes.has(jobId)) {
+      throw new ReadmePublishDestinationError(
+        "README_DESTINATION_INVALID",
+        `managed row has no jobs row: ${jobId}`,
+      );
+    }
+
+    const purpose = jobPurposes.get(jobId);
+    if (purpose === "production") continue;
+    if (purpose === "validation") {
+      rows.delete(jobId);
+      continue;
+    }
+    if (purpose === null) {
+      throw new ReadmePublishDestinationError(
+        "README_DESTINATION_INVALID",
+        `managed row has NULL purpose: ${jobId}`,
+      );
+    }
+    throw new ReadmePublishDestinationError(
+      "README_DESTINATION_INVALID",
+      `managed row has invalid purpose: ${jobId}`,
+    );
+  }
 }
 
 function existingRows(existing: string): Map<string, ReadmePublishEntry> {

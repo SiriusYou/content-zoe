@@ -28,6 +28,7 @@ import { Stage } from "../src/pipeline/types.ts";
 type ScenarioName =
   | "open-pragmas"
   | "migration-idempotence-static-begin"
+  | "db-purpose-migration"
   | "migration-sha-mismatch"
   | "jobs-crud"
   | "events-append-fk"
@@ -54,6 +55,7 @@ interface RecoveryCleanupRaceResult {
 const SCENARIOS: ScenarioName[] = [
   "open-pragmas",
   "migration-idempotence-static-begin",
+  "db-purpose-migration",
   "migration-sha-mismatch",
   "jobs-crud",
   "events-append-fk",
@@ -121,6 +123,8 @@ async function scenarioImpl(
       return runOpenPragmas(dir);
     case "migration-idempotence-static-begin":
       return runMigrationIdempotenceStaticBegin(dir);
+    case "db-purpose-migration":
+      return runDbPurposeMigration(dir);
     case "migration-sha-mismatch":
       return runMigrationShaMismatch(dir);
     case "jobs-crud":
@@ -171,11 +175,15 @@ function runMigrationIdempotenceStaticBegin(dir: string): string[] {
       rerun.skipped.includes("0001_initial.sql"),
       "expected rerun to skip already-applied 0001_initial.sql",
     );
+    assert(
+      rerun.skipped.includes("0002_jobs_purpose.sql"),
+      "expected rerun to skip already-applied 0002_jobs_purpose.sql",
+    );
     const rows = scalar<number>(
       db,
-      "SELECT COUNT(*) AS value FROM _migrations WHERE filename = '0001_initial.sql'",
+      "SELECT COUNT(*) AS value FROM _migrations WHERE filename IN ('0001_initial.sql', '0002_jobs_purpose.sql')",
     );
-    assert(rows === 1, `expected one migration row, got ${rows}`);
+    assert(rows === 2, `expected two migration rows, got ${rows}`);
   } finally {
     db.close();
   }
@@ -187,9 +195,87 @@ function runMigrationIdempotenceStaticBegin(dir: string): string[] {
   assert(!source.includes(".transaction("), "must not rely on Database.transaction");
 
   return [
-    "runMigrations was idempotent and stored one SHA-256 row for 0001_initial.sql.",
+    "runMigrations was idempotent and stored SHA-256 rows for 0001_initial.sql and 0002_jobs_purpose.sql.",
     "F3 static check found explicit BEGIN IMMEDIATE/COMMIT/ROLLBACK and no Database.transaction use. [BEGIN IMMEDIATE confirmed in source]",
   ];
+}
+
+function runDbPurposeMigration(dir: string): string[] {
+  const migrationsDir = resolve(dir, "migrations");
+  mkdirSync(migrationsDir, { recursive: true });
+  writeFileSync(
+    resolve(migrationsDir, "0001_initial.sql"),
+    readFileSync(resolve(repoRoot, "src", "migrations", "0001_initial.sql"), "utf8"),
+  );
+
+  const db = openDb(resolve(dir, "content.db"), {
+    migrate: false,
+    migrationsDir,
+  });
+
+  try {
+    const first = runMigrations(db, migrationsDir);
+    assert(first.applied.includes("0001_initial.sql"), "custom 0001 did not apply");
+    const now = unixNow();
+    for (const [jobId, weekKey] of [
+      ["2026-W20-ai-trends", "2026-W20"],
+      ["2026-W21-ai-trends", "2026-W21"],
+      ["2026-W22-ai-trends", "2026-W22"],
+      ["2026-W23-ai-trends", "2026-W23"],
+      ["2026-W24-ai-trends", "2026-W24"],
+      ["2026-W25-ai-trends", "2026-W25"],
+      ["2026-W26-ai-trends", "2026-W26"],
+    ] as const) {
+      db.query(`
+        INSERT INTO jobs (
+          id, week_key, topic, status, current_stage, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(jobId, weekKey, "Purpose migration", "published", "published", now, now);
+    }
+
+    writeFileSync(
+      resolve(migrationsDir, "0002_jobs_purpose.sql"),
+      readFileSync(resolve(repoRoot, "src", "migrations", "0002_jobs_purpose.sql"), "utf8"),
+    );
+    const second = runMigrations(db, migrationsDir);
+    assert(second.applied.includes("0002_jobs_purpose.sql"), "custom 0002 did not apply");
+    assert(
+      scalar<number>(db, "SELECT COUNT(*) AS value FROM pragma_table_info('jobs') WHERE name = 'purpose'") === 1,
+      "jobs.purpose column missing after 0002",
+    );
+    assert(
+      scalar<number>(
+        db,
+        "SELECT COUNT(*) AS value FROM jobs WHERE id IN ('2026-W20-ai-trends', '2026-W21-ai-trends', '2026-W22-ai-trends', '2026-W23-ai-trends', '2026-W24-ai-trends') AND purpose = 'validation'",
+      ) === 5,
+      "W20-W24 were not classified validation",
+    );
+    assert(
+      scalar<number>(
+        db,
+        "SELECT COUNT(*) AS value FROM jobs WHERE id = '2026-W25-ai-trends' AND purpose = 'production'",
+      ) === 1,
+      "W25 was not classified production",
+    );
+    assert(
+      scalar<number>(
+        db,
+        "SELECT COUNT(*) AS value FROM jobs WHERE id = '2026-W26-ai-trends' AND purpose IS NULL",
+      ) === 1,
+      "unlisted rows did not remain NULL",
+    );
+
+    const rerun = runMigrations(db, migrationsDir);
+    assert(rerun.applied.length === 0, "custom 0002 rerun was not idempotent");
+    assert(rerun.skipped.includes("0002_jobs_purpose.sql"), "custom 0002 was not skipped on rerun");
+
+    return [
+      "0002 added nullable jobs.purpose and classified only W20-W24 as validation plus W25 as production.",
+      "An unlisted W26 row remained NULL and the custom migration rerun was idempotent.",
+    ];
+  } finally {
+    db.close();
+  }
 }
 
 function runMigrationShaMismatch(dir: string): string[] {

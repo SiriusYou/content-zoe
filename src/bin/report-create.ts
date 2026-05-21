@@ -11,11 +11,13 @@ import {
 import { sanitizeTopic, TopicSanitizationError } from "../security/sanitize.ts";
 
 export type ReportCreateLocales = "en" | "en,zh";
+export type ReportCreatePurpose = "production" | "validation";
 
 export interface ReportCreateArgs {
   readonly weekKey: string;
   readonly rawTopic: string;
   readonly locales: ReportCreateLocales;
+  readonly purpose: ReportCreatePurpose;
 }
 
 export interface ReportCreateResult {
@@ -44,6 +46,7 @@ export class ReportCreateError extends Error {
     | "INVALID_COMMAND"
     | "INVALID_WEEK"
     | "INVALID_LOCALES"
+    | "INVALID_PURPOSE"
     | "UNKNOWN_FLAG"
     | "UNSUPPORTED_FORCE"
     | "WEEK_ALREADY_EXISTS";
@@ -60,6 +63,7 @@ export function parseReportCreateArgs(argv: readonly string[]): ReportCreateArgs
   let weekKey: string | undefined;
   let rawTopic: string | undefined;
   let locales: ReportCreateLocales = "en,zh";
+  let purpose: ReportCreatePurpose | undefined;
   const positionals: string[] = [];
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -82,6 +86,11 @@ export function parseReportCreateArgs(argv: readonly string[]): ReportCreateArgs
       index += 1;
       continue;
     }
+    if (arg === "--purpose") {
+      purpose = parsePurpose(readFlagValue(argv, index, "--purpose"));
+      index += 1;
+      continue;
+    }
     if (arg.startsWith("--")) {
       throw new ReportCreateError("UNKNOWN_FLAG", `UNKNOWN_FLAG: ${arg}`);
     }
@@ -95,9 +104,12 @@ export function parseReportCreateArgs(argv: readonly string[]): ReportCreateArgs
   ) {
     throw new ReportCreateError("INVALID_COMMAND");
   }
+  if (purpose === undefined) {
+    throw new ReportCreateError("INVALID_PURPOSE", "INVALID_PURPOSE: --purpose required");
+  }
   assertWeekKey(weekKey);
 
-  return { weekKey, rawTopic, locales };
+  return { weekKey, rawTopic, locales, purpose };
 }
 
 export function buildReportJobId(weekKey: string): string {
@@ -125,6 +137,7 @@ export function createReportJob(opts: CreateReportJobOptions): ReportCreateResul
       locales: opts.args.locales,
       attempt_number: 1,
       status: "queued",
+      purpose: opts.args.purpose,
       current_stage: "research",
       run_dir: `.runs/${jobId}`,
       created_at: now,
@@ -182,6 +195,11 @@ function readFlagValue(
 function parseLocales(value: string): ReportCreateLocales {
   if (value === "en" || value === "en,zh") return value;
   throw new ReportCreateError("INVALID_LOCALES", `INVALID_LOCALES: ${value}`);
+}
+
+function parsePurpose(value: string): ReportCreatePurpose {
+  if (value === "production" || value === "validation") return value;
+  throw new ReportCreateError("INVALID_PURPOSE", `INVALID_PURPOSE: ${value}`);
 }
 
 function assertWeekKey(weekKey: string): void {

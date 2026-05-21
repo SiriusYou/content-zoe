@@ -1,6 +1,6 @@
 # DB Smoke Evidence
 
-Generated: 2026-05-17T03:58:06.839Z
+Generated: 2026-05-21T06:22:58.631Z
 
 ## Command
 
@@ -14,12 +14,13 @@ This smoke exercises the local SQLite persistence surface only. It does not run 
 
 ## Scenario Results
 
-Passed 10/10 scenarios.
+Passed 11/11 scenarios.
 
 | Scenario | Status | Evidence |
 |---|---|---|
 | open-pragmas | PASS | openDb applied WAL, busy_timeout=5000, synchronous=NORMAL, and foreign_keys=ON.<br>WAL verification succeeded after the PRAGMAs were applied. |
-| migration-idempotence-static-begin | PASS | runMigrations was idempotent and stored one SHA-256 row for 0001_initial.sql.<br>F3 static check found explicit BEGIN IMMEDIATE/COMMIT/ROLLBACK and no Database.transaction use. [BEGIN IMMEDIATE confirmed in source] |
+| migration-idempotence-static-begin | PASS | runMigrations was idempotent and stored SHA-256 rows for 0001_initial.sql and 0002_jobs_purpose.sql.<br>F3 static check found explicit BEGIN IMMEDIATE/COMMIT/ROLLBACK and no Database.transaction use. [BEGIN IMMEDIATE confirmed in source] |
+| db-purpose-migration | PASS | 0002 added nullable jobs.purpose and classified only W20-W24 as validation plus W25 as production.<br>An unlisted W26 row remained NULL and the custom migration rerun was idempotent. |
 | migration-sha-mismatch | PASS | A modified applied migration was refused.<br>DbMigrationError.errorCode was MIGRATION_SHA_MISMATCH with expectedSha and actualSha evidence. |
 | jobs-crud | PASS | insertJob/findJobById/findJobsByStatus/updateJob preserved typed job fields.<br>Duplicate week_key surfaced DbConstraintError.subcode=SQLITE_CONSTRAINT_UNIQUE with table/column hints. |
 | events-append-fk | PASS | insertEvent/findEventsByJob preserved payload as a string and supported type filtering.<br>F6 foreign-key violation surfaced DbConstraintError.subcode=SQLITE_CONSTRAINT_FOREIGNKEY. |
