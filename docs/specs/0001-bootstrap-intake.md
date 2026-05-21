@@ -5,6 +5,11 @@
 **Mode:** DIRECT (no fanout/debate — single-implementer unit)
 **Drafted:** 2026-04-23 (from openclaw-healthcare driver session, post-Issue-1C smoke)
 
+> Current runbook note: this historical bootstrap spec predates Slice 4.27.
+> Current `report:create` commands must include `--purpose production|validation`;
+> the job id remains derived as `<week>-ai-trends` and is then passed to
+> `report:run`.
+
 ## User story
 
 As operator, I want to run:
