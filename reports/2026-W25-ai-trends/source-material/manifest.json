@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W25-ai-trends",
+  "weekKey": "2026-W25",
+  "topic": "Healthcare AI governance and medical-device oversight signals",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-21T03:43:15.549Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W25-ai-trends",
+    "totalByteCount": 12111,
+    "entries": [
+      "source-material/operator/briefing/fda-device-oversight.md",
+      "source-material/operator/briefing/hhs-ai-strategy-and-governance.md",
+      "source-material/operator/briefing/topic-and-source-boundary.md",
+      "source-material/operator/references/provider-governance-and-validation.md",
+      "source-material/operator/references/reporting-limits-and-claim-controls.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 1756,
+      "sha256": "6152602fb58e70d2b60d2f1331cb6c6b40abeaf1aa5960277811c563f4fbc4a3"
+    },
+    {
+      "id": "operator:briefing/fda-device-oversight.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W25-ai-trends/briefing/fda-device-oversight.md",
+      "localPath": "source-material/operator/briefing/fda-device-oversight.md",
+      "byteCount": 3184,
+      "sha256": "13cb8826a5f7763227747dfc4eb679ea246a53e5a5c724f6954dae8f6ad22193"
+    },
+    {
+      "id": "operator:briefing/hhs-ai-strategy-and-governance.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W25-ai-trends/briefing/hhs-ai-strategy-and-governance.md",
+      "localPath": "source-material/operator/briefing/hhs-ai-strategy-and-governance.md",
+      "byteCount": 2341,
+      "sha256": "dcf23058a07c574cb86d2851c1fc0a989a049e7617d015676f938e713821f04c"
+    },
+    {
+      "id": "operator:briefing/topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W25-ai-trends/briefing/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/briefing/topic-and-source-boundary.md",
+      "byteCount": 3013,
+      "sha256": "b800eb5670e6c09292eefafde59024624b4f684d5019d5085ace3c85573f1d50"
+    },
+    {
+      "id": "operator:references/provider-governance-and-validation.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W25-ai-trends/references/provider-governance-and-validation.md",
+      "localPath": "source-material/operator/references/provider-governance-and-validation.md",
+      "byteCount": 1841,
+      "sha256": "cfb00ad228bb3c26265a52c5fe3c7a94e10ae389019e947685253d3117b83f77"
+    },
+    {
+      "id": "operator:references/reporting-limits-and-claim-controls.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W25-ai-trends/references/reporting-limits-and-claim-controls.md",
+      "localPath": "source-material/operator/references/reporting-limits-and-claim-controls.md",
+      "byteCount": 1732,
+      "sha256": "ac921bcc364b8d52d7ba219d624cde486ccda354b8c1f3a0cd1ba9960b9b7ddc"
+    }
+  ]
+}

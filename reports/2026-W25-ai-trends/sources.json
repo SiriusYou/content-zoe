@@ -1,0 +1,77 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": [
+      "job metadata",
+      "topic scope",
+      "staged source inventory"
+    ]
+  },
+  {
+    "id": "source-manifest",
+    "kind": "local_manifest",
+    "localPath": "source-material/manifest.json",
+    "usedFor": [
+      "source inventory verification",
+      "local path and source-kind confirmation"
+    ]
+  },
+  {
+    "id": "operator:briefing/topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "sourceMaterialPath": "source-material/operator/briefing/topic-and-source-boundary.md",
+    "usedFor": [
+      "editorial intent",
+      "source boundary",
+      "primary source framing",
+      "provenance expectations"
+    ]
+  },
+  {
+    "id": "operator:briefing/fda-device-oversight.md",
+    "kind": "operator_source",
+    "sourceMaterialPath": "source-material/operator/briefing/fda-device-oversight.md",
+    "usedFor": [
+      "FDA device oversight signals",
+      "guidance timeline references",
+      "medical-device scope limits"
+    ]
+  },
+  {
+    "id": "operator:briefing/hhs-ai-strategy-and-governance.md",
+    "kind": "operator_source",
+    "sourceMaterialPath": "source-material/operator/briefing/hhs-ai-strategy-and-governance.md",
+    "usedFor": [
+      "HHS governance posture",
+      "OneHHS framing",
+      "compliance and public-trust framing"
+    ]
+  },
+  {
+    "id": "operator:references/provider-governance-and-validation.md",
+    "kind": "operator_source",
+    "sourceMaterialPath": "source-material/operator/references/provider-governance-and-validation.md",
+    "usedFor": [
+      "provider governance layer",
+      "local validation and monitoring signals",
+      "distinction from FDA regulation"
+    ]
+  },
+  {
+    "id": "operator:references/reporting-limits-and-claim-controls.md",
+    "kind": "operator_source",
+    "sourceMaterialPath": "source-material/operator/references/reporting-limits-and-claim-controls.md",
+    "usedFor": [
+      "claim guardrails",
+      "limitation language",
+      "pass/fail editorial controls"
+    ]
+  },
+  {
+    "kind": "assumption",
+    "label": "report-claim-scope",
+    "value": "Only governance, oversight, and process claims supported by the staged local source pack should appear in downstream report generation."
+  }
+]
