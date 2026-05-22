@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W26-ai-trends",
+  "weekKey": "2026-W26",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 2,
+  "generatedAt": "2026-05-22T03:50:57.022Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W26-ai-trends",
+    "totalByteCount": 11943,
+    "entries": [
+      "source-material/operator/briefing/clinician-adoption-and-trust.md",
+      "source-material/operator/briefing/fda-ai-device-oversight.md",
+      "source-material/operator/briefing/hhs-astp-ai-governance-and-interoperability.md",
+      "source-material/operator/references/health-data-governance-and-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 1722,
+      "sha256": "704f0ea62455a98398d13aa0fd8d767e24911851411dfb82280add2a4bd42f0e"
+    },
+    {
+      "id": "operator:briefing/clinician-adoption-and-trust.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W26-ai-trends/briefing/clinician-adoption-and-trust.md",
+      "localPath": "source-material/operator/briefing/clinician-adoption-and-trust.md",
+      "byteCount": 1745,
+      "sha256": "551330749bf076ea7d1e3034c867d8da2c382c6a916a366a46198be807fe77f1"
+    },
+    {
+      "id": "operator:briefing/fda-ai-device-oversight.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W26-ai-trends/briefing/fda-ai-device-oversight.md",
+      "localPath": "source-material/operator/briefing/fda-ai-device-oversight.md",
+      "byteCount": 2976,
+      "sha256": "39699384c5bcf79f3dca6b60bd278ce6153dbdeb1d381c963ed3f0071e5019a7"
+    },
+    {
+      "id": "operator:briefing/hhs-astp-ai-governance-and-interoperability.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W26-ai-trends/briefing/hhs-astp-ai-governance-and-interoperability.md",
+      "localPath": "source-material/operator/briefing/hhs-astp-ai-governance-and-interoperability.md",
+      "byteCount": 2646,
+      "sha256": "732519e6829abbaf109c91d31eb531f5f2114df3d25c84e85326a9e53dae4c34"
+    },
+    {
+      "id": "operator:references/health-data-governance-and-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W26-ai-trends/references/health-data-governance-and-boundaries.md",
+      "localPath": "source-material/operator/references/health-data-governance-and-boundaries.md",
+      "byteCount": 2358,
+      "sha256": "7df127127dc223c1e457238304dc277b8262923b5e8a2a4107a06e4d9bae6de9"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W26-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 2218,
+      "sha256": "2070dd5284754043c73ce6154e36dafb3e0dfb5c2eb1bff51f8e4dd92df5e639"
+    }
+  ]
+}

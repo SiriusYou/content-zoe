@@ -1,0 +1,91 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "source_material_path": "source-material/context.md",
+    "used_for": [
+      "job metadata",
+      "local source inventory"
+    ]
+  },
+  {
+    "id": "manifest",
+    "kind": "local_manifest",
+    "source_material_path": "source-material/manifest.json",
+    "used_for": [
+      "source entry verification",
+      "local path and source kind cross-check"
+    ]
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "source_material_path": "source-material/operator/topic-and-source-boundary.md",
+    "used_for": [
+      "primary angle selection",
+      "safe claim boundaries",
+      "publication gate"
+    ]
+  },
+  {
+    "id": "operator:briefing/fda-ai-device-oversight.md",
+    "kind": "operator_source",
+    "source_material_path": "source-material/operator/briefing/fda-ai-device-oversight.md",
+    "used_for": [
+      "FDA oversight summary",
+      "lifecycle and PCCP framing",
+      "limits on deployment claims"
+    ]
+  },
+  {
+    "id": "operator:briefing/hhs-astp-ai-governance-and-interoperability.md",
+    "kind": "operator_source",
+    "source_material_path": "source-material/operator/briefing/hhs-astp-ai-governance-and-interoperability.md",
+    "used_for": [
+      "HTI-1 and DSI transparency framing",
+      "certified health IT distribution-layer claim",
+      "regime distinction versus FDA"
+    ]
+  },
+  {
+    "id": "operator:briefing/clinician-adoption-and-trust.md",
+    "kind": "operator_source",
+    "source_material_path": "source-material/operator/briefing/clinician-adoption-and-trust.md",
+    "used_for": [
+      "AMA survey facts",
+      "training-gap framing",
+      "self-report limitation"
+    ]
+  },
+  {
+    "id": "operator:references/health-data-governance-and-boundaries.md",
+    "kind": "operator_source",
+    "source_material_path": "source-material/operator/references/health-data-governance-and-boundaries.md",
+    "used_for": [
+      "privacy and de-identification caution layer",
+      "data-governance constraints",
+      "evidence-limit paragraph support"
+    ]
+  },
+  {
+    "id": "assumption:governance-over-outcomes-angle",
+    "kind": "assumption",
+    "statement": "The best-supported report angle is governance and adoption friction rather than clinical outcomes, because the staged bundle contains regulatory, transparency, and survey material but no new patient-outcome evidence.",
+    "basis": [
+      "source-material/operator/topic-and-source-boundary.md",
+      "source-material/operator/briefing/fda-ai-device-oversight.md",
+      "source-material/operator/briefing/hhs-astp-ai-governance-and-interoperability.md",
+      "source-material/operator/briefing/clinician-adoption-and-trust.md"
+    ]
+  },
+  {
+    "id": "assumption:deployment-gap",
+    "kind": "assumption",
+    "statement": "The staged bundle does not support claims of widespread production deployment across health systems; any such claim would require additional staged evidence.",
+    "basis": [
+      "source-material/operator/topic-and-source-boundary.md",
+      "source-material/operator/briefing/clinician-adoption-and-trust.md",
+      "source-material/operator/briefing/fda-ai-device-oversight.md"
+    ]
+  }
+]
