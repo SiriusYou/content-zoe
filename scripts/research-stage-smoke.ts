@@ -162,12 +162,14 @@ async function runResearchSourceContextPrompt(runDir: string): Promise<string[]>
   assert(prompt.includes("source-material/manifest.json"), "prompt must name staged manifest.json");
   assert(prompt.includes("Operator fact: source-material prompt smoke copied fact."), "prompt must embed operator source content");
   assert(prompt.includes("untrusted data"), "prompt must label staged source material as untrusted data");
-  assert(prompt.includes("cite the staged source entry in sources.json"), "prompt must require staged-source citations");
+  assert(prompt.includes("Write ./sources.json at the current working directory root"), "prompt must pin sources.json to the attempt root");
+  assert(prompt.includes("Do not place this file under research/"), "prompt must forbid nested research/sources.json");
+  assert(prompt.includes("cite the staged source entry in ./sources.json"), "prompt must require staged-source citations in root sources.json");
   assert(prompt.includes("Do not use external web search"), "prompt must preserve the no-external-tools stance");
   return [
     "buildResearchPrompt output began with RESEARCH_PROMPT verbatim.",
     "The dynamic prompt exposed source-material/context.md, manifest.json, and operator/facts.md content.",
-    "The dynamic prompt labeled staged source text as untrusted data and required sources.json citations without external tools.",
+    "The dynamic prompt labeled staged source text as untrusted data and required root sources.json citations without external tools.",
   ];
 }
 
