@@ -1,0 +1,90 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": [
+      "job metadata",
+      "staged source inventory"
+    ]
+  },
+  {
+    "id": "manifest",
+    "kind": "local_manifest",
+    "localPath": "source-material/manifest.json",
+    "usedFor": [
+      "source bundle validation",
+      "attempt metadata"
+    ]
+  },
+  {
+    "id": "run-state",
+    "kind": "local_run_state",
+    "localPath": "run-state.json",
+    "usedFor": [
+      "current stage confirmation",
+      "attempt recovery context"
+    ]
+  },
+  {
+    "id": "operator:briefing/physician-and-provider-adoption.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/physician-and-provider-adoption.md",
+    "usedFor": [
+      "physician self-reported adoption signal",
+      "training gap",
+      "provider rollout caveat"
+    ]
+  },
+  {
+    "id": "operator:briefing/policy-and-transparency-signals.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/policy-and-transparency-signals.md",
+    "usedFor": [
+      "policy framing",
+      "transparency and governance distinctions",
+      "evidence limits on operational maturity"
+    ]
+  },
+  {
+    "id": "operator:briefing/product-and-market-activity.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/product-and-market-activity.md",
+    "usedFor": [
+      "workflow-commercialization angle",
+      "vendor-positioning caveat",
+      "market-direction framing"
+    ]
+  },
+  {
+    "id": "operator:references/privacy-safety-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/privacy-safety-and-reader-boundaries.md",
+    "usedFor": [
+      "privacy and safety guardrails",
+      "de-identification caveat",
+      "risk-management framing"
+    ]
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "intended angle",
+      "safe claims",
+      "unsafe claims",
+      "publication gate guidance"
+    ]
+  },
+  {
+    "id": "assumption-local-only",
+    "kind": "assumption",
+    "statement": "This research stage uses only local staged material in the current working directory and does not independently verify upstream URLs or claims."
+  },
+  {
+    "id": "assumption-no-outcomes-evidence",
+    "kind": "assumption",
+    "statement": "Because the staged bundle does not contain patient-outcome evidence or a comprehensive market map, the brief constrains the report to adoption, workflow, governance, and privacy framing."
+  }
+]
