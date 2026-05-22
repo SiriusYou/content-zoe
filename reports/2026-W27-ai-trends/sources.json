@@ -1,0 +1,82 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": [
+      "job identity",
+      "locale scope",
+      "staged source inventory"
+    ]
+  },
+  {
+    "id": "research-source-manifest",
+    "kind": "manifest",
+    "localPath": "source-material/manifest.json",
+    "usedFor": [
+      "artifact inventory",
+      "source metadata",
+      "attempt context"
+    ]
+  },
+  {
+    "id": "operator:briefing/physician-and-provider-adoption.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/physician-and-provider-adoption.md",
+    "usedFor": [
+      "physician AI exposure framing",
+      "training-gap framing",
+      "provider rollout caveat"
+    ]
+  },
+  {
+    "id": "operator:briefing/policy-and-transparency-signals.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/policy-and-transparency-signals.md",
+    "usedFor": [
+      "policy and transparency framing",
+      "governance caveats",
+      "regulatory scope distinctions"
+    ]
+  },
+  {
+    "id": "operator:briefing/product-and-market-activity.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/product-and-market-activity.md",
+    "usedFor": [
+      "workflow/documentation commercialization framing",
+      "vendor-positioning caveat",
+      "market-direction evidence"
+    ]
+  },
+  {
+    "id": "operator:references/privacy-safety-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/privacy-safety-and-reader-boundaries.md",
+    "usedFor": [
+      "privacy and safety guardrails",
+      "de-identification caution",
+      "risk-management framing"
+    ]
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "intended angle",
+      "safe claim boundaries",
+      "publication gate guidance"
+    ]
+  },
+  {
+    "id": "assumption-local-only",
+    "kind": "assumption",
+    "statement": "This research stage used only staged files in the current working directory and did not perform external source validation."
+  },
+  {
+    "id": "assumption-evidence-limits",
+    "kind": "assumption",
+    "statement": "Claims stronger than the staged evidence, especially around patient outcomes, universal deployment, or independent vendor efficacy, were treated as unsupported."
+  }
+]

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W27-ai-trends",
+  "weekKey": "2026-W27",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 3,
+  "generatedAt": "2026-05-22T05:34:53.914Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W27-ai-trends",
+    "totalByteCount": 9588,
+    "entries": [
+      "source-material/operator/briefing/physician-and-provider-adoption.md",
+      "source-material/operator/briefing/policy-and-transparency-signals.md",
+      "source-material/operator/briefing/product-and-market-activity.md",
+      "source-material/operator/references/privacy-safety-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 1710,
+      "sha256": "c0366942759f0d0368ee3104adc2b53f5949170e0b09cdd5689050a2a815c467"
+    },
+    {
+      "id": "operator:briefing/physician-and-provider-adoption.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W27-ai-trends/briefing/physician-and-provider-adoption.md",
+      "localPath": "source-material/operator/briefing/physician-and-provider-adoption.md",
+      "byteCount": 1870,
+      "sha256": "cfae257abe47a4ab88022c633c260f814658a2cfb66c5b7d348ae5803086768e"
+    },
+    {
+      "id": "operator:briefing/policy-and-transparency-signals.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W27-ai-trends/briefing/policy-and-transparency-signals.md",
+      "localPath": "source-material/operator/briefing/policy-and-transparency-signals.md",
+      "byteCount": 1847,
+      "sha256": "804683cb2b1ee8d14423f2f24da1f985f7c877a8082294ec54faf5ee19ad02c1"
+    },
+    {
+      "id": "operator:briefing/product-and-market-activity.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W27-ai-trends/briefing/product-and-market-activity.md",
+      "localPath": "source-material/operator/briefing/product-and-market-activity.md",
+      "byteCount": 1873,
+      "sha256": "e1d5eb707e33636be5feafd9593bd6ee46e12e5d3de44e4d3a988684b724aa27"
+    },
+    {
+      "id": "operator:references/privacy-safety-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W27-ai-trends/references/privacy-safety-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/privacy-safety-and-reader-boundaries.md",
+      "byteCount": 1845,
+      "sha256": "c91dd8ed11586340bae4e45fed3e79bbc3b09ece3bf8675e0376404e4a19a0a3"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W27-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 2153,
+      "sha256": "5f82b85c01124b08403edb8877b7d59b5b0dbce1dabea1799415b0e5890d0f39"
+    }
+  ]
+}
