@@ -457,10 +457,13 @@ function runMessageContractStaticCheck(): string[] {
   assert(text.includes("6"), "message omitted attempt number");
   assert(text.includes(summary), "message omitted stored approval summary");
   assert(text.includes("/approve message-contract 6"), "message omitted approve hint");
-  assert(text.includes("/reject message-contract 6"), "message omitted reject hint");
+  assert(
+    text.includes("/reject message-contract 6 <scope>:<type> <reason>"),
+    "message omitted structured reject hint",
+  );
 
   return [
-    "formatApprovalNotification includes job id, attempt number, stored summary body, /approve, and /reject.",
+    "formatApprovalNotification includes job id, attempt number, stored summary body, /approve, and structured /reject scope:type grammar.",
   ];
 }
 

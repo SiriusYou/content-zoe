@@ -63,7 +63,7 @@ export function formatApprovalNotification(
     input.approvalSummary,
     "",
     `Approve: /approve ${input.jobId} ${input.attemptNumber}`,
-    `Reject: /reject ${input.jobId} ${input.attemptNumber} <reason>`,
+    `Reject: /reject ${input.jobId} ${input.attemptNumber} <scope>:<type> <reason>`,
   ].join("\n");
 }
 
