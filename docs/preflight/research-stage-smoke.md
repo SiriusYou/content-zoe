@@ -1,9 +1,9 @@
 # research-stage smoke evidence
 
 - Command: `bun run research-stage-smoke`
-- Started: 2026-05-22T14:45:26.800Z
-- Finished: 2026-05-22T14:45:26.809Z
-- Scenario root: /Users/youjia/dev/content-zoe/.runs/research-stage-smoke/2026-05-22T14-45-26.799Z (removed by finally-cleanup)
+- Started: 2026-05-23T01:32:13.703Z
+- Finished: 2026-05-23T01:32:13.715Z
+- Scenario root: /Users/youjia/dev/content-zoe/.runs/research-stage-smoke/2026-05-23T01-32-13.701Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
@@ -15,4 +15,8 @@
 | missing-research-brief | PASS | Provider wrote only sources.json.<br>The concrete research manifest failed with MANIFEST_FILE_MISSING. |
 | empty-research-brief | PASS | Provider wrote a zero-byte research/brief.md and valid sources.json.<br>The concrete research manifest failed with MANIFEST_FILE_EMPTY. |
 | empty-sources-json | PASS | Provider wrote non-empty research/brief.md and empty sources.json.<br>The concrete research manifest failed with MANIFEST_JSON_UNPARSEABLE. |
+| sources-provenance-source-material-allowed | PASS | Provider wrote sources.json with a source-material localPath and an explicit assumption.<br>The concrete research manifest accepted the fail-closed provenance allowlist positive case. |
+| sources-provenance-runtime-path-rejected | PASS | Provider wrote a reader-visible sources.json citation to run-state.json.<br>The concrete research manifest rejected runtime metadata before the stage could pass. |
+| sources-provenance-basis-runtime-rejected | PASS | Provider wrote a basis array pointing at run-state.json.<br>The concrete research manifest rejected path-like basis citations outside source-material/. |
+| sources-provenance-pathless-runtime-rejected | PASS | Provider wrote a pathless non-assumption sources.json entry.<br>The concrete research manifest rejected the pathless loophole unless the entry is an explicit assumption. |
 | path-boundary-inherited | PASS | research/brief.md was a symlink to a file outside the run directory.<br>The concrete research manifest inherited runStage boundary validation. |

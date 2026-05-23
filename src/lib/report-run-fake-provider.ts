@@ -85,8 +85,9 @@ function writeResearchArtifacts(runDir: string): void {
     path.resolve(runDir, "sources.json"),
     `${JSON.stringify([
       {
-        title: "Fake provider local fixture",
-        type: "synthetic",
+        id: "assumption-fake-provider-local-fixture",
+        kind: "assumption",
+        statement: "Fake provider local fixture for smoke coverage.",
       },
     ])}\n`,
   );

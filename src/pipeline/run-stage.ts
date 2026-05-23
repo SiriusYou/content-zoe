@@ -11,6 +11,7 @@ import {
   LLMProviderError,
   type LLMProvider,
 } from "../llm/provider.ts";
+import { validateSourcesProvenanceText } from "../lib/sources-provenance.ts";
 import {
   type JobContext,
   type ManifestError,
@@ -220,7 +221,19 @@ function validateManifestRule(
   }
 
   try {
-    JSON.parse(readFileSync(boundary.realPath, "utf8"));
+    const text = readFileSync(boundary.realPath, "utf8");
+    JSON.parse(text);
+    if (rule.kind === "sources_provenance_allowlist") {
+      const validation = validateSourcesProvenanceText(text, rule.path);
+      if (!validation.ok) {
+        return manifestError(
+          "MANIFEST_JSON_PROVENANCE_INVALID",
+          validation.message ?? `manifest provenance is invalid: ${rule.path}`,
+          rule,
+          { path: boundary.realPath, cause: validation.cause },
+        );
+      }
+    }
     return undefined;
   } catch (err) {
     return manifestError(
@@ -235,7 +248,7 @@ function validateManifestRule(
 function resolvePathRule(
   rule: Extract<
     ManifestRule,
-    { kind: "file_exists" | "file_non_empty" | "json_parseable" }
+    { kind: "file_exists" | "file_non_empty" | "json_parseable" | "sources_provenance_allowlist" }
   >,
   canonicalRunDir: string,
 ): {

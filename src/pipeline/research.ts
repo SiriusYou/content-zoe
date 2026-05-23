@@ -15,6 +15,8 @@ Create concise, implementation-ready research artifacts using only the informati
 Required outputs:
 - Write a non-empty Markdown brief to research/brief.md.
 - Write ./sources.json at the current working directory root as parseable JSON. Use a JSON array; each item may describe an input, assumption, or local source used. Do not place this file under research/.
+- In ./sources.json, every cited local path must be under source-material/. Explicit assumptions may omit local paths and must use kind "assumption" or an id beginning with "assumption".
+- Do not cite run-state.json, .runs files, transcripts, stderr logs, temporary files, reports, research outputs, or arbitrary current-directory files in ./sources.json.
 
 Do not require external web tools, MCP servers, browser automation, third-party research services such as Tavily, Exa, or Firecrawl, or real Codex credentials to complete this stage.
 
@@ -67,6 +69,7 @@ export const RESEARCH_STAGE: StageDef = {
     rules: [
       { kind: "file_non_empty", path: "research/brief.md" },
       { kind: "json_parseable", path: "sources.json" },
+      { kind: "sources_provenance_allowlist", path: "sources.json" },
     ],
   },
 };

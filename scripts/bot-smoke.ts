@@ -110,6 +110,7 @@ type ScenarioName =
   | "approve-without-source-material-optional"
   | "approve-missing-sources-json"
   | "approve-malformed-sources-json"
+  | "approve-invalid-sources-provenance"
   | "approve-missing-report-en"
   | "approve-source-material-present-missing-manifest"
   | "approve-source-material-manifest-shape-invalid"
@@ -188,6 +189,7 @@ const SCENARIOS: readonly ScenarioName[] = [
   "approve-without-source-material-optional",
   "approve-missing-sources-json",
   "approve-malformed-sources-json",
+  "approve-invalid-sources-provenance",
   "approve-missing-report-en",
   "approve-source-material-present-missing-manifest",
   "approve-source-material-manifest-shape-invalid",
@@ -237,19 +239,25 @@ const slice424Scope = new Set([
   "src/promote.ts",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
-  "src/lib/readme-publish-destination.ts",
-  "src/bin/report-publish-readme.ts",
-  "scripts/report-publish-readme-smoke.ts",
-  "docs/preflight/report-publish-readme-smoke.md",
+  "src/lib/sources-provenance.ts",
+  "src/lib/report-run-fake-provider.ts",
+  "src/pipeline/types.ts",
+  "src/pipeline/run-stage.ts",
+  "src/pipeline/research.ts",
+  "scripts/research-stage-smoke.ts",
+  "docs/preflight/research-stage-smoke.md",
 ]);
 const botSmokeActiveTriggers = new Set([
   "src/promote.ts",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
-  "src/lib/readme-publish-destination.ts",
-  "src/bin/report-publish-readme.ts",
-  "scripts/report-publish-readme-smoke.ts",
-  "docs/preflight/report-publish-readme-smoke.md",
+  "src/lib/sources-provenance.ts",
+  "src/lib/report-run-fake-provider.ts",
+  "src/pipeline/types.ts",
+  "src/pipeline/run-stage.ts",
+  "src/pipeline/research.ts",
+  "scripts/research-stage-smoke.ts",
+  "docs/preflight/research-stage-smoke.md",
 ]);
 const botSmokeActiveFrozenFiles = [
   "bun.lock",
@@ -267,9 +275,9 @@ const botSmokeActiveFrozenFiles = [
   "src/telegram/notifier.ts",
   "src/telegram/allowlist.ts",
   "src/lib/report-loop.ts",
-  "src/lib/report-run-fake-provider.ts",
   "src/lib/runtime-config.ts",
   "src/lib/publish-destination.ts",
+  "src/lib/readme-publish-destination.ts",
   "src/bin/report-create.ts",
   "src/bin/report-remind.ts",
   "src/bin/report-status.ts",
@@ -282,7 +290,6 @@ const botSmokeActiveFrozenFiles = [
   "src/preflight.ts",
 ];
 const botSmokeActiveFrozenDirectories = [
-  "src/pipeline/",
   "src/migrations/",
   "src/llm/",
   "src/prompts/",
@@ -460,6 +467,8 @@ async function scenarioImpl(
       return runApproveMissingSourcesJson(dir);
     case "approve-malformed-sources-json":
       return runApproveMalformedSourcesJson(dir);
+    case "approve-invalid-sources-provenance":
+      return runApproveInvalidSourcesProvenance(dir);
     case "approve-missing-report-en":
       return runApproveMissingReportEn(dir);
     case "approve-source-material-present-missing-manifest":
@@ -1718,6 +1727,28 @@ async function runApproveMalformedSourcesJson(dir: string): Promise<string[]> {
       writeFileSync(resolve(attemptDir, "sources.json"), "{not json\n", "utf8");
     },
     detail: "Valid cloned attempt with malformed sources.json fails before reports/DB/events mutation.",
+  });
+}
+
+async function runApproveInvalidSourcesProvenance(dir: string): Promise<string[]> {
+  return runApprovePreconditionFailureCase(dir, {
+    jobId: "approve-invalid-sources-provenance",
+    weekKey: "2026-W72",
+    expectedCode: "PUBLISH_SOURCE_MISSING",
+    mutate(attemptDir) {
+      writeFileSync(
+        resolve(attemptDir, "sources.json"),
+        `${JSON.stringify([
+          {
+            id: "run-state",
+            kind: "local_run_state",
+            localPath: "run-state.json",
+          },
+        ])}\n`,
+        "utf8",
+      );
+    },
+    detail: "Valid cloned attempt with sources.json citing run-state.json fails before reports/DB/events mutation.",
   });
 }
 
@@ -3164,7 +3195,7 @@ function runBoundaryStaticCheck(): string[] {
 
   return [
     `Cycle-scope boundary check ran in ${scopeMode} mode and saw changed files: ${changed.join(", ") || "<none>"}.`,
-    "Active Slice 4.24 scope admits only promote, bot-smoke evidence, and report-publish-readme implementation/smoke files.",
+    "Active Slice 4.28 scope admits only sources provenance validation, research prompt/rule, promote boundary, and smoke evidence files.",
     "Synthetic Slice 4.12 report:create files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic Slice 4.13 report:remind files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic Slice 4.14 report:status files resolve to inherited-surface mode without a bot-smoke exemption.",
@@ -3330,9 +3361,24 @@ function writeAttemptBundle(
     );
   }
   if (options.omit !== "sources.json") {
+    const sources = options.sourceMaterial === true
+      ? [
+          {
+            id: "operator:facts.md",
+            kind: "operator_source",
+            localPath: "source-material/operator/facts.md",
+          },
+        ]
+      : [
+          {
+            id: `assumption-${jobId}`,
+            kind: "assumption",
+            statement: `Synthetic local source assumption for ${jobId} attempt ${attemptNumber}.`,
+          },
+        ];
     writeFileSync(
       resolve(attemptDir, "sources.json"),
-      `${JSON.stringify([{ title: "Local source", jobId, attemptNumber }])}\n`,
+      `${JSON.stringify(sources)}\n`,
     );
   }
   if (options.omit !== "research") {
@@ -3500,7 +3546,11 @@ function eventCount(db: DbClient): number {
 }
 
 function changedFilesAgainstBase(): string[] {
-  return changedFilesForCurrentCycle(repoRoot);
+  return changedFilesForCurrentCycle(repoRoot).filter(
+    (file) =>
+      !file.startsWith("reports/2026-W22-ai-trends/") &&
+      !file.startsWith("reports/2026-W23-ai-trends/"),
+  );
 }
 
 function readSource(relativePath: string): string {

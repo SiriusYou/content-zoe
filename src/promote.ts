@@ -23,6 +23,7 @@ import {
   type Event,
   type Job,
 } from "./db.ts";
+import { validateSourcesProvenanceText } from "./lib/sources-provenance.ts";
 
 export type PromoteErrorCode =
   | "UNKNOWN_JOB"
@@ -221,7 +222,14 @@ function readSourceManifest(
       assertRequiredFile(cwd, sourceAttemptDir, "report.zh.md");
     }
     const sourcesPath = assertRequiredFile(cwd, sourceAttemptDir, "sources.json");
-    JSON.parse(readFileSync(sourcesPath, "utf8"));
+    const sourcesText = readFileSync(sourcesPath, "utf8");
+    JSON.parse(sourcesText);
+    const sourcesValidation = validateSourcesProvenanceText(sourcesText, "sources.json");
+    if (!sourcesValidation.ok) {
+      throw new Error(sourcesValidation.message ?? "sources.json provenance is invalid", {
+        cause: sourcesValidation.cause,
+      });
+    }
 
     const researchDir = resolveUnderDirectory(cwd, sourceAttemptDir, "research");
     if (!statSync(researchDir).isDirectory()) {

@@ -44,6 +44,10 @@ export type ManifestRule =
       path: string;
     }
   | {
+      kind: "sources_provenance_allowlist";
+      path: string;
+    }
+  | {
       kind: "files_match_glob";
       glob: string;
       minCount?: number;
@@ -53,6 +57,7 @@ export type ManifestErrorCode =
   | "MANIFEST_FILE_MISSING"
   | "MANIFEST_FILE_EMPTY"
   | "MANIFEST_JSON_UNPARSEABLE"
+  | "MANIFEST_JSON_PROVENANCE_INVALID"
   | "MANIFEST_GLOB_NO_MATCH"
   | "MANIFEST_PATH_OUTSIDE_RUNDIR";
 

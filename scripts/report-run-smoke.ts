@@ -1413,15 +1413,20 @@ async function runReportRunSourceCarryForward(dir: string): Promise<string[]> {
 
 async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
   const allowed = new Set([
-    "src/bin/report-run.ts",
+    "src/promote.ts",
+    "src/lib/sources-provenance.ts",
     "src/lib/report-run-fake-provider.ts",
+    "src/pipeline/types.ts",
+    "src/pipeline/run-stage.ts",
     "src/pipeline/research.ts",
+    "scripts/bot-smoke.ts",
+    "docs/preflight/bot-smoke.md",
     "scripts/research-stage-smoke.ts",
     "docs/preflight/research-stage-smoke.md",
     "scripts/report-run-smoke.ts",
     "docs/preflight/report-run-smoke.md",
   ]);
-  const anchor = "32ad4486cd2cb3b88db4f782abc38d231ffe9b70";
+  const anchor = "a310f9bae4c161143be1507b1ca7982f99773e29";
   const committed = gitLines(["diff", "--name-only", `${anchor}..HEAD`]);
   const working = gitLines(["diff", "--name-only", anchor]).filter(
     (name) => name !== "README.md" && !name.startsWith("reports/"),
@@ -1433,6 +1438,8 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
 
   const reportRun = readFileSync(resolve(repoRoot, "src", "bin", "report-run.ts"), "utf8");
   const research = readFileSync(resolve(repoRoot, "src", "pipeline", "research.ts"), "utf8");
+  const runStageSource = readFileSync(resolve(repoRoot, "src", "pipeline", "run-stage.ts"), "utf8");
+  const promoteSource = readFileSync(resolve(repoRoot, "src", "promote.ts"), "utf8");
   const fakeProvider = readFileSync(resolve(repoRoot, "src", "lib", "report-run-fake-provider.ts"), "utf8");
   assert(reportRun.includes("stageResearchSourceMaterial"), "report-run lacks source staging helper");
   assert(reportRun.includes('".data",\n    SOURCE_MATERIAL_DIR'), "operator source convention is not .data/source-material/<job-id>");
@@ -1442,6 +1449,9 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
   assert(!reportRun.includes('kind: "repo_context"'), "report-run still emits repo_context manifest entries");
   assert(research.includes("export function buildResearchPrompt"), "research prompt lacks buildPrompt path");
   assert(research.includes("return `${RESEARCH_PROMPT}"), "research buildPrompt does not begin with RESEARCH_PROMPT");
+  assert(research.includes('kind: "sources_provenance_allowlist"'), "research stage lacks sources provenance manifest rule");
+  assert(runStageSource.includes("validateSourcesProvenanceText"), "runStage does not validate sources provenance output");
+  assert(promoteSource.includes("validateSourcesProvenanceText"), "promote boundary does not validate sources provenance output");
   assert(
     fakeProvider.includes("prompt.startsWith(STAGES[Stage.RESEARCH].prompt)"),
     "fake provider research matcher is not strict-prefix compatible",
@@ -1459,6 +1469,7 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
     "src/migrations/",
     "src/telegram/",
     "src/bin/report-create.ts",
+    "src/bin/report-run.ts",
     "src/bin/report-show.ts",
     "src/bin/report-events.ts",
     "src/bin/report-publish-readme.ts",
@@ -1468,7 +1479,6 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
     "src/pipeline/translate-zh.ts",
     "AGENTS.md",
     "CLAUDE.md",
-    "PLAN.md",
     "ROLE_POSITIONING.md",
     "docs/process/",
     ".omx/memory-edit/",
@@ -1478,8 +1488,8 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
 
   return [
     `Approval-label-anchor diff inspected (${anchor}..HEAD plus implementation working files, excluding pre-existing README/reports runtime evidence): ${names.join(", ")}.`,
-    "Only Slice 4.26 allowed implementation/evidence files were present in the boundary diff.",
-    "Static source inspection found local report-run source staging, the .data/source-material/<job-id> convention, and no automatic repo-context code path.",
+    "Only Slice 4.28 allowed implementation/evidence files were present in the boundary diff.",
+    "Static source inspection found local report-run source staging, the .data/source-material/<job-id> convention, no automatic repo-context code path, and sources provenance validation at research/promote boundaries.",
     "Static hard-out scan found no package/schema/runtime/provider/downstream prompt/publish/Telegram/governance surfaces in the implementation range.",
   ];
 }

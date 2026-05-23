@@ -28,6 +28,10 @@ type ScenarioName =
   | "missing-research-brief"
   | "empty-research-brief"
   | "empty-sources-json"
+  | "sources-provenance-source-material-allowed"
+  | "sources-provenance-runtime-path-rejected"
+  | "sources-provenance-basis-runtime-rejected"
+  | "sources-provenance-pathless-runtime-rejected"
   | "path-boundary-inherited";
 
 interface ScenarioOutcome {
@@ -47,6 +51,10 @@ const SCENARIOS: ScenarioName[] = [
   "missing-research-brief",
   "empty-research-brief",
   "empty-sources-json",
+  "sources-provenance-source-material-allowed",
+  "sources-provenance-runtime-path-rejected",
+  "sources-provenance-basis-runtime-rejected",
+  "sources-provenance-pathless-runtime-rejected",
   "path-boundary-inherited",
 ];
 
@@ -128,6 +136,14 @@ async function scenarioImpl(
       return runEmptyResearchBrief(runDir);
     case "empty-sources-json":
       return runEmptySourcesJson(runDir);
+    case "sources-provenance-source-material-allowed":
+      return runSourcesProvenanceSourceMaterialAllowed(runDir);
+    case "sources-provenance-runtime-path-rejected":
+      return runSourcesProvenanceRuntimePathRejected(runDir);
+    case "sources-provenance-basis-runtime-rejected":
+      return runSourcesProvenanceBasisRuntimeRejected(runDir);
+    case "sources-provenance-pathless-runtime-rejected":
+      return runSourcesProvenancePathlessRuntimeRejected(runDir);
     case "path-boundary-inherited":
       return runPathBoundaryInherited(runDir);
   }
@@ -165,6 +181,8 @@ async function runResearchSourceContextPrompt(runDir: string): Promise<string[]>
   assert(prompt.includes("Write ./sources.json at the current working directory root"), "prompt must pin sources.json to the attempt root");
   assert(prompt.includes("Do not place this file under research/"), "prompt must forbid nested research/sources.json");
   assert(prompt.includes("cite the staged source entry in ./sources.json"), "prompt must require staged-source citations in root sources.json");
+  assert(prompt.includes("must be under source-material/"), "prompt must fail-close sources.json local paths to source-material");
+  assert(prompt.includes("Do not cite run-state.json"), "prompt must forbid runtime metadata citations");
   assert(prompt.includes("Do not use external web search"), "prompt must preserve the no-external-tools stance");
   return [
     "buildResearchPrompt output began with RESEARCH_PROMPT verbatim.",
@@ -319,6 +337,101 @@ async function runEmptySourcesJson(runDir: string): Promise<string[]> {
   return [
     "Provider wrote non-empty research/brief.md and empty sources.json.",
     "The concrete research manifest failed with MANIFEST_JSON_UNPARSEABLE.",
+  ];
+}
+
+async function runSourcesProvenanceSourceMaterialAllowed(runDir: string): Promise<string[]> {
+  const result = await runStage(
+    STAGES[Stage.RESEARCH],
+    new WritingProvider(() => {
+      mkdirSync(resolve(runDir, "research"), { recursive: true });
+      writeFileSync(resolve(runDir, "research", "brief.md"), "brief\n");
+      writeFileSync(
+        resolve(runDir, "sources.json"),
+        `${JSON.stringify([
+          {
+            id: "operator:facts.md",
+            kind: "operator_source",
+            localPath: "source-material/operator/facts.md",
+          },
+          {
+            id: "assumption-evidence-limits",
+            kind: "assumption",
+            statement: "Evidence limits are stated explicitly.",
+          },
+        ])}\n`,
+      );
+    }),
+    { runDir, cwd: repoRoot },
+  );
+
+  assert(result.status === "ok", `expected ok for source-material provenance, got ${result.status}`);
+  return [
+    "Provider wrote sources.json with a source-material localPath and an explicit assumption.",
+    "The concrete research manifest accepted the fail-closed provenance allowlist positive case.",
+  ];
+}
+
+async function runSourcesProvenanceRuntimePathRejected(runDir: string): Promise<string[]> {
+  const result = await runStage(
+    STAGES[Stage.RESEARCH],
+    new WritingProvider(() => {
+      mkdirSync(resolve(runDir, "research"), { recursive: true });
+      writeFileSync(resolve(runDir, "research", "brief.md"), "brief\n");
+      writeFileSync(
+        resolve(runDir, "sources.json"),
+        `${JSON.stringify([{ id: "run-state", kind: "local_run_state", localPath: "run-state.json" }])}\n`,
+      );
+    }),
+    { runDir, cwd: repoRoot },
+  );
+
+  assertManifestCode(result, "MANIFEST_JSON_PROVENANCE_INVALID");
+  return [
+    "Provider wrote a reader-visible sources.json citation to run-state.json.",
+    "The concrete research manifest rejected runtime metadata before the stage could pass.",
+  ];
+}
+
+async function runSourcesProvenanceBasisRuntimeRejected(runDir: string): Promise<string[]> {
+  const result = await runStage(
+    STAGES[Stage.RESEARCH],
+    new WritingProvider(() => {
+      mkdirSync(resolve(runDir, "research"), { recursive: true });
+      writeFileSync(resolve(runDir, "research", "brief.md"), "brief\n");
+      writeFileSync(
+        resolve(runDir, "sources.json"),
+        `${JSON.stringify([{ id: "derived-note", basis: ["run-state.json"] }])}\n`,
+      );
+    }),
+    { runDir, cwd: repoRoot },
+  );
+
+  assertManifestCode(result, "MANIFEST_JSON_PROVENANCE_INVALID");
+  return [
+    "Provider wrote a basis array pointing at run-state.json.",
+    "The concrete research manifest rejected path-like basis citations outside source-material/.",
+  ];
+}
+
+async function runSourcesProvenancePathlessRuntimeRejected(runDir: string): Promise<string[]> {
+  const result = await runStage(
+    STAGES[Stage.RESEARCH],
+    new WritingProvider(() => {
+      mkdirSync(resolve(runDir, "research"), { recursive: true });
+      writeFileSync(resolve(runDir, "research", "brief.md"), "brief\n");
+      writeFileSync(
+        resolve(runDir, "sources.json"),
+        `${JSON.stringify([{ kind: "runtime", title: "Pathless runtime metadata" }])}\n`,
+      );
+    }),
+    { runDir, cwd: repoRoot },
+  );
+
+  assertManifestCode(result, "MANIFEST_JSON_PROVENANCE_INVALID");
+  return [
+    "Provider wrote a pathless non-assumption sources.json entry.",
+    "The concrete research manifest rejected the pathless loophole unless the entry is an explicit assumption.",
   ];
 }
 
