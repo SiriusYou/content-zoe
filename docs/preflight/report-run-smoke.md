@@ -1,9 +1,9 @@
 # report-run smoke evidence
 
 - Command: `bun run report-run-smoke`
-- Started: 2026-05-23T01:36:51.996Z
-- Finished: 2026-05-23T01:36:52.810Z
-- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-23T01-36-51.996Z (removed by finally-cleanup)
+- Started: 2026-05-23T02:06:41.177Z
+- Finished: 2026-05-23T02:06:41.977Z
+- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-23T02-06-41.176Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
@@ -38,4 +38,4 @@
 | report-run-source-total-bound | PASS | Aggregate operator source content over 1 MiB failed before provider invocation.<br>Failure happened before fake-provider research artifacts, lifecycle stage_enter, or stage_complete.<br>The DB job status/current_stage/attempt_number remained unchanged. |
 | report-run-source-symlink-escape | PASS | Symlink escape in operator source material failed before provider invocation.<br>Failure happened before fake-provider research artifacts, lifecycle stage_enter, or stage_complete.<br>The DB job status/current_stage/attempt_number remained unchanged. |
 | report-run-source-carry-forward | PASS | Resume from completed research carried source-material alongside research/ and sources.json.<br>Missing research prompt was never called, preserving Slice 4.22 downstream resume behavior. |
-| report-run-boundary-static-check | PASS | Approval-label-anchor diff inspected (a310f9bae4c161143be1507b1ca7982f99773e29..HEAD plus implementation working files, excluding pre-existing README/reports runtime evidence): docs/preflight/bot-smoke.md, docs/preflight/report-run-smoke.md, docs/preflight/research-stage-smoke.md, scripts/bot-smoke.ts, scripts/report-run-smoke.ts, scripts/research-stage-smoke.ts, src/lib/report-run-fake-provider.ts, src/pipeline/research.ts, src/pipeline/run-stage.ts, src/pipeline/types.ts, src/promote.ts.<br>Only Slice 4.28 allowed implementation/evidence files were present in the boundary diff.<br>Static source inspection found local report-run source staging, the .data/source-material/<job-id> convention, no automatic repo-context code path, and sources provenance validation at research/promote boundaries.<br>Static hard-out scan found no package/schema/runtime/provider/downstream prompt/publish/Telegram/governance surfaces in the implementation range. |
+| report-run-boundary-static-check | PASS | Approval-label-anchor diff inspected (a310f9bae4c161143be1507b1ca7982f99773e29..HEAD plus implementation working files, excluding pre-existing README/reports runtime evidence): docs/preflight/bot-smoke.md, docs/preflight/report-run-smoke.md, docs/preflight/research-stage-smoke.md, scripts/bot-smoke.ts, scripts/report-run-smoke.ts, scripts/research-stage-smoke.ts, src/lib/report-run-fake-provider.ts, src/lib/sources-provenance.ts, src/pipeline/research.ts, src/pipeline/run-stage.ts, src/pipeline/types.ts, src/promote.ts.<br>Only Slice 4.28 allowed implementation/evidence files were present in the boundary diff.<br>Static source inspection found local report-run source staging, the .data/source-material/<job-id> convention, no automatic repo-context code path, and sources provenance validation at research/promote boundaries.<br>Static hard-out scan found no package/schema/runtime/provider/downstream prompt/publish/Telegram/governance surfaces in the implementation range. |

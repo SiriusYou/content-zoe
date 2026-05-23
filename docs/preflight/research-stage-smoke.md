@@ -1,9 +1,9 @@
 # research-stage smoke evidence
 
 - Command: `bun run research-stage-smoke`
-- Started: 2026-05-23T01:32:13.703Z
-- Finished: 2026-05-23T01:32:13.715Z
-- Scenario root: /Users/youjia/dev/content-zoe/.runs/research-stage-smoke/2026-05-23T01-32-13.701Z (removed by finally-cleanup)
+- Started: 2026-05-23T02:06:18.018Z
+- Finished: 2026-05-23T02:06:18.024Z
+- Scenario root: /Users/youjia/dev/content-zoe/.runs/research-stage-smoke/2026-05-23T02-06-18.018Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|

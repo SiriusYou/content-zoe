@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import {
   assertCycleScopePolicy,
   assertNoForbiddenPatterns,
-  changedFilesForCurrentCycle,
+  changedFilesAgainstBase as changedFilesAgainstBaseFromAnchor,
   PROCESS_SPAWN_PATTERNS,
   PROMPT_SURFACE_PATTERNS,
   TELEGRAM_SDK_IMPORT_PATTERNS,
@@ -235,6 +235,7 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
+const slice428ImplementationAnchor = "a310f9bae4c161143be1507b1ca7982f99773e29";
 const slice424Scope = new Set([
   "src/promote.ts",
   "scripts/bot-smoke.ts",
@@ -246,6 +247,8 @@ const slice424Scope = new Set([
   "src/pipeline/research.ts",
   "scripts/research-stage-smoke.ts",
   "docs/preflight/research-stage-smoke.md",
+  "scripts/report-run-smoke.ts",
+  "docs/preflight/report-run-smoke.md",
 ]);
 const botSmokeActiveTriggers = new Set([
   "src/promote.ts",
@@ -258,6 +261,8 @@ const botSmokeActiveTriggers = new Set([
   "src/pipeline/research.ts",
   "scripts/research-stage-smoke.ts",
   "docs/preflight/research-stage-smoke.md",
+  "scripts/report-run-smoke.ts",
+  "docs/preflight/report-run-smoke.md",
 ]);
 const botSmokeActiveFrozenFiles = [
   "bun.lock",
@@ -3546,7 +3551,7 @@ function eventCount(db: DbClient): number {
 }
 
 function changedFilesAgainstBase(): string[] {
-  return changedFilesForCurrentCycle(repoRoot).filter(
+  return changedFilesAgainstBaseFromAnchor(repoRoot, slice428ImplementationAnchor).filter(
     (file) =>
       !file.startsWith("reports/2026-W22-ai-trends/") &&
       !file.startsWith("reports/2026-W23-ai-trends/"),
