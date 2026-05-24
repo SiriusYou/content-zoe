@@ -1,0 +1,44 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": "Job metadata and staged source inventory."
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": "Primary report angle, safe claims, unsafe claims, and publication gate."
+  },
+  {
+    "id": "operator:briefing/clinical-use-and-training-signal.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/clinical-use-and-training-signal.md",
+    "usedFor": "Physician adoption, training pressure, and augmented-intelligence framing."
+  },
+  {
+    "id": "operator:briefing/data-infrastructure-and-transparency-controls.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/data-infrastructure-and-transparency-controls.md",
+    "usedFor": "Interoperability, TEFCA, certification, and transparency control-surface framing."
+  },
+  {
+    "id": "operator:briefing/device-lifecycle-and-real-world-assurance.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/device-lifecycle-and-real-world-assurance.md",
+    "usedFor": "Lifecycle assurance and real-world monitoring for regulated AI-enabled device software."
+  },
+  {
+    "id": "operator:briefing/vendor-accountability-and-cyber-risk.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/vendor-accountability-and-cyber-risk.md",
+    "usedFor": "Third-party AI accountability, procurement controls, and cybersecurity framing."
+  },
+  {
+    "id": "operator:references/privacy-scaling-and-risk-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/privacy-scaling-and-risk-boundaries.md",
+    "usedFor": "Privacy, de-identification, responsible scaling, and risk-boundary framing."
+  }
+]
