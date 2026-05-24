@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W29-ai-trends",
+  "weekKey": "2026-W29",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 2,
+  "generatedAt": "2026-05-24T03:41:57.830Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W29-ai-trends",
+    "totalByteCount": 13341,
+    "entries": [
+      "source-material/operator/briefing/clinical-adoption-and-workforce.md",
+      "source-material/operator/briefing/federal-policy-and-device-oversight.md",
+      "source-material/operator/briefing/health-system-governance-and-third-party-risk.md",
+      "source-material/operator/briefing/international-scale-and-evidence-limits.md",
+      "source-material/operator/references/privacy-safety-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2015,
+      "sha256": "97e7d4a5a5dcdc0d68db729ac0d2449dc0cc6b47320cb50f63f47178d8e82a6c"
+    },
+    {
+      "id": "operator:briefing/clinical-adoption-and-workforce.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W29-ai-trends/briefing/clinical-adoption-and-workforce.md",
+      "localPath": "source-material/operator/briefing/clinical-adoption-and-workforce.md",
+      "byteCount": 1849,
+      "sha256": "32eb66fa0db6ca5ec5d54d6ffb9e14d3689a7606b6e5f7331c0c7b1596b597b1"
+    },
+    {
+      "id": "operator:briefing/federal-policy-and-device-oversight.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W29-ai-trends/briefing/federal-policy-and-device-oversight.md",
+      "localPath": "source-material/operator/briefing/federal-policy-and-device-oversight.md",
+      "byteCount": 2721,
+      "sha256": "1c501519879c0224018040023cc5e70bea8ed7fc9dab0625b1e43255536ac640"
+    },
+    {
+      "id": "operator:briefing/health-system-governance-and-third-party-risk.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W29-ai-trends/briefing/health-system-governance-and-third-party-risk.md",
+      "localPath": "source-material/operator/briefing/health-system-governance-and-third-party-risk.md",
+      "byteCount": 2233,
+      "sha256": "829f54ffed7381d28c0991f6f76a77e9832d52e1ff59f5edf6ef3135cc335094"
+    },
+    {
+      "id": "operator:briefing/international-scale-and-evidence-limits.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W29-ai-trends/briefing/international-scale-and-evidence-limits.md",
+      "localPath": "source-material/operator/briefing/international-scale-and-evidence-limits.md",
+      "byteCount": 2067,
+      "sha256": "060fe3f847b21eea7e598a43eadc3444c8dde6c85cb9d9baf7d32a246047b04e"
+    },
+    {
+      "id": "operator:references/privacy-safety-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W29-ai-trends/references/privacy-safety-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/privacy-safety-and-reader-boundaries.md",
+      "byteCount": 2030,
+      "sha256": "b8ce7efa8605ba6a90dc9b1e41d9d4e9c04bf75de2295857253e02c33b236028"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W29-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 2441,
+      "sha256": "0c0d0d3109f51ffb18321ed9ecdeeafe2556c7b1a455c044a4be13f04c0870d2"
+    }
+  ]
+}

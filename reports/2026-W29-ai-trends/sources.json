@@ -1,0 +1,85 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": [
+      "job metadata",
+      "staged source inventory"
+    ]
+  },
+  {
+    "id": "source-material-manifest",
+    "kind": "research_source_material_manifest",
+    "localPath": "source-material/manifest.json",
+    "usedFor": [
+      "job metadata confirmation",
+      "operator source entry validation"
+    ]
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "intended report angle",
+      "safe and unsafe claim boundaries",
+      "publication gate guidance"
+    ]
+  },
+  {
+    "id": "operator:briefing/clinical-adoption-and-workforce.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/clinical-adoption-and-workforce.md",
+    "usedFor": [
+      "physician adoption figures",
+      "workflow use cases",
+      "adoption evidence limits"
+    ]
+  },
+  {
+    "id": "operator:briefing/federal-policy-and-device-oversight.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/federal-policy-and-device-oversight.md",
+    "usedFor": [
+      "FDA lifecycle and cybersecurity framing",
+      "HHS and ONC coordination framing",
+      "regulated vs workflow AI distinction"
+    ]
+  },
+  {
+    "id": "operator:briefing/health-system-governance-and-third-party-risk.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/health-system-governance-and-third-party-risk.md",
+    "usedFor": [
+      "third-party AI risk framing",
+      "procurement and contract controls",
+      "vendor accountability limits"
+    ]
+  },
+  {
+    "id": "operator:briefing/international-scale-and-evidence-limits.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/international-scale-and-evidence-limits.md",
+    "usedFor": [
+      "OECD scaling constraints",
+      "policy readiness limits",
+      "international evidence caveats"
+    ]
+  },
+  {
+    "id": "operator:references/privacy-safety-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/privacy-safety-and-reader-boundaries.md",
+    "usedFor": [
+      "privacy and de-identification boundaries",
+      "WHO and NIST risk framing",
+      "reader safety cautions"
+    ]
+  },
+  {
+    "id": "assumption-synthesis-scope",
+    "kind": "assumption",
+    "statement": "Because the staged bundle consists of summarized source notes and boundaries rather than full primary documents, the brief preserves the bundle's stated evidence limits and avoids stronger factual claims."
+  }
+]
