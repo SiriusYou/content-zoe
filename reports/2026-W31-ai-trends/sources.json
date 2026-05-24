@@ -1,0 +1,55 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "role": "attempt-local job context and staged source inventory"
+  },
+  {
+    "id": "source-material-manifest",
+    "kind": "source_manifest",
+    "localPath": "source-material/manifest.json",
+    "role": "parseable record of staged source entries and local paths"
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "role": "primary report angle, safe claims, unsafe claims, and publication gate"
+  },
+  {
+    "id": "operator:briefing/physician-use-training-and-accountability.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/physician-use-training-and-accountability.md",
+    "role": "physician adoption signal, training needs, and accountability framing"
+  },
+  {
+    "id": "operator:briefing/interoperability-and-federal-ai-infrastructure.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/interoperability-and-federal-ai-infrastructure.md",
+    "role": "federal interoperability, TEFCA, and algorithm-transparency infrastructure framing"
+  },
+  {
+    "id": "operator:briefing/ai-device-evidence-and-real-world-monitoring.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/ai-device-evidence-and-real-world-monitoring.md",
+    "role": "regulated-device lifecycle evidence and post-deployment monitoring framing"
+  },
+  {
+    "id": "operator:briefing/vendor-risk-cybersecurity-and-procurement.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/vendor-risk-cybersecurity-and-procurement.md",
+    "role": "third-party AI procurement, supply-chain, and cybersecurity risk framing"
+  },
+  {
+    "id": "operator:references/regulatory-privacy-and-risk-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/regulatory-privacy-and-risk-boundaries.md",
+    "role": "privacy, de-identification, responsible scaling, and AI risk boundary framing"
+  },
+  {
+    "id": "assumption-no-external-evidence",
+    "kind": "assumption",
+    "role": "brief is intentionally constrained to staged local materials and does not assert facts beyond them"
+  }
+]
