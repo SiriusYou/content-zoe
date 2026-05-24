@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W33-ai-trends",
+  "weekKey": "2026-W33",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-24T06:41:20.724Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W33-ai-trends",
+    "totalByteCount": 13284,
+    "entries": [
+      "source-material/operator/briefing/data-transparency-and-interoperability-controls.md",
+      "source-material/operator/briefing/device-lifecycle-and-evidence-controls.md",
+      "source-material/operator/briefing/procurement-vendor-risk-and-cyber-resilience.md",
+      "source-material/operator/briefing/workforce-readiness-and-clinical-accountability.md",
+      "source-material/operator/references/privacy-security-and-international-governance-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2107,
+      "sha256": "a77ef1607be34731d3455637c2fd38bb98b97fb5b97330bb4e1f11c7471aacd8"
+    },
+    {
+      "id": "operator:briefing/data-transparency-and-interoperability-controls.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W33-ai-trends/briefing/data-transparency-and-interoperability-controls.md",
+      "localPath": "source-material/operator/briefing/data-transparency-and-interoperability-controls.md",
+      "byteCount": 2198,
+      "sha256": "96eeef5ebad4fb00e8d1d41064e479af2ab1c214b4e9be0ed720a3dd3467ce2c"
+    },
+    {
+      "id": "operator:briefing/device-lifecycle-and-evidence-controls.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W33-ai-trends/briefing/device-lifecycle-and-evidence-controls.md",
+      "localPath": "source-material/operator/briefing/device-lifecycle-and-evidence-controls.md",
+      "byteCount": 2196,
+      "sha256": "7c0831e0d05cd220c271093ee70e3cb1baf52d1026b6fb30c94054ae373f1b27"
+    },
+    {
+      "id": "operator:briefing/procurement-vendor-risk-and-cyber-resilience.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W33-ai-trends/briefing/procurement-vendor-risk-and-cyber-resilience.md",
+      "localPath": "source-material/operator/briefing/procurement-vendor-risk-and-cyber-resilience.md",
+      "byteCount": 1770,
+      "sha256": "0b9e538e58142867d91fda2973a9267b7b61763e3562cfdc52c347c9a6c47b20"
+    },
+    {
+      "id": "operator:briefing/workforce-readiness-and-clinical-accountability.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W33-ai-trends/briefing/workforce-readiness-and-clinical-accountability.md",
+      "localPath": "source-material/operator/briefing/workforce-readiness-and-clinical-accountability.md",
+      "byteCount": 1932,
+      "sha256": "eb661687979dbe39da938be11edc8a18b6450340f3531645b6c2643250a9b12a"
+    },
+    {
+      "id": "operator:references/privacy-security-and-international-governance-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W33-ai-trends/references/privacy-security-and-international-governance-boundaries.md",
+      "localPath": "source-material/operator/references/privacy-security-and-international-governance-boundaries.md",
+      "byteCount": 1852,
+      "sha256": "036c88d395713451d0bf779b1651c2b20c4c62d3cc37495a4b1747a11f47fbd4"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W33-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 3336,
+      "sha256": "8cb931c44bfb485f93f014dd0cc707034d90bc17bdd497078e911bee00943c07"
+    }
+  ]
+}
