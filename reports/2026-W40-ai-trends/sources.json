@@ -1,0 +1,78 @@
+[
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "report thesis",
+      "style constraints",
+      "safe and unsafe claims",
+      "publication gate"
+    ]
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "usedFor": [
+      "evidence posture",
+      "reader-facing claim limits",
+      "source boundary reminders"
+    ]
+  },
+  {
+    "id": "operator:briefing/baselines-and-local-validation.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/baselines-and-local-validation.md",
+    "usedFor": [
+      "baseline requirements",
+      "local validation framing",
+      "fit-and-limits language"
+    ]
+  },
+  {
+    "id": "operator:briefing/drift-monitoring-and-signal-thresholds.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/drift-monitoring-and-signal-thresholds.md",
+    "usedFor": [
+      "monitoring section",
+      "signal and threshold framing",
+      "response options"
+    ]
+  },
+  {
+    "id": "operator:briefing/change-control-and-release-evidence.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/change-control-and-release-evidence.md",
+    "usedFor": [
+      "change-control section",
+      "release evidence requirements",
+      "regulated-device caution"
+    ]
+  },
+  {
+    "id": "operator:briefing/workflow-impact-and-human-oversight.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/workflow-impact-and-human-oversight.md",
+    "usedFor": [
+      "human oversight framing",
+      "workflow impact evidence examples",
+      "escalation and authority conditions"
+    ]
+  },
+  {
+    "id": "operator:briefing/accountability-records-and-response-routines.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/accountability-records-and-response-routines.md",
+    "usedFor": [
+      "closing section",
+      "accountability records",
+      "signal-to-decision narrative"
+    ]
+  },
+  {
+    "id": "assumption:no-local-outcome-evidence",
+    "kind": "assumption",
+    "statement": "Because the staged material is governance-oriented and contains no local deployment metrics or incident data, the brief assumes the report must avoid outcome-proof claims and present source gaps explicitly."
+  }
+]

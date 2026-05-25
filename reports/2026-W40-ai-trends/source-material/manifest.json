@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W40-ai-trends",
+  "weekKey": "2026-W40",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-25T05:06:56.804Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W40-ai-trends",
+    "totalByteCount": 12749,
+    "entries": [
+      "source-material/operator/briefing/accountability-records-and-response-routines.md",
+      "source-material/operator/briefing/baselines-and-local-validation.md",
+      "source-material/operator/briefing/change-control-and-release-evidence.md",
+      "source-material/operator/briefing/drift-monitoring-and-signal-thresholds.md",
+      "source-material/operator/briefing/workflow-impact-and-human-oversight.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2264,
+      "sha256": "aeb25ec889f8d636fffb1c0055335de2f539561078c27924bbe3d6cee92c7e4c"
+    },
+    {
+      "id": "operator:briefing/accountability-records-and-response-routines.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W40-ai-trends/briefing/accountability-records-and-response-routines.md",
+      "localPath": "source-material/operator/briefing/accountability-records-and-response-routines.md",
+      "byteCount": 1621,
+      "sha256": "96bd4531241f80159aed9474c6a05177cd64fe3b9d5d2010abb152b7f1932325"
+    },
+    {
+      "id": "operator:briefing/baselines-and-local-validation.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W40-ai-trends/briefing/baselines-and-local-validation.md",
+      "localPath": "source-material/operator/briefing/baselines-and-local-validation.md",
+      "byteCount": 1630,
+      "sha256": "bacc74a0ddbd2697861a9371bc215d576ddf723a905e99a0dba1d9cf5d1b91d3"
+    },
+    {
+      "id": "operator:briefing/change-control-and-release-evidence.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W40-ai-trends/briefing/change-control-and-release-evidence.md",
+      "localPath": "source-material/operator/briefing/change-control-and-release-evidence.md",
+      "byteCount": 1852,
+      "sha256": "a5581a07b4777d71b6fd155c856c98ec91e5ecfbaec5ace658481c5a65c90fc9"
+    },
+    {
+      "id": "operator:briefing/drift-monitoring-and-signal-thresholds.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W40-ai-trends/briefing/drift-monitoring-and-signal-thresholds.md",
+      "localPath": "source-material/operator/briefing/drift-monitoring-and-signal-thresholds.md",
+      "byteCount": 1680,
+      "sha256": "5dd51790ddb9bbca409f48e9ab2b4251bdaf325a30b631ce6d20e582b3cf4f5f"
+    },
+    {
+      "id": "operator:briefing/workflow-impact-and-human-oversight.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W40-ai-trends/briefing/workflow-impact-and-human-oversight.md",
+      "localPath": "source-material/operator/briefing/workflow-impact-and-human-oversight.md",
+      "byteCount": 1587,
+      "sha256": "53bc11b9f805ba1608a18b5272dc3388a8b7c986ec23868eee0e242530ec339b"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W40-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 1784,
+      "sha256": "5134965420a4cf090697d666741d2e2665e6e98f201da451090193e87e2e289b"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W40-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 2595,
+      "sha256": "799aebfa2241ce252542e32674b79067c068a2be616c84c833b6d95f74326e14"
+    }
+  ]
+}
