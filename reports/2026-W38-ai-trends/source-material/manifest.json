@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W38-ai-trends",
+  "weekKey": "2026-W38",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-25T04:01:29.760Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W38-ai-trends",
+    "totalByteCount": 10728,
+    "entries": [
+      "source-material/operator/briefing/clinical-operations-change-management.md",
+      "source-material/operator/briefing/data-quality-and-drift-review.md",
+      "source-material/operator/briefing/evidence-registers-and-decision-records.md",
+      "source-material/operator/briefing/feedback-loop-and-learning-system.md",
+      "source-material/operator/references/patient-safety-and-incident-learning.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 1991,
+      "sha256": "d3fd3950ea0c8b294e37e55322fea36476f99c09d4edb93cd55f1a5e717a435b"
+    },
+    {
+      "id": "operator:briefing/clinical-operations-change-management.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W38-ai-trends/briefing/clinical-operations-change-management.md",
+      "localPath": "source-material/operator/briefing/clinical-operations-change-management.md",
+      "byteCount": 1798,
+      "sha256": "c0db82b374a8967d84279fd769e0eafb8754ab430bd5be95753a7e4bc934e166"
+    },
+    {
+      "id": "operator:briefing/data-quality-and-drift-review.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W38-ai-trends/briefing/data-quality-and-drift-review.md",
+      "localPath": "source-material/operator/briefing/data-quality-and-drift-review.md",
+      "byteCount": 1606,
+      "sha256": "9b40c2b4c7f9cbf041ede2ff32a83c488c74ac64ffcfc018ee428edd29361eca"
+    },
+    {
+      "id": "operator:briefing/evidence-registers-and-decision-records.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W38-ai-trends/briefing/evidence-registers-and-decision-records.md",
+      "localPath": "source-material/operator/briefing/evidence-registers-and-decision-records.md",
+      "byteCount": 1676,
+      "sha256": "c9609c8916c17b95c6f0ea9b866464f4112833b8ca4c73f7783ea62704c3d57f"
+    },
+    {
+      "id": "operator:briefing/feedback-loop-and-learning-system.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W38-ai-trends/briefing/feedback-loop-and-learning-system.md",
+      "localPath": "source-material/operator/briefing/feedback-loop-and-learning-system.md",
+      "byteCount": 1755,
+      "sha256": "27f8dca3072cdff79a2c5827340da4f82a2094c999d75ff71a5e824c5c94463e"
+    },
+    {
+      "id": "operator:references/patient-safety-and-incident-learning.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W38-ai-trends/references/patient-safety-and-incident-learning.md",
+      "localPath": "source-material/operator/references/patient-safety-and-incident-learning.md",
+      "byteCount": 1602,
+      "sha256": "7c515e04b37dbb475bdadc2f8abccfeb3475e2913ea8881e90d4e11b289cc64a"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W38-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 2291,
+      "sha256": "c216cab0974cc343dc51cda5b25e1d0d0ecc61323ee8eda0b4efdb47a1212d5b"
+    }
+  ]
+}

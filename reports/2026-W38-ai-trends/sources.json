@@ -1,0 +1,38 @@
+[
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usage": "Primary thesis, title constraints, publication gate, and evidence-limits posture."
+  },
+  {
+    "id": "operator:briefing/feedback-loop-and-learning-system.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/feedback-loop-and-learning-system.md",
+    "usage": "Learning-loop framing, live-use inputs, and post-deployment decision actions."
+  },
+  {
+    "id": "operator:briefing/evidence-registers-and-decision-records.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/evidence-registers-and-decision-records.md",
+    "usage": "Decision-record and evidence-register claims plus documentation limits."
+  },
+  {
+    "id": "operator:briefing/data-quality-and-drift-review.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/data-quality-and-drift-review.md",
+    "usage": "Drift-review governance framing and examples of local changes that may affect model behavior."
+  },
+  {
+    "id": "operator:briefing/clinical-operations-change-management.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/clinical-operations-change-management.md",
+    "usage": "Workflow, training, escalation, downtime, and human-oversight constraints."
+  },
+  {
+    "id": "operator:references/patient-safety-and-incident-learning.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/patient-safety-and-incident-learning.md",
+    "usage": "Incident-learning scope, taxonomy, reporting, and response-owner framing."
+  }
+]
