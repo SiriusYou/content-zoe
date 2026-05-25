@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W39-ai-trends",
+  "weekKey": "2026-W39",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-25T04:36:05.174Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W39-ai-trends",
+    "totalByteCount": 14145,
+    "entries": [
+      "source-material/operator/briefing/patient-feedback-and-recourse.md",
+      "source-material/operator/briefing/patient-transparency-and-disclosure.md",
+      "source-material/operator/briefing/secondary-use-and-deidentification-governance.md",
+      "source-material/operator/briefing/source-attributes-and-decision-context.md",
+      "source-material/operator/briefing/vendor-access-and-third-party-duty.md",
+      "source-material/operator/references/privacy-security-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2264,
+      "sha256": "8dec791e2671094576cea565cf02c76d79fd9ee073428cbf9e04c20fc24304aa"
+    },
+    {
+      "id": "operator:briefing/patient-feedback-and-recourse.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W39-ai-trends/briefing/patient-feedback-and-recourse.md",
+      "localPath": "source-material/operator/briefing/patient-feedback-and-recourse.md",
+      "byteCount": 1808,
+      "sha256": "94d5377c87b7ab79af91c843d4a30f4219a516f4d730935a9cbb0e90193ea5a6"
+    },
+    {
+      "id": "operator:briefing/patient-transparency-and-disclosure.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W39-ai-trends/briefing/patient-transparency-and-disclosure.md",
+      "localPath": "source-material/operator/briefing/patient-transparency-and-disclosure.md",
+      "byteCount": 1966,
+      "sha256": "5f22332639d543ffb9d899b198025b811abfb6172f76bd62671cd02c8d23b867"
+    },
+    {
+      "id": "operator:briefing/secondary-use-and-deidentification-governance.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W39-ai-trends/briefing/secondary-use-and-deidentification-governance.md",
+      "localPath": "source-material/operator/briefing/secondary-use-and-deidentification-governance.md",
+      "byteCount": 1997,
+      "sha256": "299f5cb82a98f651aef382ee23534113372887c1dcd64b4dfcb187ccc3f5c03a"
+    },
+    {
+      "id": "operator:briefing/source-attributes-and-decision-context.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W39-ai-trends/briefing/source-attributes-and-decision-context.md",
+      "localPath": "source-material/operator/briefing/source-attributes-and-decision-context.md",
+      "byteCount": 2072,
+      "sha256": "c61eeeb19c856166739ad3a8b45b7a97695cb2b54fc695a8c8d250ec378058e5"
+    },
+    {
+      "id": "operator:briefing/vendor-access-and-third-party-duty.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W39-ai-trends/briefing/vendor-access-and-third-party-duty.md",
+      "localPath": "source-material/operator/briefing/vendor-access-and-third-party-duty.md",
+      "byteCount": 1903,
+      "sha256": "901fbf3aa83492b6f3969abfad1f41af3c7416b14275ee266812a9243dc2d23f"
+    },
+    {
+      "id": "operator:references/privacy-security-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W39-ai-trends/references/privacy-security-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/privacy-security-and-reader-boundaries.md",
+      "byteCount": 1850,
+      "sha256": "53e0bf7cd93746f24cca3cc91415808a1c1a232caf1929aac41af3e1a3d55320"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W39-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 2549,
+      "sha256": "d96d4069a85468f184618b55491d43f477bf7ae0bc4580bc630857530449113a"
+    }
+  ]
+}

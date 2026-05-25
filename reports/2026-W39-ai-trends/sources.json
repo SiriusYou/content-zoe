@@ -1,0 +1,56 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": "Job metadata, staged source inventory, and locale context."
+  },
+  {
+    "id": "source-material-manifest",
+    "kind": "research_source_material_manifest",
+    "localPath": "source-material/manifest.json",
+    "usedFor": "Confirmation of staged source inventory and local source identifiers."
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": "Primary thesis, style guardrails, safe claims, unsafe claims, and publication gate."
+  },
+  {
+    "id": "operator:references/privacy-security-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/privacy-security-and-reader-boundaries.md",
+    "usedFor": "Evidence-limits posture and boundaries against outcome, compliance, and security overclaiming."
+  },
+  {
+    "id": "operator:briefing/source-attributes-and-decision-context.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/source-attributes-and-decision-context.md",
+    "usedFor": "Source-attributes framing, decision-context lens, and governance actions tied to metadata."
+  },
+  {
+    "id": "operator:briefing/patient-transparency-and-disclosure.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/patient-transparency-and-disclosure.md",
+    "usedFor": "Patient-facing disclosure duties, accountability framing, and disclosure caveats."
+  },
+  {
+    "id": "operator:briefing/secondary-use-and-deidentification-governance.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/secondary-use-and-deidentification-governance.md",
+    "usedFor": "Secondary-use governance, de-identification limits, and reuse-control framing."
+  },
+  {
+    "id": "operator:briefing/vendor-access-and-third-party-duty.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/vendor-access-and-third-party-duty.md",
+    "usedFor": "Third-party risk, vendor access constraints, and contractual control priorities."
+  },
+  {
+    "id": "operator:briefing/patient-feedback-and-recourse.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/patient-feedback-and-recourse.md",
+    "usedFor": "Feedback and recourse as governance infrastructure and learning-loop closure."
+  }
+]
