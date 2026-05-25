@@ -1,0 +1,57 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": "job scope only",
+    "notes": "Used to confirm the report topic and staged source set, not as reader-facing evidence."
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": "primary thesis and publication boundaries",
+    "notes": "Defines the main angle, style limits, and evidence-cautious posture for the report."
+  },
+  {
+    "id": "operator:briefing/measurement-and-operational-telemetry.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/measurement-and-operational-telemetry.md",
+    "usedFor": "lead argument on measurement and post-deployment monitoring",
+    "notes": "Supports telemetry as an operating discipline rather than proof of outcomes."
+  },
+  {
+    "id": "operator:briefing/local-validation-and-workflow-fit.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/local-validation-and-workflow-fit.md",
+    "usedFor": "local validation and workflow-fit framing",
+    "notes": "Supports the claim that deployment readiness depends on local workflow, population, and escalation fit."
+  },
+  {
+    "id": "operator:briefing/escalation-and-human-oversight.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/escalation-and-human-oversight.md",
+    "usedFor": "oversight and escalation design requirements",
+    "notes": "Supports role clarity, escalation triggers, and documentation responsibilities."
+  },
+  {
+    "id": "operator:briefing/procurement-evidence-and-vendor-duty.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/procurement-evidence-and-vendor-duty.md",
+    "usedFor": "procurement and vendor-evidence responsibilities",
+    "notes": "Supports procurement as part of governance, without proving vendor quality."
+  },
+  {
+    "id": "operator:references/privacy-data-and-patient-trust.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/privacy-data-and-patient-trust.md",
+    "usedFor": "privacy, data governance, and trust boundaries",
+    "notes": "Supports data provenance, access control, and accountability as conditions for trust."
+  },
+  {
+    "id": "assumption-source-bounded-synthesis",
+    "kind": "assumption",
+    "usedFor": "research-stage synthesis scope",
+    "notes": "Because this stage is limited to staged local material, the brief treats upstream frameworks only through the operator summaries present in source-material and does not claim independent verification."
+  }
+]
