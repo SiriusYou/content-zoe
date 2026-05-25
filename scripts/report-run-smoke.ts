@@ -58,6 +58,8 @@ type ScenarioName =
   | "recovery-cleanup-db-audit"
   | "resume-running-attempt-db-transition"
   | "resume-attempt-bootstrap-coherence"
+  | "non-resume-incomplete-attempt-refusal"
+  | "resume-prefixed-orphan-recovery"
   | "recovery-cleanup-atomicity-and-atom-edge"
   | "resume-race-or-stale-guard"
   | "recovery-cleanup-idempotence-and-divergence"
@@ -100,6 +102,8 @@ const SCENARIOS: ScenarioName[] = [
   "recovery-cleanup-db-audit",
   "resume-running-attempt-db-transition",
   "resume-attempt-bootstrap-coherence",
+  "non-resume-incomplete-attempt-refusal",
+  "resume-prefixed-orphan-recovery",
   "recovery-cleanup-atomicity-and-atom-edge",
   "resume-race-or-stale-guard",
   "recovery-cleanup-idempotence-and-divergence",
@@ -210,6 +214,10 @@ async function scenarioImpl(
       return runResumeRunningAttemptDbTransition(dir);
     case "resume-attempt-bootstrap-coherence":
       return runResumeAttemptBootstrapCoherence(dir);
+    case "non-resume-incomplete-attempt-refusal":
+      return runNonResumeIncompleteAttemptRefusal(dir);
+    case "resume-prefixed-orphan-recovery":
+      return runResumePrefixedOrphanRecovery(dir);
     case "recovery-cleanup-atomicity-and-atom-edge":
       return runRecoveryCleanupAtomicityAndAtomEdge(dir);
     case "resume-race-or-stale-guard":
@@ -892,6 +900,82 @@ async function runResumeAttemptBootstrapCoherence(dir: string): Promise<string[]
   ];
 }
 
+async function runNonResumeIncompleteAttemptRefusal(dir: string): Promise<string[]> {
+  const jobId = "non-resume-incomplete-refusal";
+  seedRunningTranslateFixture(dir, jobId);
+
+  const preJob = readJob(dir, jobId);
+  assert(preJob?.attempt_number === 1, "pre-state jobs.attempt_number must be 1");
+  assert(preJob.status === "running", `pre-state status must be running, got ${preJob.status}`);
+  assert(existsSync(resolve(dir, ".runs", jobId, "attempt-1")), "missing attempt-1");
+  assert(!existsSync(resolve(dir, ".runs", jobId, "attempt-2")), "attempt-2 must not pre-exist");
+
+  const result = runReportRunCli(dir, [jobId, "--locales=en,zh"]);
+  assert(result.exitCode === 1, `expected non-resume refusal exit 1, got ${result.exitCode}: ${result.stderr}`);
+  assert(result.stderr.includes("--resume"), `refusal did not instruct --resume: ${result.stderr}`);
+  assert(
+    result.stderr.includes("incomplete DB-backed attempt-1"),
+    `refusal did not identify the incomplete DB attempt: ${result.stderr}`,
+  );
+  assert(!existsSync(resolve(dir, ".runs", jobId, "attempt-2")), "refusal published attempt-2");
+  assert(
+    allEvents(dir, jobId).filter((event) => event.attempt_number === 2).length === 0,
+    "refusal wrote attempt-2 lifecycle events",
+  );
+  const postJob = readJob(dir, jobId);
+  assert(postJob?.attempt_number === 1, "refusal changed jobs.attempt_number");
+  assert(postJob.status === "running", "refusal changed jobs.status");
+  assert(postJob.current_stage === Stage.TRANSLATE_ZH, "refusal changed jobs.current_stage");
+
+  return [
+    "A non-resume rerun against an incomplete DB-backed attempt failed before filesystem publication.",
+    "The operator-facing error included --resume and identified the incomplete DB-backed attempt.",
+    "The refusal left no attempt-2 directory, no attempt-2 lifecycle event, and kept jobs.attempt_number=1.",
+  ];
+}
+
+async function runResumePrefixedOrphanRecovery(dir: string): Promise<string[]> {
+  const jobId = "resume-prefixed-orphan-recovery";
+  seedRunningResearchFixture(dir, jobId);
+  const orphanAttempt = resolve(dir, ".runs", jobId, "attempt-2");
+  mkdirSync(orphanAttempt, { recursive: true });
+  writeState(orphanAttempt, {
+    schemaVersion: 1,
+    jobId,
+    attemptNumber: 2,
+    lastStage: Stage.RESEARCH,
+    status: "running",
+    startedAt: new Date().toISOString(),
+  });
+
+  const preJob = readJob(dir, jobId);
+  assert(preJob?.attempt_number === 1, "orphan fixture must keep DB at attempt 1");
+  assert(preJob.status === "running", "orphan fixture DB row must be running");
+  assert(readState(dir, jobId, 2).recoveryCleanup === undefined, "orphan must lack recoveryCleanup");
+  assert(allEvents(dir, jobId).filter((event) => event.attempt_number === 2).length === 0, "orphan fixture must lack attempt-2 events");
+
+  const result = runReportRunCli(dir, [jobId, "--locales=en,zh", "--resume"]);
+  assert(result.exitCode === 0, `expected orphan recovery success, got ${result.exitCode}: ${result.stderr}`);
+  assert(!existsSync(resolve(dir, ".runs", jobId, "attempt-3")), "orphan recovery created attempt-3");
+
+  const state = readState(dir, jobId, 2);
+  assert(state.status === "awaiting_approval", `expected awaiting_approval, got ${state.status}`);
+  assert(state.recoveryCleanup !== undefined, "recovered attempt-2 lacks recoveryCleanup");
+  assert(state.recoveryCleanup.fromAttempt === 1, "recovered cleanup fromAttempt mismatch");
+  assert(state.recoveryCleanup.restartStage === Stage.RESEARCH, "recovered cleanup restartStage mismatch");
+  const postJob = readJob(dir, jobId);
+  assert(postJob?.attempt_number === 2, `expected DB attempt 2, got ${postJob?.attempt_number}`);
+  assert(postJob.status === "awaiting_approval", `expected DB awaiting_approval, got ${postJob.status}`);
+  assert(recoveryCleanupEvents(dir, jobId, 2).length === 1, "missing recovered cleanup event");
+  assert(findAttemptEvents(dir, jobId, 2, "stage_enter").length >= 1, "missing recovered attempt-2 stage_enter");
+
+  return [
+    "The fixture matched the pre-fix orphan class: running attempt-2 without recoveryCleanup, DB still attempt 1, and no attempt-2 events.",
+    "CLI --resume discarded the unauthoritative directory and recovered as attempt-2 without creating attempt-3.",
+    "Post-state was coherent across DB, run-state, recovery_cleanup, and stage_enter lifecycle evidence.",
+  ];
+}
+
 async function runRecoveryCleanupAtomicityAndAtomEdge(dir: string): Promise<string[]> {
   const jobId = "recovery-cleanup-atomicity";
   writeRunningTranslateAttempt(dir, jobId);
@@ -1413,21 +1497,14 @@ async function runReportRunSourceCarryForward(dir: string): Promise<string[]> {
 
 async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
   const allowed = new Set([
-    "src/promote.ts",
-    "src/lib/sources-provenance.ts",
-    "src/lib/report-run-fake-provider.ts",
-    "src/pipeline/types.ts",
-    "src/pipeline/run-stage.ts",
-    "src/pipeline/research.ts",
-    "scripts/bot-smoke.ts",
-    "docs/preflight/bot-smoke.md",
-    "scripts/research-stage-smoke.ts",
-    "docs/preflight/research-stage-smoke.md",
+    "src/bin/report-run.ts",
     "scripts/report-run-smoke.ts",
     "docs/preflight/report-run-smoke.md",
   ]);
-  const anchor = "a310f9bae4c161143be1507b1ca7982f99773e29";
-  const committed = gitLines(["diff", "--name-only", `${anchor}..HEAD`]);
+  const anchor = "84ce0cd784ccc1231cc9717cff6885967b55a16e";
+  const committed = gitLines(["diff", "--name-only", `${anchor}..HEAD`]).filter(
+    (name) => name !== "README.md" && !name.startsWith("reports/"),
+  );
   const working = gitLines(["diff", "--name-only", anchor]).filter(
     (name) => name !== "README.md" && !name.startsWith("reports/"),
   );
@@ -1437,26 +1514,11 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
   assert(unexpected.length === 0, `unexpected implementation files: ${unexpected.join(",")}`);
 
   const reportRun = readFileSync(resolve(repoRoot, "src", "bin", "report-run.ts"), "utf8");
-  const research = readFileSync(resolve(repoRoot, "src", "pipeline", "research.ts"), "utf8");
-  const runStageSource = readFileSync(resolve(repoRoot, "src", "pipeline", "run-stage.ts"), "utf8");
-  const promoteSource = readFileSync(resolve(repoRoot, "src", "promote.ts"), "utf8");
-  const fakeProvider = readFileSync(resolve(repoRoot, "src", "lib", "report-run-fake-provider.ts"), "utf8");
-  assert(reportRun.includes("stageResearchSourceMaterial"), "report-run lacks source staging helper");
-  assert(reportRun.includes('".data",\n    SOURCE_MATERIAL_DIR'), "operator source convention is not .data/source-material/<job-id>");
-  assert(reportRun.includes("attempt.startStage === Stage.RESEARCH"), "source staging is not limited to research starts");
-  assert(!reportRun.includes("REPO_CONTEXT_FILES"), "report-run still has repo context allowlist");
-  assert(!reportRun.includes("readRepoContextEntries"), "report-run still has repo context staging helper");
-  assert(!reportRun.includes('kind: "repo_context"'), "report-run still emits repo_context manifest entries");
-  assert(research.includes("export function buildResearchPrompt"), "research prompt lacks buildPrompt path");
-  assert(research.includes("return `${RESEARCH_PROMPT}"), "research buildPrompt does not begin with RESEARCH_PROMPT");
-  assert(research.includes('kind: "sources_provenance_allowlist"'), "research stage lacks sources provenance manifest rule");
-  assert(runStageSource.includes("validateSourcesProvenanceText"), "runStage does not validate sources provenance output");
-  assert(promoteSource.includes("validateSourcesProvenanceText"), "promote boundary does not validate sources provenance output");
-  assert(
-    fakeProvider.includes("prompt.startsWith(STAGES[Stage.RESEARCH].prompt)"),
-    "fake provider research matcher is not strict-prefix compatible",
-  );
-  assert(!fakeProvider.includes("prompt === STAGES[Stage.RESEARCH].prompt"), "fake provider still uses exact research prompt equality");
+  assert(reportRun.includes("assertFreshAttemptAllowed"), "report-run lacks non-resume attempt precondition");
+  assert(reportRun.includes("--resume"), "report-run refusal path lacks --resume operator guidance");
+  assert(reportRun.includes("isUnauthoritativeFreshAttemptOrphan"), "report-run lacks orphan resume classifier");
+  assert(reportRun.includes("findEventsByJob"), "orphan classifier does not inspect lifecycle events");
+  assert(reportRun.includes("fsOps.rmSync(prior.dir"), "orphan recovery does not remove the unauthoritative attempt directory");
   for (const hardOut of [
     "package.json",
     "bun.lock",
@@ -1469,7 +1531,6 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
     "src/migrations/",
     "src/telegram/",
     "src/bin/report-create.ts",
-    "src/bin/report-run.ts",
     "src/bin/report-show.ts",
     "src/bin/report-events.ts",
     "src/bin/report-publish-readme.ts",
@@ -1488,8 +1549,8 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
 
   return [
     `Approval-label-anchor diff inspected (${anchor}..HEAD plus implementation working files, excluding pre-existing README/reports runtime evidence): ${names.join(", ")}.`,
-    "Only Slice 4.28 allowed implementation/evidence files were present in the boundary diff.",
-    "Static source inspection found local report-run source staging, the .data/source-material/<job-id> convention, no automatic repo-context code path, and sources provenance validation at research/promote boundaries.",
+    "Only Slice 4.29 allowed implementation/evidence files were present in the boundary diff.",
+    "Static source inspection found the non-resume refusal, --resume guidance, lifecycle-event orphan classifier, and orphan directory cleanup path.",
     "Static hard-out scan found no package/schema/runtime/provider/downstream prompt/publish/Telegram/governance surfaces in the implementation range.",
   ];
 }
@@ -1745,6 +1806,32 @@ function seedRunningTranslateFixture(cwd: string, jobId: string): void {
   seedJobRow(cwd, jobId);
   setJobState(cwd, jobId, 1, "running", Stage.TRANSLATE_ZH);
   writeRunningTranslateAttempt(cwd, jobId);
+}
+
+function seedRunningResearchFixture(cwd: string, jobId: string): void {
+  seedJobRow(cwd, jobId);
+  setJobState(cwd, jobId, 1, "running", Stage.RESEARCH);
+  const attempt1 = resolve(cwd, ".runs", jobId, "attempt-1");
+  mkdirSync(attempt1, { recursive: true });
+  writeState(attempt1, {
+    schemaVersion: 1,
+    jobId,
+    attemptNumber: 1,
+    lastStage: Stage.RESEARCH,
+    status: "running",
+    startedAt: new Date().toISOString(),
+  });
+  const db = openDb(resolve(cwd, ".data", "content.db"));
+  try {
+    recordStageEnter(db, {
+      jobId,
+      attemptNumber: 1,
+      stage: Stage.RESEARCH,
+      runDir: `.runs/${jobId}/attempt-1`,
+    });
+  } finally {
+    db.close();
+  }
 }
 
 function writeRunningTranslateAttempt(cwd: string, jobId: string): void {

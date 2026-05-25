@@ -21,6 +21,7 @@ import type { LLMProvider } from "../llm/provider.ts";
 import {
   bootstrapResumeAttemptLifecycle,
   type DbClient,
+  findEventsByJob,
   findJobById,
   type Job,
   openDb,
@@ -731,6 +732,7 @@ function prepareFreshAttempt(
   fsOps: FileSystemOps,
 ): ReportRunAttempt {
   const attempts = scanAttempts(jobRoot);
+  assertFreshAttemptAllowed(opts, cwd, attempts);
   const attemptNumber = nextAttemptNumber(attempts);
   const runDir = path.resolve(jobRoot, `attempt-${attemptNumber}`);
   assertInsideCwd(runDir, cwd);
@@ -825,6 +827,19 @@ function prepareResumeAttempt(
 
   const validated = validateRunState(priorState, opts.jobId);
   assertRunStateAttemptMatchesDirectory(validated, prior);
+  if (
+    isUnauthoritativeFreshAttemptOrphan({
+      opts,
+      cwd,
+      attempts,
+      attempt: prior,
+      state: validated,
+    })
+  ) {
+    fsOps.rmSync(prior.dir, { recursive: true, force: true });
+    return prepareResumeAttempt(opts, cwd, jobRoot, fsOps);
+  }
+
   if (validated.recoveryCleanup && validated.status === "running") {
     return {
       runDir: realpathSync(prior.dir),
@@ -957,6 +972,80 @@ function publishResumeBootstrap(params: {
     recoveryCleanup,
     alreadyComplete: false,
   };
+}
+
+function assertFreshAttemptAllowed(
+  opts: PrepareReportRunAttemptOptions,
+  cwd: string,
+  attempts: readonly AttemptEntry[],
+): void {
+  const job = readDbJobIfPresent(cwd, opts.jobId);
+  if (!job || job.status === "awaiting_approval") return;
+  const currentAttemptExists = attempts.some(
+    (attempt) => attempt.attemptNumber === job.attempt_number,
+  );
+  if (job.status === "queued" && !currentAttemptExists) return;
+
+  throw new Error(
+    `report:run precondition failed: job ${JSON.stringify(
+      opts.jobId,
+    )} already has incomplete DB-backed attempt-${job.attempt_number} (${job.status}/${job.current_stage}); rerun with --resume`,
+  );
+}
+
+function isUnauthoritativeFreshAttemptOrphan(params: {
+  opts: PrepareReportRunAttemptOptions;
+  cwd: string;
+  attempts: readonly AttemptEntry[];
+  attempt: AttemptEntry;
+  state: RunState;
+}): boolean {
+  const { opts, cwd, attempts, attempt, state } = params;
+  if (attempt.attemptNumber <= 1) return false;
+  if (!attempts.some((entry) => entry.attemptNumber === attempt.attemptNumber - 1)) {
+    return false;
+  }
+  if (state.status !== "running" || state.recoveryCleanup !== undefined) return false;
+
+  const snapshot = readDbAttemptSnapshot(cwd, opts.jobId, attempt.attemptNumber);
+  if (!snapshot || snapshot.job.status === "awaiting_approval") return false;
+  return (
+    snapshot.job.attempt_number === attempt.attemptNumber - 1 &&
+    snapshot.attemptEventCount === 0
+  );
+}
+
+function readDbJobIfPresent(cwd: string, jobId: string): Job | null {
+  const dbPath = path.resolve(cwd, ".data", "content.db");
+  if (!existsSync(dbPath)) return null;
+
+  const db = openDb(dbPath);
+  try {
+    return findJobById(db, jobId);
+  } finally {
+    db.close();
+  }
+}
+
+function readDbAttemptSnapshot(
+  cwd: string,
+  jobId: string,
+  attemptNumber: number,
+): { job: Job; attemptEventCount: number } | null {
+  const dbPath = path.resolve(cwd, ".data", "content.db");
+  if (!existsSync(dbPath)) return null;
+
+  const db = openDb(dbPath);
+  try {
+    const job = findJobById(db, jobId);
+    if (!job) return null;
+    const attemptEventCount = findEventsByJob(db, jobId).filter(
+      (event) => event.attempt_number === attemptNumber,
+    ).length;
+    return { job, attemptEventCount };
+  } finally {
+    db.close();
+  }
 }
 
 function scanAttempts(jobRoot: string): AttemptEntry[] {
