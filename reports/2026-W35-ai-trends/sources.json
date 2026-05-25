@@ -1,0 +1,75 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": [
+      "job metadata",
+      "topic scope",
+      "staged source inventory"
+    ]
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "primary report angle",
+      "safe claims",
+      "unsafe claims",
+      "title constraints",
+      "publication gate guidance"
+    ]
+  },
+  {
+    "id": "operator:briefing/assurance-and-health-system-governance.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/assurance-and-health-system-governance.md",
+    "usedFor": [
+      "assurance framing",
+      "governance routines",
+      "evidence limits"
+    ]
+  },
+  {
+    "id": "operator:briefing/source-attributes-and-reviewability.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/source-attributes-and-reviewability.md",
+    "usedFor": [
+      "reviewability framing",
+      "source attributes",
+      "algorithm transparency",
+      "interoperability context"
+    ]
+  },
+  {
+    "id": "operator:briefing/change-control-and-model-lifecycle.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/change-control-and-model-lifecycle.md",
+    "usedFor": [
+      "change control framing",
+      "lifecycle management",
+      "boundary on device-software applicability"
+    ]
+  },
+  {
+    "id": "operator:briefing/third-party-ai-risk-and-resilience.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/third-party-ai-risk-and-resilience.md",
+    "usedFor": [
+      "third-party risk framing",
+      "vendor accountability",
+      "cybersecurity and resilience"
+    ]
+  },
+  {
+    "id": "operator:references/privacy-safety-and-human-accountability.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/privacy-safety-and-human-accountability.md",
+    "usedFor": [
+      "privacy boundaries",
+      "human accountability",
+      "physician-experience governance pressure"
+    ]
+  }
+]

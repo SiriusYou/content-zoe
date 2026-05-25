@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W35-ai-trends",
+  "weekKey": "2026-W35",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-25T01:55:17.982Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W35-ai-trends",
+    "totalByteCount": 14267,
+    "entries": [
+      "source-material/operator/briefing/assurance-and-health-system-governance.md",
+      "source-material/operator/briefing/change-control-and-model-lifecycle.md",
+      "source-material/operator/briefing/source-attributes-and-reviewability.md",
+      "source-material/operator/briefing/third-party-ai-risk-and-resilience.md",
+      "source-material/operator/references/privacy-safety-and-human-accountability.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2003,
+      "sha256": "b2176d26bea1b54500d5e666cb8ac24c3103c9f112b28866903c005ac75d73da"
+    },
+    {
+      "id": "operator:briefing/assurance-and-health-system-governance.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W35-ai-trends/briefing/assurance-and-health-system-governance.md",
+      "localPath": "source-material/operator/briefing/assurance-and-health-system-governance.md",
+      "byteCount": 2099,
+      "sha256": "06431ec36fb04819996bc3291a9ca46fb8efb0d4bb739c23b7d24e38c9ceb47b"
+    },
+    {
+      "id": "operator:briefing/change-control-and-model-lifecycle.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W35-ai-trends/briefing/change-control-and-model-lifecycle.md",
+      "localPath": "source-material/operator/briefing/change-control-and-model-lifecycle.md",
+      "byteCount": 2193,
+      "sha256": "43a9a8b2d8bf4133629a83cf14bd0185b905968d137e64efe3734c7f318cca8e"
+    },
+    {
+      "id": "operator:briefing/source-attributes-and-reviewability.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W35-ai-trends/briefing/source-attributes-and-reviewability.md",
+      "localPath": "source-material/operator/briefing/source-attributes-and-reviewability.md",
+      "byteCount": 2138,
+      "sha256": "17cae1842fbb72eb50dbbfa83e2cd72439f75ba798db9edac2af28c2c7e0bd4e"
+    },
+    {
+      "id": "operator:briefing/third-party-ai-risk-and-resilience.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W35-ai-trends/briefing/third-party-ai-risk-and-resilience.md",
+      "localPath": "source-material/operator/briefing/third-party-ai-risk-and-resilience.md",
+      "byteCount": 1982,
+      "sha256": "7c9c3f54dd6d1391c07cc0361d1a7c500c20de9bb438614c2e046a360c153b5a"
+    },
+    {
+      "id": "operator:references/privacy-safety-and-human-accountability.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W35-ai-trends/references/privacy-safety-and-human-accountability.md",
+      "localPath": "source-material/operator/references/privacy-safety-and-human-accountability.md",
+      "byteCount": 2412,
+      "sha256": "e0d06f12913ceb24c9311d595873d3f66cc6ae5a133257d29da7b59cda8f99d7"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W35-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 3443,
+      "sha256": "b602a99dd21cc33bea82c28dfe97586c233d56541603450ff44e1816ba7a1259"
+    }
+  ]
+}
