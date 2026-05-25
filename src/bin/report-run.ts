@@ -984,6 +984,7 @@ function assertFreshAttemptAllowed(
   const currentAttemptExists = attempts.some(
     (attempt) => attempt.attemptNumber === job.attempt_number,
   );
+  if (job.attempt_number === 1 && attempts.length === 0) return;
   if (job.status === "queued" && !currentAttemptExists) return;
 
   throw new Error(
