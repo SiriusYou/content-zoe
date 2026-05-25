@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W41-ai-trends",
+  "weekKey": "2026-W41",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 2,
+  "generatedAt": "2026-05-25T07:33:41.350Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W41-ai-trends",
+    "totalByteCount": 12492,
+    "entries": [
+      "source-material/operator/briefing/pause-and-rollback-criteria.md",
+      "source-material/operator/briefing/portfolio-inventory-and-ownership.md",
+      "source-material/operator/briefing/retirement-and-replacement-evidence.md",
+      "source-material/operator/briefing/user-communication-and-transition.md",
+      "source-material/operator/briefing/vendor-exit-and-support-risk.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2212,
+      "sha256": "da18ae0500cda3a0379f10c965a645c6d3ae8aeb6e5ab1a5e2ef52a9711a3d10"
+    },
+    {
+      "id": "operator:briefing/pause-and-rollback-criteria.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W41-ai-trends/briefing/pause-and-rollback-criteria.md",
+      "localPath": "source-material/operator/briefing/pause-and-rollback-criteria.md",
+      "byteCount": 1550,
+      "sha256": "9f4ab2ff00a1eed96a46cfca3335e1389d7ed94996d6feb04ddf002f6951cc82"
+    },
+    {
+      "id": "operator:briefing/portfolio-inventory-and-ownership.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W41-ai-trends/briefing/portfolio-inventory-and-ownership.md",
+      "localPath": "source-material/operator/briefing/portfolio-inventory-and-ownership.md",
+      "byteCount": 1702,
+      "sha256": "b35a876fdd4a41ba991ee562cebdd450b13b0ec439e99263517e0524dbcd15c1"
+    },
+    {
+      "id": "operator:briefing/retirement-and-replacement-evidence.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W41-ai-trends/briefing/retirement-and-replacement-evidence.md",
+      "localPath": "source-material/operator/briefing/retirement-and-replacement-evidence.md",
+      "byteCount": 1670,
+      "sha256": "05ec83f71415da37578b6482d795099215fe5c170f2095251e0b6b198bd02a80"
+    },
+    {
+      "id": "operator:briefing/user-communication-and-transition.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W41-ai-trends/briefing/user-communication-and-transition.md",
+      "localPath": "source-material/operator/briefing/user-communication-and-transition.md",
+      "byteCount": 1654,
+      "sha256": "e7e13e72f6b16075e781080588e8cf92c98d130601b772dadebd9d78274db62b"
+    },
+    {
+      "id": "operator:briefing/vendor-exit-and-support-risk.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W41-ai-trends/briefing/vendor-exit-and-support-risk.md",
+      "localPath": "source-material/operator/briefing/vendor-exit-and-support-risk.md",
+      "byteCount": 1630,
+      "sha256": "b9e4dcbd1d62d0fd4d6747d90c2a1b3db73d83651d1b09de520c882454303441"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W41-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 1806,
+      "sha256": "7f5936a56981303cea5a93679e51f1e61a4408beea752fbb4984ae3779bc7fde"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W41-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 2480,
+      "sha256": "d77393ee80f86c4cd9f7bbe8eaadb840ecd6151f4180ff990676374153212bd6"
+    }
+  ]
+}

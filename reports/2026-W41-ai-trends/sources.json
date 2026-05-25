@@ -1,0 +1,72 @@
+[
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "core thesis",
+      "safe and unsafe claims",
+      "title and publication constraints"
+    ]
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "usedFor": [
+      "evidence posture",
+      "reader-boundary constraints",
+      "non-claim limits"
+    ]
+  },
+  {
+    "id": "operator:briefing/pause-and-rollback-criteria.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/pause-and-rollback-criteria.md",
+    "usedFor": [
+      "off-ramp framing",
+      "pause and rollback criteria"
+    ]
+  },
+  {
+    "id": "operator:briefing/portfolio-inventory-and-ownership.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/portfolio-inventory-and-ownership.md",
+    "usedFor": [
+      "portfolio inventory states",
+      "ownership responsibilities"
+    ]
+  },
+  {
+    "id": "operator:briefing/retirement-and-replacement-evidence.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/retirement-and-replacement-evidence.md",
+    "usedFor": [
+      "retirement framing",
+      "replacement caveats"
+    ]
+  },
+  {
+    "id": "operator:briefing/user-communication-and-transition.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/user-communication-and-transition.md",
+    "usedFor": [
+      "transition communication",
+      "fallback workflow messaging"
+    ]
+  },
+  {
+    "id": "operator:briefing/vendor-exit-and-support-risk.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/vendor-exit-and-support-risk.md",
+    "usedFor": [
+      "vendor exit planning",
+      "support-risk framing"
+    ]
+  },
+  {
+    "id": "assumption:no-local-deployment-proof",
+    "kind": "assumption",
+    "statement": "Because the staged material provides governance guidance rather than deployment case evidence, the brief avoids claims about real-world incidents, outcomes, vendor events, or specific tool decisions."
+  }
+]
