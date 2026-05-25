@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W34-ai-trends",
+  "weekKey": "2026-W34",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-25T01:28:03.568Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W34-ai-trends",
+    "totalByteCount": 12706,
+    "entries": [
+      "source-material/operator/briefing/data-infrastructure-and-transparency-work.md",
+      "source-material/operator/briefing/evidence-operations-and-workforce-readiness.md",
+      "source-material/operator/briefing/lifecycle-control-and-change-management.md",
+      "source-material/operator/briefing/procurement-cyber-and-third-party-controls.md",
+      "source-material/operator/references/privacy-governance-and-scaling-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2055,
+      "sha256": "e595eedaf1f4ddbff4797d3de266accf4863b8cc016612ba9f39507725dcee40"
+    },
+    {
+      "id": "operator:briefing/data-infrastructure-and-transparency-work.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W34-ai-trends/briefing/data-infrastructure-and-transparency-work.md",
+      "localPath": "source-material/operator/briefing/data-infrastructure-and-transparency-work.md",
+      "byteCount": 2124,
+      "sha256": "c180536eb0586dc7a7ec248d93251407e2c071f6313a138e7772248b269de601"
+    },
+    {
+      "id": "operator:briefing/evidence-operations-and-workforce-readiness.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W34-ai-trends/briefing/evidence-operations-and-workforce-readiness.md",
+      "localPath": "source-material/operator/briefing/evidence-operations-and-workforce-readiness.md",
+      "byteCount": 1878,
+      "sha256": "036b32e63d28022e3c6f1440dfc133e71c898f434d1273b93adb90925563a81c"
+    },
+    {
+      "id": "operator:briefing/lifecycle-control-and-change-management.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W34-ai-trends/briefing/lifecycle-control-and-change-management.md",
+      "localPath": "source-material/operator/briefing/lifecycle-control-and-change-management.md",
+      "byteCount": 2029,
+      "sha256": "6522440ccc6143eba3b8556f55a9f6dc1154fe107e3ef5f2056336f767f8e398"
+    },
+    {
+      "id": "operator:briefing/procurement-cyber-and-third-party-controls.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W34-ai-trends/briefing/procurement-cyber-and-third-party-controls.md",
+      "localPath": "source-material/operator/briefing/procurement-cyber-and-third-party-controls.md",
+      "byteCount": 1552,
+      "sha256": "6f6d6428d8003b2ee2a8028fdc3be821be431071289d75ef55ca59eddb339721"
+    },
+    {
+      "id": "operator:references/privacy-governance-and-scaling-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W34-ai-trends/references/privacy-governance-and-scaling-boundaries.md",
+      "localPath": "source-material/operator/references/privacy-governance-and-scaling-boundaries.md",
+      "byteCount": 1741,
+      "sha256": "972533ce529dd88f6765b5e876da8a1eb5c74468ce88f9dbf6082e5c6bf9d30e"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W34-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 3382,
+      "sha256": "af923acc19b09cb26b1d6e4d6ad5b1bbc540bd2d72f0d1e750af7c5f251e5ec4"
+    }
+  ]
+}

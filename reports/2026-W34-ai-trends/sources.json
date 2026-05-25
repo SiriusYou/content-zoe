@@ -1,0 +1,79 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": [
+      "job metadata",
+      "topic scope",
+      "locale context",
+      "staged source inventory"
+    ]
+  },
+  {
+    "id": "operator:briefing/evidence-operations-and-workforce-readiness.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/evidence-operations-and-workforce-readiness.md",
+    "usedFor": [
+      "clinician exposure and workforce-readiness framing",
+      "human oversight, training, escalation, and documentation claims",
+      "evidence-limit warnings around self-reported use"
+    ]
+  },
+  {
+    "id": "operator:briefing/lifecycle-control-and-change-management.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/lifecycle-control-and-change-management.md",
+    "usedFor": [
+      "lifecycle control and monitoring framing",
+      "predetermined change control and bounded modification claims",
+      "device-software regulatory boundary"
+    ]
+  },
+  {
+    "id": "operator:briefing/data-infrastructure-and-transparency-work.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/data-infrastructure-and-transparency-work.md",
+    "usedFor": [
+      "interoperability and transparency framing",
+      "TEFCA and certification context",
+      "reviewability and accountability claims"
+    ]
+  },
+  {
+    "id": "operator:briefing/procurement-cyber-and-third-party-controls.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/procurement-cyber-and-third-party-controls.md",
+    "usedFor": [
+      "procurement and operational-resilience framing",
+      "vendor, cyber, and incident-response governance claims",
+      "evidence-limit warnings around framework adoption"
+    ]
+  },
+  {
+    "id": "operator:references/privacy-governance-and-scaling-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/privacy-governance-and-scaling-boundaries.md",
+    "usedFor": [
+      "privacy and governance boundary framing",
+      "scaling caution",
+      "non-compliance-proof warnings"
+    ]
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "overall report angle",
+      "safe vs unsafe claim boundaries",
+      "week-token-free title guidance",
+      "publication gate constraints"
+    ]
+  },
+  {
+    "id": "assumption-local-only-stage",
+    "kind": "assumption",
+    "statement": "This research stage synthesizes only staged local source summaries and does not independently verify the cited external primary materials."
+  }
+]
