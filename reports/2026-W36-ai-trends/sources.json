@@ -1,0 +1,71 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": [
+      "job metadata",
+      "staged source inventory"
+    ]
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "intended report angle",
+      "safe claim boundaries",
+      "publication gate guidance"
+    ]
+  },
+  {
+    "id": "operator:briefing/decision-support-reviewability.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/decision-support-reviewability.md",
+    "usedFor": [
+      "reviewability framing",
+      "transparency and interoperability limits"
+    ]
+  },
+  {
+    "id": "operator:briefing/deployment-assurance-and-evidence-ops.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/deployment-assurance-and-evidence-ops.md",
+    "usedFor": [
+      "assurance operations framing",
+      "safety learning and accountable ownership"
+    ]
+  },
+  {
+    "id": "operator:briefing/lifecycle-monitoring-and-change-discipline.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/lifecycle-monitoring-and-change-discipline.md",
+    "usedFor": [
+      "lifecycle monitoring",
+      "bounded device-software change discipline"
+    ]
+  },
+  {
+    "id": "operator:briefing/vendor-evidence-and-resilience.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/vendor-evidence-and-resilience.md",
+    "usedFor": [
+      "vendor evidence",
+      "supply-chain and cyber resilience framing"
+    ]
+  },
+  {
+    "id": "operator:references/human-accountability-and-privacy-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/human-accountability-and-privacy-boundaries.md",
+    "usedFor": [
+      "human accountability",
+      "privacy and ethics boundaries"
+    ]
+  },
+  {
+    "id": "assumption-no-external-verification",
+    "kind": "assumption",
+    "statement": "This research stage was completed from staged local source material only, without external verification or supplemental web research."
+  }
+]

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W36-ai-trends",
+  "weekKey": "2026-W36",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 2,
+  "generatedAt": "2026-05-25T02:51:53.049Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W36-ai-trends",
+    "totalByteCount": 13448,
+    "entries": [
+      "source-material/operator/briefing/decision-support-reviewability.md",
+      "source-material/operator/briefing/deployment-assurance-and-evidence-ops.md",
+      "source-material/operator/briefing/lifecycle-monitoring-and-change-discipline.md",
+      "source-material/operator/briefing/vendor-evidence-and-resilience.md",
+      "source-material/operator/references/human-accountability-and-privacy-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2007,
+      "sha256": "601f96ab8c581465b621b75d3b8d17c4482e67efb6d650c90fdfe53a7e6728c9"
+    },
+    {
+      "id": "operator:briefing/decision-support-reviewability.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W36-ai-trends/briefing/decision-support-reviewability.md",
+      "localPath": "source-material/operator/briefing/decision-support-reviewability.md",
+      "byteCount": 2011,
+      "sha256": "2c0347e20f1e3ffe5fe7bb8c851a434353e37ed5ea7e7b8cafc087dc39a0b3e5"
+    },
+    {
+      "id": "operator:briefing/deployment-assurance-and-evidence-ops.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W36-ai-trends/briefing/deployment-assurance-and-evidence-ops.md",
+      "localPath": "source-material/operator/briefing/deployment-assurance-and-evidence-ops.md",
+      "byteCount": 1879,
+      "sha256": "34f7aeaae8e56b1ff525cd0467aea7dad1d5c1597290d79a266beecfcb30ba31"
+    },
+    {
+      "id": "operator:briefing/lifecycle-monitoring-and-change-discipline.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W36-ai-trends/briefing/lifecycle-monitoring-and-change-discipline.md",
+      "localPath": "source-material/operator/briefing/lifecycle-monitoring-and-change-discipline.md",
+      "byteCount": 2074,
+      "sha256": "d410729ee81bbb27363b67d6946984701261797c167cea0c7f00e4b927a79823"
+    },
+    {
+      "id": "operator:briefing/vendor-evidence-and-resilience.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W36-ai-trends/briefing/vendor-evidence-and-resilience.md",
+      "localPath": "source-material/operator/briefing/vendor-evidence-and-resilience.md",
+      "byteCount": 1861,
+      "sha256": "d734254cfb434b6f8780745fd8c77a4b6dc3f160c04a84359ea3cd504cc4776b"
+    },
+    {
+      "id": "operator:references/human-accountability-and-privacy-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W36-ai-trends/references/human-accountability-and-privacy-boundaries.md",
+      "localPath": "source-material/operator/references/human-accountability-and-privacy-boundaries.md",
+      "byteCount": 2278,
+      "sha256": "44435328bdb897ef2455badd4a9939e641bf2fce4f80d8208ff46eebb8b75e84"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W36-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 3345,
+      "sha256": "dd2ce010493bd5bfac96eaa317fffc05612ee1dafdf1a3482c47d5fb6eef32a3"
+    }
+  ]
+}
