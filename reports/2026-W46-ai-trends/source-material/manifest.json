@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W46-ai-trends",
+  "weekKey": "2026-W46",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-26T14:56:52.848Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W46-ai-trends",
+    "totalByteCount": 21261,
+    "entries": [
+      "source-material/operator/briefing/contingency-planning-and-ai-dependence.md",
+      "source-material/operator/briefing/data-availability-and-record-integrity.md",
+      "source-material/operator/briefing/drills-communication-and-restart-criteria.md",
+      "source-material/operator/briefing/manual-mode-and-fallback-workflow.md",
+      "source-material/operator/briefing/vendor-cloud-and-interface-dependencies.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2278,
+      "sha256": "0d86d0c89a5fa0bff19deb80e4e49786bc75ff340507b705d7e54c2fff4f4a55"
+    },
+    {
+      "id": "operator:briefing/contingency-planning-and-ai-dependence.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W46-ai-trends/briefing/contingency-planning-and-ai-dependence.md",
+      "localPath": "source-material/operator/briefing/contingency-planning-and-ai-dependence.md",
+      "byteCount": 2203,
+      "sha256": "d91ae463eae13c86ec652f10a94a7e88834dcf2dd4bb86372809e530507546b5"
+    },
+    {
+      "id": "operator:briefing/data-availability-and-record-integrity.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W46-ai-trends/briefing/data-availability-and-record-integrity.md",
+      "localPath": "source-material/operator/briefing/data-availability-and-record-integrity.md",
+      "byteCount": 2209,
+      "sha256": "4e005b82ef2358c04fda906b2984c7c429c81bae964f130a5f266be824bf218e"
+    },
+    {
+      "id": "operator:briefing/drills-communication-and-restart-criteria.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W46-ai-trends/briefing/drills-communication-and-restart-criteria.md",
+      "localPath": "source-material/operator/briefing/drills-communication-and-restart-criteria.md",
+      "byteCount": 2072,
+      "sha256": "52609483f864948637249f3e3a96de68656b4bb58abd56e6fde532da3effe95e"
+    },
+    {
+      "id": "operator:briefing/manual-mode-and-fallback-workflow.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W46-ai-trends/briefing/manual-mode-and-fallback-workflow.md",
+      "localPath": "source-material/operator/briefing/manual-mode-and-fallback-workflow.md",
+      "byteCount": 2172,
+      "sha256": "19131a1b02afb33e0685995cc511d11d0adbb0fb2e7a07ae2300f39654eaf0c0"
+    },
+    {
+      "id": "operator:briefing/vendor-cloud-and-interface-dependencies.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W46-ai-trends/briefing/vendor-cloud-and-interface-dependencies.md",
+      "localPath": "source-material/operator/briefing/vendor-cloud-and-interface-dependencies.md",
+      "byteCount": 2091,
+      "sha256": "a958e6cc171257cce75864c9f345afc25f43bb27cbe268720e662075515ec241"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W46-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 4505,
+      "sha256": "8b59752803e7e72bea2f064b3939c36f4791923ed2f185600bc058f83415526c"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W46-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 6009,
+      "sha256": "69b534bac032a0727faa6cbfed82976ca967d12dbf20735f7f1146b5ddfe6433"
+    }
+  ]
+}

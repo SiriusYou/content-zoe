@@ -1,0 +1,74 @@
+[
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "core thesis",
+      "title constraints",
+      "safe and unsafe claims",
+      "publication gate"
+    ]
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "usedFor": [
+      "evidence posture",
+      "required English and Chinese warning lines",
+      "reader boundary limits"
+    ]
+  },
+  {
+    "id": "operator:briefing/contingency-planning-and-ai-dependence.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/contingency-planning-and-ai-dependence.md",
+    "usedFor": [
+      "continuity framing",
+      "dependency mapping",
+      "downtime mode distinctions",
+      "criticality by workflow"
+    ]
+  },
+  {
+    "id": "operator:briefing/manual-mode-and-fallback-workflow.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/manual-mode-and-fallback-workflow.md",
+    "usedFor": [
+      "manual-mode workflow requirements",
+      "trigger and owner expectations",
+      "reconciliation expectations"
+    ]
+  },
+  {
+    "id": "operator:briefing/data-availability-and-record-integrity.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/data-availability-and-record-integrity.md",
+    "usedFor": [
+      "data integrity and recovery framing",
+      "missing, delayed, duplicated, stale, or inconsistent state risks",
+      "auditability caveats"
+    ]
+  },
+  {
+    "id": "operator:briefing/vendor-cloud-and-interface-dependencies.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/vendor-cloud-and-interface-dependencies.md",
+    "usedFor": [
+      "vendor and interface dependency framing",
+      "non-model failure modes",
+      "pause and escalation conditions"
+    ]
+  },
+  {
+    "id": "operator:briefing/drills-communication-and-restart-criteria.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/drills-communication-and-restart-criteria.md",
+    "usedFor": [
+      "drill and training expectations",
+      "communication requirements",
+      "restart as governance decision"
+    ]
+  }
+]
