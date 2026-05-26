@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W43-ai-trends",
+  "weekKey": "2026-W43",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-26T05:47:26.012Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W43-ai-trends",
+    "totalByteCount": 20206,
+    "entries": [
+      "source-material/operator/briefing/escalation-from-intake-to-monitoring.md",
+      "source-material/operator/briefing/intake-register-and-use-case-classification.md",
+      "source-material/operator/briefing/regulatory-routing-device-certified-it-nondevice.md",
+      "source-material/operator/briefing/review-rights-and-local-ownership.md",
+      "source-material/operator/briefing/third-party-and-shadow-ai-discovery.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2290,
+      "sha256": "b2edbdc55ab2e6e8038824e0abcea3a3f13615d753374509a00cbfe94545f052"
+    },
+    {
+      "id": "operator:briefing/escalation-from-intake-to-monitoring.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W43-ai-trends/briefing/escalation-from-intake-to-monitoring.md",
+      "localPath": "source-material/operator/briefing/escalation-from-intake-to-monitoring.md",
+      "byteCount": 2234,
+      "sha256": "630bb8fc5aec211fe34805e8d26bede3b5b0cd7b8a1707e0624a7fb796f9c35f"
+    },
+    {
+      "id": "operator:briefing/intake-register-and-use-case-classification.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W43-ai-trends/briefing/intake-register-and-use-case-classification.md",
+      "localPath": "source-material/operator/briefing/intake-register-and-use-case-classification.md",
+      "byteCount": 2182,
+      "sha256": "a8e47708fecce059ea94b749c92a125954c84fdc23a672eaa869d6356245dffe"
+    },
+    {
+      "id": "operator:briefing/regulatory-routing-device-certified-it-nondevice.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W43-ai-trends/briefing/regulatory-routing-device-certified-it-nondevice.md",
+      "localPath": "source-material/operator/briefing/regulatory-routing-device-certified-it-nondevice.md",
+      "byteCount": 2556,
+      "sha256": "96b3101e0991c940ea531561c3bc3b89940c026dfcbda7f3fbdf5d0a8ab94360"
+    },
+    {
+      "id": "operator:briefing/review-rights-and-local-ownership.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W43-ai-trends/briefing/review-rights-and-local-ownership.md",
+      "localPath": "source-material/operator/briefing/review-rights-and-local-ownership.md",
+      "byteCount": 1990,
+      "sha256": "5c84110c5cc8384a146e88126a05964cbf03cb19328125da2f193eb54ca9367e"
+    },
+    {
+      "id": "operator:briefing/third-party-and-shadow-ai-discovery.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W43-ai-trends/briefing/third-party-and-shadow-ai-discovery.md",
+      "localPath": "source-material/operator/briefing/third-party-and-shadow-ai-discovery.md",
+      "byteCount": 2341,
+      "sha256": "93246d23376075fe1c9c929c9366b22570b0d150879b64d1c8a084c6cb7016d4"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W43-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 3308,
+      "sha256": "b019d1ce58593f4f348fd60992e94dd463e1e90d4eaa74ab5c9b715633d8fcfe"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W43-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 5595,
+      "sha256": "a0b0b2533579d2cc6521cd69705327731c7b874f9cbf582694d4865e3d4640f9"
+    }
+  ]
+}

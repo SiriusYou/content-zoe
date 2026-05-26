@@ -1,0 +1,89 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": [
+      "job scope",
+      "topic",
+      "locale targets"
+    ],
+    "note": "Administrative context only; not used as substantive evidence."
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "core thesis",
+      "safe claims",
+      "unsafe claims",
+      "title and framing constraints"
+    ]
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "usedFor": [
+      "evidence limits",
+      "required warning strings",
+      "reader boundary"
+    ]
+  },
+  {
+    "id": "operator:briefing/intake-register-and-use-case-classification.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/intake-register-and-use-case-classification.md",
+    "usedFor": [
+      "intake register framing",
+      "plain-language intake questions",
+      "distinction between intake and approval"
+    ]
+  },
+  {
+    "id": "operator:briefing/regulatory-routing-device-certified-it-nondevice.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/regulatory-routing-device-certified-it-nondevice.md",
+    "usedFor": [
+      "routing by tool category",
+      "regulatory caution",
+      "limits of device and certification signals"
+    ]
+  },
+  {
+    "id": "operator:briefing/review-rights-and-local-ownership.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/review-rights-and-local-ownership.md",
+    "usedFor": [
+      "ownership requirements",
+      "review rights",
+      "escalation authority"
+    ]
+  },
+  {
+    "id": "operator:briefing/third-party-and-shadow-ai-discovery.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/third-party-and-shadow-ai-discovery.md",
+    "usedFor": [
+      "third-party discovery",
+      "embedded AI discovery",
+      "shadow AI governance questions"
+    ]
+  },
+  {
+    "id": "operator:briefing/escalation-from-intake-to-monitoring.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/escalation-from-intake-to-monitoring.md",
+    "usedFor": [
+      "downstream monitoring linkage",
+      "change and escalation triggers",
+      "intake-to-exit dependency framing"
+    ]
+  },
+  {
+    "id": "assumption-brief-scope",
+    "kind": "assumption",
+    "statement": "The research brief should stay implementation-ready and source-bounded, preparing a report draft for en and zh locales without adding external facts."
+  }
+]
