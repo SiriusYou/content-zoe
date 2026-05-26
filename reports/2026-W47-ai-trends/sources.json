@@ -1,0 +1,87 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/manifest.json",
+    "usedFor": [
+      "job topic",
+      "locales",
+      "staged source inventory"
+    ]
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "thesis framing",
+      "safe and unsafe claim boundaries",
+      "title direction"
+    ]
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "usedFor": [
+      "evidence warnings",
+      "reader-boundary limits",
+      "unsupported-claim exclusions"
+    ]
+  },
+  {
+    "id": "operator:briefing/approved-use-and-scope-register.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/approved-use-and-scope-register.md",
+    "usedFor": [
+      "approved-use field list",
+      "out-of-scope boundary framing"
+    ]
+  },
+  {
+    "id": "operator:briefing/general-purpose-and-shadow-use-creep.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/general-purpose-and-shadow-use-creep.md",
+    "usedFor": [
+      "general-purpose tool risks",
+      "shadow-use framing",
+      "detection examples"
+    ]
+  },
+  {
+    "id": "operator:briefing/pilot-to-production-and-cross-setting-spread.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/pilot-to-production-and-cross-setting-spread.md",
+    "usedFor": [
+      "spread-path analysis",
+      "expansion-review triggers"
+    ]
+  },
+  {
+    "id": "operator:briefing/review-triggers-and-change-notices.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/review-triggers-and-change-notices.md",
+    "usedFor": [
+      "trigger list",
+      "change-notice operations",
+      "monitoring posture"
+    ]
+  },
+  {
+    "id": "operator:briefing/training-ownership-and-accountability-drift.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/training-ownership-and-accountability-drift.md",
+    "usedFor": [
+      "training drift",
+      "ownership drift",
+      "accountability framing"
+    ]
+  },
+  {
+    "id": "assumption:no-local-implementation-proof",
+    "kind": "assumption",
+    "usedFor": [
+      "brief remains implementation-ready but source-bounded because the staged corpus contains governance framing rather than local proof"
+    ]
+  }
+]

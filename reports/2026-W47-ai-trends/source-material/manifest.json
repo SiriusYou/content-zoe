@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W47-ai-trends",
+  "weekKey": "2026-W47",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-26T15:55:59.306Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W47-ai-trends",
+    "totalByteCount": 19724,
+    "entries": [
+      "source-material/operator/briefing/approved-use-and-scope-register.md",
+      "source-material/operator/briefing/general-purpose-and-shadow-use-creep.md",
+      "source-material/operator/briefing/pilot-to-production-and-cross-setting-spread.md",
+      "source-material/operator/briefing/review-triggers-and-change-notices.md",
+      "source-material/operator/briefing/training-ownership-and-accountability-drift.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2276,
+      "sha256": "146efd50913927cfe61f50e65d7d03b6bc8934c4d4f7f1ef4e4aa5b19124150c"
+    },
+    {
+      "id": "operator:briefing/approved-use-and-scope-register.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W47-ai-trends/briefing/approved-use-and-scope-register.md",
+      "localPath": "source-material/operator/briefing/approved-use-and-scope-register.md",
+      "byteCount": 1928,
+      "sha256": "4b9140d1bfa56ffba930a97fd425f5ae74162a11397dd5bf3e533f2c4e93b4cf"
+    },
+    {
+      "id": "operator:briefing/general-purpose-and-shadow-use-creep.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W47-ai-trends/briefing/general-purpose-and-shadow-use-creep.md",
+      "localPath": "source-material/operator/briefing/general-purpose-and-shadow-use-creep.md",
+      "byteCount": 2106,
+      "sha256": "0abddc0676ca5197bbf38c1d731f9df8750df4d1d60cb7ba00129f9e25e77791"
+    },
+    {
+      "id": "operator:briefing/pilot-to-production-and-cross-setting-spread.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W47-ai-trends/briefing/pilot-to-production-and-cross-setting-spread.md",
+      "localPath": "source-material/operator/briefing/pilot-to-production-and-cross-setting-spread.md",
+      "byteCount": 1787,
+      "sha256": "f35a6588f2d5e21d28359b5c3fa95a3aa016ca02c7b1be9fa1ea5efd44151075"
+    },
+    {
+      "id": "operator:briefing/review-triggers-and-change-notices.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W47-ai-trends/briefing/review-triggers-and-change-notices.md",
+      "localPath": "source-material/operator/briefing/review-triggers-and-change-notices.md",
+      "byteCount": 1683,
+      "sha256": "400ca7291344a9f564eb17d6fe4828c1904ad9bf4151caac83150a88a1e75c08"
+    },
+    {
+      "id": "operator:briefing/training-ownership-and-accountability-drift.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W47-ai-trends/briefing/training-ownership-and-accountability-drift.md",
+      "localPath": "source-material/operator/briefing/training-ownership-and-accountability-drift.md",
+      "byteCount": 1756,
+      "sha256": "eb5a881f5f39534730f9f42bbb7492e62b792d09e591aa32da4f50f036e251f2"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W47-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 4061,
+      "sha256": "52ea13ded73c64450e0fcba6de38150dbca99682901d47eb6429b9433a1d23c4"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W47-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 6403,
+      "sha256": "949003dca8a6b6d77d42f8b3cb794eddb483dbe2b3e093e6ee08f61dfdd58d7f"
+    }
+  ]
+}
