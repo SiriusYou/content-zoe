@@ -1,0 +1,50 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": "Job topic, locales, and confirmation of staged source inventory"
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": "Primary thesis, title constraints, safe and unsafe claim boundaries, and publication gate"
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "usedFor": "Evidence-limits posture, required warning text, and reader-boundary constraints"
+  },
+  {
+    "id": "operator:briefing/workflow-and-human-factors-fit.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/workflow-and-human-factors-fit.md",
+    "usedFor": "Workflow-fit framing, operational review questions, and lifecycle revisit triggers"
+  },
+  {
+    "id": "operator:briefing/attention-load-and-alert-fatigue.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/attention-load-and-alert-fatigue.md",
+    "usedFor": "Attention-load framing, alert-fatigue analogy, and burden-review questions"
+  },
+  {
+    "id": "operator:briefing/local-validation-and-workday-burden.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/local-validation-and-workday-burden.md",
+    "usedFor": "Local-validation framing and examples of observable workday-burden evidence"
+  },
+  {
+    "id": "operator:briefing/training-oversight-and-human-review-capacity.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/training-oversight-and-human-review-capacity.md",
+    "usedFor": "Human-review capacity, training scope, and oversight-limit framing"
+  },
+  {
+    "id": "operator:briefing/device-usability-and-nondevice-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/device-usability-and-nondevice-boundaries.md",
+    "usedFor": "Category-aware governance and non-generalization of device guidance"
+  }
+]

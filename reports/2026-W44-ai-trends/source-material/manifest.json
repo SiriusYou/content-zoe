@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W44-ai-trends",
+  "weekKey": "2026-W44",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 2,
+  "generatedAt": "2026-05-26T13:43:25.861Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W44-ai-trends",
+    "totalByteCount": 19327,
+    "entries": [
+      "source-material/operator/briefing/attention-load-and-alert-fatigue.md",
+      "source-material/operator/briefing/device-usability-and-nondevice-boundaries.md",
+      "source-material/operator/briefing/local-validation-and-workday-burden.md",
+      "source-material/operator/briefing/training-oversight-and-human-review-capacity.md",
+      "source-material/operator/briefing/workflow-and-human-factors-fit.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2264,
+      "sha256": "30d4df135032b8f8efebf125520ce1d58660ce004c77e1e7cdf19c7523a70716"
+    },
+    {
+      "id": "operator:briefing/attention-load-and-alert-fatigue.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W44-ai-trends/briefing/attention-load-and-alert-fatigue.md",
+      "localPath": "source-material/operator/briefing/attention-load-and-alert-fatigue.md",
+      "byteCount": 2127,
+      "sha256": "eba039e8a19872c715b8e02412d2c444d99cba6f184b71745ee415228fb6a0ad"
+    },
+    {
+      "id": "operator:briefing/device-usability-and-nondevice-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W44-ai-trends/briefing/device-usability-and-nondevice-boundaries.md",
+      "localPath": "source-material/operator/briefing/device-usability-and-nondevice-boundaries.md",
+      "byteCount": 2027,
+      "sha256": "d27dca30de0c7581cf405d803ca7a37ffb80dc1e4462def1a0ce3e2a5b840f88"
+    },
+    {
+      "id": "operator:briefing/local-validation-and-workday-burden.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W44-ai-trends/briefing/local-validation-and-workday-burden.md",
+      "localPath": "source-material/operator/briefing/local-validation-and-workday-burden.md",
+      "byteCount": 1878,
+      "sha256": "9f62b93f990870f96162de96991d0adc81d1c6f0de9a8310ad5274194b8645b1"
+    },
+    {
+      "id": "operator:briefing/training-oversight-and-human-review-capacity.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W44-ai-trends/briefing/training-oversight-and-human-review-capacity.md",
+      "localPath": "source-material/operator/briefing/training-oversight-and-human-review-capacity.md",
+      "byteCount": 1944,
+      "sha256": "fc234e2bb17cc1df7fb3f34ded5419f6d53ef3167297cccc9ca07e59a4e04373"
+    },
+    {
+      "id": "operator:briefing/workflow-and-human-factors-fit.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W44-ai-trends/briefing/workflow-and-human-factors-fit.md",
+      "localPath": "source-material/operator/briefing/workflow-and-human-factors-fit.md",
+      "byteCount": 2140,
+      "sha256": "2da89fa571592fccf438fc5a1a63608c0bb70b654229fada142b8a7f2279db81"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W44-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 3743,
+      "sha256": "90981107b18b5886f4084ebaf0d83774ef2d36c624d3ae3925f0fb121a6ad06b"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W44-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 5468,
+      "sha256": "625599e276a89786b34ba54c2dec2d503625dc615047cc1b114b7afec3def601"
+    }
+  ]
+}
