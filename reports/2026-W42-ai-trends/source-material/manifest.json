@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W42-ai-trends",
+  "weekKey": "2026-W42",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 2,
+  "generatedAt": "2026-05-26T05:19:42.540Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W42-ai-trends",
+    "totalByteCount": 17571,
+    "entries": [
+      "source-material/operator/briefing/assurance-and-local-implementation-context.md",
+      "source-material/operator/briefing/device-list-and-public-summary-limits.md",
+      "source-material/operator/briefing/lifecycle-risk-and-change-records.md",
+      "source-material/operator/briefing/source-attributes-and-predictive-dsi-records.md",
+      "source-material/operator/briefing/user-facing-transparency-and-workflow.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2286,
+      "sha256": "53ff30d94439b8759ccd6f6187946695de8a5e52e9ddb0d4e62a4034c8b6348f"
+    },
+    {
+      "id": "operator:briefing/assurance-and-local-implementation-context.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W42-ai-trends/briefing/assurance-and-local-implementation-context.md",
+      "localPath": "source-material/operator/briefing/assurance-and-local-implementation-context.md",
+      "byteCount": 2059,
+      "sha256": "d15a2b0f443138d45e41cd31455c7d27fe14575baf1964be1fa90e9cb6558832"
+    },
+    {
+      "id": "operator:briefing/device-list-and-public-summary-limits.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W42-ai-trends/briefing/device-list-and-public-summary-limits.md",
+      "localPath": "source-material/operator/briefing/device-list-and-public-summary-limits.md",
+      "byteCount": 2080,
+      "sha256": "88b7f6f5fadf905bb238011e050c897aa7023ec2d42e5e31b9a2be6925591e9d"
+    },
+    {
+      "id": "operator:briefing/lifecycle-risk-and-change-records.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W42-ai-trends/briefing/lifecycle-risk-and-change-records.md",
+      "localPath": "source-material/operator/briefing/lifecycle-risk-and-change-records.md",
+      "byteCount": 2400,
+      "sha256": "9babb72934fe7c8458d1be6894409d0c4fbbde139af506ee2cb6791a7cf1a8e6"
+    },
+    {
+      "id": "operator:briefing/source-attributes-and-predictive-dsi-records.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W42-ai-trends/briefing/source-attributes-and-predictive-dsi-records.md",
+      "localPath": "source-material/operator/briefing/source-attributes-and-predictive-dsi-records.md",
+      "byteCount": 2479,
+      "sha256": "89a1ad164195cc002f092b4d0ec68ea50c6b9ea6252e0008835c41d80bd0ed6a"
+    },
+    {
+      "id": "operator:briefing/user-facing-transparency-and-workflow.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W42-ai-trends/briefing/user-facing-transparency-and-workflow.md",
+      "localPath": "source-material/operator/briefing/user-facing-transparency-and-workflow.md",
+      "byteCount": 2481,
+      "sha256": "085a415659a08b1767e16a7893d56d8623776607ffc7c0a9b7b3eb873de7c4c0"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W42-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 2023,
+      "sha256": "4bbe26465e1f84a5b0054fb587c02fd12e24675eb4158021fc56a379153e4cbe"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W42-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 4049,
+      "sha256": "e9540252586ad65bde9e631552d19deb9b9d1e26935ede78a861ab35cf90b01f"
+    }
+  ]
+}
