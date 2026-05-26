@@ -1,0 +1,50 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": "job topic, locales, and staged source inventory"
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": "primary thesis, title constraints, safe claims, unsafe claims, and publication gate"
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "usedFor": "evidence-limit posture, required warnings, and reader-boundary constraints"
+  },
+  {
+    "id": "operator:briefing/action-authority-and-permission-model.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/action-authority-and-permission-model.md",
+    "usedFor": "permission-boundary framing and action classes"
+  },
+  {
+    "id": "operator:briefing/recommendation-vs-directive-output.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/recommendation-vs-directive-output.md",
+    "usedFor": "decision-support framing, basis-for-review nuance, and directive-vs-recommendation distinctions"
+  },
+  {
+    "id": "operator:briefing/human-authorization-and-escalation.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/human-authorization-and-escalation.md",
+    "usedFor": "meaningful human review, override, and escalation constraints"
+  },
+  {
+    "id": "operator:briefing/access-audit-and-integrity-controls.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/access-audit-and-integrity-controls.md",
+    "usedFor": "access, auditability, integrity, attribution, and reviewability framing"
+  },
+  {
+    "id": "operator:briefing/vendor-embedded-and-agentic-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/vendor-embedded-and-agentic-boundaries.md",
+    "usedFor": "embedded-feature update review and agent-like workflow boundaries"
+  }
+]
