@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2027-W02-ai-trends",
+  "weekKey": "2027-W02",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 2,
+  "generatedAt": "2026-05-27T13:06:45.241Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2027-W02-ai-trends",
+    "totalByteCount": 17794,
+    "entries": [
+      "source-material/operator/briefing/decision-rights-and-next-actions.md",
+      "source-material/operator/briefing/monitoring-fallback-and-escalation-responsibility.md",
+      "source-material/operator/briefing/owner-of-record-model.md",
+      "source-material/operator/briefing/source-attributes-and-local-context.md",
+      "source-material/operator/briefing/unknown-disputed-and-outdated-ownership.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2251,
+      "sha256": "c283ea6b78cff31680b6e7ac1412719f4456c3991e93aa81fb2a0975590d7e0d"
+    },
+    {
+      "id": "operator:briefing/decision-rights-and-next-actions.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W02-ai-trends/briefing/decision-rights-and-next-actions.md",
+      "localPath": "source-material/operator/briefing/decision-rights-and-next-actions.md",
+      "byteCount": 1218,
+      "sha256": "fc7be2d82573cfb190c83102efcec40fa0967b263376193c7c8fd23fcf7779ad"
+    },
+    {
+      "id": "operator:briefing/monitoring-fallback-and-escalation-responsibility.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W02-ai-trends/briefing/monitoring-fallback-and-escalation-responsibility.md",
+      "localPath": "source-material/operator/briefing/monitoring-fallback-and-escalation-responsibility.md",
+      "byteCount": 1386,
+      "sha256": "7ea54922638e5382435d38aec67cb2264f8f17a53c4e108f39542545e31484d8"
+    },
+    {
+      "id": "operator:briefing/owner-of-record-model.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W02-ai-trends/briefing/owner-of-record-model.md",
+      "localPath": "source-material/operator/briefing/owner-of-record-model.md",
+      "byteCount": 1061,
+      "sha256": "58bb55cda4e71de8d571795e8610cbdaa781a64cd0ac95523278ab757c0bedb9"
+    },
+    {
+      "id": "operator:briefing/source-attributes-and-local-context.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W02-ai-trends/briefing/source-attributes-and-local-context.md",
+      "localPath": "source-material/operator/briefing/source-attributes-and-local-context.md",
+      "byteCount": 1354,
+      "sha256": "526ea01ef69e9bfc4d3750a63fbc65449c313ddfc5b2206d51ee0e6f27a3ec98"
+    },
+    {
+      "id": "operator:briefing/unknown-disputed-and-outdated-ownership.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W02-ai-trends/briefing/unknown-disputed-and-outdated-ownership.md",
+      "localPath": "source-material/operator/briefing/unknown-disputed-and-outdated-ownership.md",
+      "byteCount": 979,
+      "sha256": "a253668934941207d109dd0efeec9f6e6d03ab109e719c18675a80e409ff5bec"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W02-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 3265,
+      "sha256": "e4886ea5eb2743a558065fc406fbe6d68dc2f02af250037a657724db7153923d"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W02-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 8531,
+      "sha256": "b2f8af44046d4cd2038c26c0ca5262b507325845c5da5532b4a624cb30a7ff83"
+    }
+  ]
+}
