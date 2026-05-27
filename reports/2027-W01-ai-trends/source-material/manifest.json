@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2027-W01-ai-trends",
+  "weekKey": "2027-W01",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 3,
+  "generatedAt": "2026-05-27T12:12:53.783Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2027-W01-ai-trends",
+    "totalByteCount": 18180,
+    "entries": [
+      "source-material/operator/briefing/evidence-monitoring-and-validation-gaps.md",
+      "source-material/operator/briefing/fallback-retirement-and-closed-items.md",
+      "source-material/operator/briefing/owner-and-decision-rights.md",
+      "source-material/operator/briefing/review-queue-operating-model.md",
+      "source-material/operator/briefing/triggers-and-prioritization.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2210,
+      "sha256": "99954132085898d2eff0016526f7468279872985ad8089d54e785b5f609567c1"
+    },
+    {
+      "id": "operator:briefing/evidence-monitoring-and-validation-gaps.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W01-ai-trends/briefing/evidence-monitoring-and-validation-gaps.md",
+      "localPath": "source-material/operator/briefing/evidence-monitoring-and-validation-gaps.md",
+      "byteCount": 1337,
+      "sha256": "580e35db277223006658d3ade908de2b49cae591a95a721918a97ded09af76e9"
+    },
+    {
+      "id": "operator:briefing/fallback-retirement-and-closed-items.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W01-ai-trends/briefing/fallback-retirement-and-closed-items.md",
+      "localPath": "source-material/operator/briefing/fallback-retirement-and-closed-items.md",
+      "byteCount": 1253,
+      "sha256": "48c6b5f9e7bdbfaa324f2692dfe3beffcb924083bf11278308d236cd2dc33f83"
+    },
+    {
+      "id": "operator:briefing/owner-and-decision-rights.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W01-ai-trends/briefing/owner-and-decision-rights.md",
+      "localPath": "source-material/operator/briefing/owner-and-decision-rights.md",
+      "byteCount": 1180,
+      "sha256": "ba86895d7c70e3b74d7eaa129cba5c28271e3391f83793a23041835ffb5c327b"
+    },
+    {
+      "id": "operator:briefing/review-queue-operating-model.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W01-ai-trends/briefing/review-queue-operating-model.md",
+      "localPath": "source-material/operator/briefing/review-queue-operating-model.md",
+      "byteCount": 1437,
+      "sha256": "fdd5b56fb03098d2a4f40c9811580d48a37d10a54469bd483fb0a950cebc6864"
+    },
+    {
+      "id": "operator:briefing/triggers-and-prioritization.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W01-ai-trends/briefing/triggers-and-prioritization.md",
+      "localPath": "source-material/operator/briefing/triggers-and-prioritization.md",
+      "byteCount": 1507,
+      "sha256": "5ffca1faee7dee90fc4d7e1086608c22e047d789ad6ed24306ce532cd390f422"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W01-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 3170,
+      "sha256": "5e78a424f13d9b515cafceaa0118ffab45460875bd0d79d777b65e4a73a22ae8"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W01-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 8296,
+      "sha256": "6bd289043eca8e73b0c44a37d647e76364d4a05428c8ec0f2694c5464ef982ae"
+    }
+  ]
+}

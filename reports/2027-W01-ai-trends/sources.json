@@ -1,0 +1,88 @@
+[
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "core thesis",
+      "title direction",
+      "reader-facing angle",
+      "safe and unsafe claim boundaries",
+      "drafting constraints"
+    ]
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "usedFor": [
+      "evidence posture",
+      "warning requirements",
+      "reader boundary",
+      "explicit exclusions"
+    ]
+  },
+  {
+    "id": "operator:briefing/review-queue-operating-model.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/review-queue-operating-model.md",
+    "usedFor": [
+      "queue operating model",
+      "queue fields",
+      "status examples"
+    ]
+  },
+  {
+    "id": "operator:briefing/triggers-and-prioritization.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/triggers-and-prioritization.md",
+    "usedFor": [
+      "trigger examples",
+      "prioritization factors",
+      "triage outputs"
+    ]
+  },
+  {
+    "id": "operator:briefing/owner-and-decision-rights.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/owner-and-decision-rights.md",
+    "usedFor": [
+      "owner follow-up",
+      "decision categories",
+      "anti-invention boundary"
+    ]
+  },
+  {
+    "id": "operator:briefing/evidence-monitoring-and-validation-gaps.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/evidence-monitoring-and-validation-gaps.md",
+    "usedFor": [
+      "evidence gap framing",
+      "monitoring questions",
+      "validation gap framing"
+    ]
+  },
+  {
+    "id": "operator:briefing/fallback-retirement-and-closed-items.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/fallback-retirement-and-closed-items.md",
+    "usedFor": [
+      "fallback questions",
+      "retirement and closed-status distinctions"
+    ]
+  },
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": [
+      "job topic",
+      "locale scope"
+    ]
+  },
+  {
+    "id": "assumption:no-fetched-primary-text-in-run-dir",
+    "kind": "assumption",
+    "statement": "The current working directory contains staged operator summaries and source-family references, but not fetched primary-source documents beyond those staged summaries."
+  }
+]
