@@ -1,0 +1,93 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": [
+      "job topic",
+      "week context",
+      "locales",
+      "staged source inventory"
+    ]
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "report thesis",
+      "preferred title direction",
+      "safe claims",
+      "unsafe claims",
+      "publication gate",
+      "style constraints"
+    ]
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "usedFor": [
+      "evidence posture",
+      "required warning posture",
+      "reader boundary",
+      "explicit exclusions"
+    ]
+  },
+  {
+    "id": "operator:briefing/carry-forward-file-and-open-items.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/carry-forward-file-and-open-items.md",
+    "usedFor": [
+      "carry-forward definition",
+      "open-item categories",
+      "operating function",
+      "unknowns should remain visible"
+    ]
+  },
+  {
+    "id": "operator:briefing/year-boundary-inventory-reconciliation.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/year-boundary-inventory-reconciliation.md",
+    "usedFor": [
+      "inventory linkage",
+      "reconciliation questions",
+      "embedded and indirect workflow scope"
+    ]
+  },
+  {
+    "id": "operator:briefing/monitoring-incidents-and-change-debt.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/monitoring-incidents-and-change-debt.md",
+    "usedFor": [
+      "monitoring continuity",
+      "change debt concept",
+      "incident and near-miss boundaries"
+    ]
+  },
+  {
+    "id": "operator:briefing/owner-review-and-expiring-decisions.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/owner-review-and-expiring-decisions.md",
+    "usedFor": [
+      "owner confirmation",
+      "expiring decisions",
+      "escalation and decision rights"
+    ]
+  },
+  {
+    "id": "operator:briefing/retirement-archive-and-2027-handoff.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/retirement-archive-and-2027-handoff.md",
+    "usedFor": [
+      "retirement and archive handling",
+      "next-cycle handoff categories",
+      "residual dependency questions"
+    ]
+  },
+  {
+    "id": "assumption-no-external-research",
+    "kind": "assumption",
+    "statement": "This research stage uses only staged local material and task context; no external web, browser, MCP, or credential-backed sources were consulted."
+  }
+]

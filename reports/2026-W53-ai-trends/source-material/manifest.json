@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W53-ai-trends",
+  "weekKey": "2026-W53",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-27T05:49:00.073Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W53-ai-trends",
+    "totalByteCount": 21015,
+    "entries": [
+      "source-material/operator/briefing/carry-forward-file-and-open-items.md",
+      "source-material/operator/briefing/monitoring-incidents-and-change-debt.md",
+      "source-material/operator/briefing/owner-review-and-expiring-decisions.md",
+      "source-material/operator/briefing/retirement-archive-and-2027-handoff.md",
+      "source-material/operator/briefing/year-boundary-inventory-reconciliation.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2254,
+      "sha256": "aa9a3b2cb8494661367b487576a95ea2124d6085e9969c13eff717334d02c64d"
+    },
+    {
+      "id": "operator:briefing/carry-forward-file-and-open-items.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W53-ai-trends/briefing/carry-forward-file-and-open-items.md",
+      "localPath": "source-material/operator/briefing/carry-forward-file-and-open-items.md",
+      "byteCount": 1858,
+      "sha256": "6eec7f09439475b70bc9088c21bf1e60624db1fe181923e1587fb1329afad188"
+    },
+    {
+      "id": "operator:briefing/monitoring-incidents-and-change-debt.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W53-ai-trends/briefing/monitoring-incidents-and-change-debt.md",
+      "localPath": "source-material/operator/briefing/monitoring-incidents-and-change-debt.md",
+      "byteCount": 1846,
+      "sha256": "0e17e0b4d42a380c142311b5bbbafcd17735f5ac12828ed405c053ffd17f5c53"
+    },
+    {
+      "id": "operator:briefing/owner-review-and-expiring-decisions.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W53-ai-trends/briefing/owner-review-and-expiring-decisions.md",
+      "localPath": "source-material/operator/briefing/owner-review-and-expiring-decisions.md",
+      "byteCount": 1851,
+      "sha256": "5b270e56480ba32ca4592dbb8282e64a8dbd73897039a0517bfd365d180dd438"
+    },
+    {
+      "id": "operator:briefing/retirement-archive-and-2027-handoff.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W53-ai-trends/briefing/retirement-archive-and-2027-handoff.md",
+      "localPath": "source-material/operator/briefing/retirement-archive-and-2027-handoff.md",
+      "byteCount": 1765,
+      "sha256": "8fee7a6b743b668802cbaa54c4c187369039d2e1998f0f46d359f19c547171eb"
+    },
+    {
+      "id": "operator:briefing/year-boundary-inventory-reconciliation.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W53-ai-trends/briefing/year-boundary-inventory-reconciliation.md",
+      "localPath": "source-material/operator/briefing/year-boundary-inventory-reconciliation.md",
+      "byteCount": 2037,
+      "sha256": "951090d33e8ff2700f64ef3ed6e435d2fdce1f622236bd817fe439b599d2770a"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W53-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 3332,
+      "sha256": "f7372b1e2bd55af2e9feb0feda08ed2e0148dbc25441f4a698b557ac2683aced"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W53-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 8326,
+      "sha256": "5d13cc9482638194286f811d74ee487e629aba6b35a371b7cadd70bc79a36dc7"
+    }
+  ]
+}
