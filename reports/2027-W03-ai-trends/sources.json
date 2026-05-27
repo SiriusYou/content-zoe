@@ -1,0 +1,102 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": [
+      "job metadata",
+      "topic",
+      "locale targets",
+      "staged source inventory"
+    ]
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "primary thesis",
+      "title direction",
+      "safe claims",
+      "unsafe claims",
+      "publication gates",
+      "selected source basis naming"
+    ]
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "usedFor": [
+      "evidence-limit posture",
+      "warning requirements",
+      "reader-facing phrasing",
+      "non-claims"
+    ]
+  },
+  {
+    "id": "operator:briefing/review-date-model.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/review-date-model.md",
+    "usedFor": [
+      "review-date definition",
+      "useful record fields",
+      "routing-not-proof framing"
+    ]
+  },
+  {
+    "id": "operator:briefing/change-triggers-and-use-drift.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/change-triggers-and-use-drift.md",
+    "usedFor": [
+      "use drift rationale",
+      "trigger categories",
+      "non-exhaustive trigger caution"
+    ]
+  },
+  {
+    "id": "operator:briefing/continued-use-decisions.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/continued-use-decisions.md",
+    "usedFor": [
+      "decision-routing categories",
+      "expired-status handling",
+      "unknown-status handling"
+    ]
+  },
+  {
+    "id": "operator:briefing/monitoring-fallback-and-escalation.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/monitoring-fallback-and-escalation.md",
+    "usedFor": [
+      "monitoring linkage",
+      "fallback framing",
+      "escalation-route framing"
+    ]
+  },
+  {
+    "id": "operator:briefing/source-attributes-and-local-context.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/source-attributes-and-local-context.md",
+    "usedFor": [
+      "source-attributes framing",
+      "local-context change examples",
+      "public-language guard"
+    ]
+  },
+  {
+    "id": "operator:briefing/unknown-expired-and-disputed-review.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/unknown-expired-and-disputed-review.md",
+    "usedFor": [
+      "disputed-status framing",
+      "unknown-status visibility",
+      "expired-status visibility"
+    ]
+  },
+  {
+    "id": "assumption-no-staged-public-fulltext",
+    "kind": "assumption",
+    "statement": "Because the working directory only stages boundary notes and source-family references rather than full public-source texts, the brief should avoid direct quotations and fine-grained claims that would require underlying source verification."
+  }
+]

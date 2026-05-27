@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2027-W03-ai-trends",
+  "weekKey": "2027-W03",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 2,
+  "generatedAt": "2026-05-27T14:18:34.985Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2027-W03-ai-trends",
+    "totalByteCount": 22695,
+    "entries": [
+      "source-material/operator/briefing/change-triggers-and-use-drift.md",
+      "source-material/operator/briefing/continued-use-decisions.md",
+      "source-material/operator/briefing/monitoring-fallback-and-escalation.md",
+      "source-material/operator/briefing/review-date-model.md",
+      "source-material/operator/briefing/source-attributes-and-local-context.md",
+      "source-material/operator/briefing/unknown-expired-and-disputed-review.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2429,
+      "sha256": "0aa511d5addce5df1b3c8d9b43104b9041fd6420cba83bc426fcd4008d5658df"
+    },
+    {
+      "id": "operator:briefing/change-triggers-and-use-drift.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W03-ai-trends/briefing/change-triggers-and-use-drift.md",
+      "localPath": "source-material/operator/briefing/change-triggers-and-use-drift.md",
+      "byteCount": 1684,
+      "sha256": "62d4d84ee9fe31b8ca44cc450025c6b6c0e38d72c4c0ccb00670fb5ff79d9eab"
+    },
+    {
+      "id": "operator:briefing/continued-use-decisions.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W03-ai-trends/briefing/continued-use-decisions.md",
+      "localPath": "source-material/operator/briefing/continued-use-decisions.md",
+      "byteCount": 1766,
+      "sha256": "fcb832b21a59d69351bb74e90f4e1300f9d3347009bcaa85d04ff35cedffe33f"
+    },
+    {
+      "id": "operator:briefing/monitoring-fallback-and-escalation.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W03-ai-trends/briefing/monitoring-fallback-and-escalation.md",
+      "localPath": "source-material/operator/briefing/monitoring-fallback-and-escalation.md",
+      "byteCount": 1548,
+      "sha256": "c0dee32cba035b9184d2fd1cf389de405656e79e0d60de10558906f3911ad698"
+    },
+    {
+      "id": "operator:briefing/review-date-model.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W03-ai-trends/briefing/review-date-model.md",
+      "localPath": "source-material/operator/briefing/review-date-model.md",
+      "byteCount": 1856,
+      "sha256": "90825e6e63cf3a9b0918955b7b2268add6e96ce38554e7cada170ec732a081c3"
+    },
+    {
+      "id": "operator:briefing/source-attributes-and-local-context.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W03-ai-trends/briefing/source-attributes-and-local-context.md",
+      "localPath": "source-material/operator/briefing/source-attributes-and-local-context.md",
+      "byteCount": 1776,
+      "sha256": "101bb235e160f9103fc2e1a4abad2a116b22a8a9673d9f2427794186e00495a9"
+    },
+    {
+      "id": "operator:briefing/unknown-expired-and-disputed-review.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W03-ai-trends/briefing/unknown-expired-and-disputed-review.md",
+      "localPath": "source-material/operator/briefing/unknown-expired-and-disputed-review.md",
+      "byteCount": 1554,
+      "sha256": "5e4d8cf34f8a6ed27633a93d3b24dad7b7aa4a72d23360a7513e77182e79044f"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W03-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 3522,
+      "sha256": "52f7eb3de91cf809b96b7b3a57624aa4500dba4f24fd43ace9481e69f238653b"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W03-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 8989,
+      "sha256": "27da2f6f8724def41959da1a0d9f425695b958875f4417e0dc80024a39aaf590"
+    }
+  ]
+}
