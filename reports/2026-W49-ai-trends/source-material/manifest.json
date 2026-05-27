@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W49-ai-trends",
+  "weekKey": "2026-W49",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-27T02:03:24.428Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W49-ai-trends",
+    "totalByteCount": 22796,
+    "entries": [
+      "source-material/operator/briefing/access-language-and-workflow-burden.md",
+      "source-material/operator/briefing/data-proxy-and-source-attribute-risk.md",
+      "source-material/operator/briefing/governance-mitigation-and-ownership.md",
+      "source-material/operator/briefing/local-subgroup-and-context-review.md",
+      "source-material/operator/briefing/monitoring-feedback-and-recourse-signals.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2258,
+      "sha256": "006c149c3a94685d4a275e288d51c94c18f85a9bfb17971edf0fcad3ab455036"
+    },
+    {
+      "id": "operator:briefing/access-language-and-workflow-burden.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W49-ai-trends/briefing/access-language-and-workflow-burden.md",
+      "localPath": "source-material/operator/briefing/access-language-and-workflow-burden.md",
+      "byteCount": 2316,
+      "sha256": "7dc2c0a98ebee6c7f889feea7f71765c87f62dd0cd36fd9eb8aea45385203bc4"
+    },
+    {
+      "id": "operator:briefing/data-proxy-and-source-attribute-risk.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W49-ai-trends/briefing/data-proxy-and-source-attribute-risk.md",
+      "localPath": "source-material/operator/briefing/data-proxy-and-source-attribute-risk.md",
+      "byteCount": 2349,
+      "sha256": "9bb729b7b45dfbaec14a1fc7f21357cf2cb7e8e4cf05a4b5106f456a99f93d1f"
+    },
+    {
+      "id": "operator:briefing/governance-mitigation-and-ownership.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W49-ai-trends/briefing/governance-mitigation-and-ownership.md",
+      "localPath": "source-material/operator/briefing/governance-mitigation-and-ownership.md",
+      "byteCount": 2354,
+      "sha256": "34cb70b2eaae359f2b420ad9a5979cbe140d87a554294a2a7d173a1fb69315f5"
+    },
+    {
+      "id": "operator:briefing/local-subgroup-and-context-review.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W49-ai-trends/briefing/local-subgroup-and-context-review.md",
+      "localPath": "source-material/operator/briefing/local-subgroup-and-context-review.md",
+      "byteCount": 2236,
+      "sha256": "767eb62c45c11a416f4e411bd9fb8340e75cc0b754c3bffd29817087442f9d88"
+    },
+    {
+      "id": "operator:briefing/monitoring-feedback-and-recourse-signals.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W49-ai-trends/briefing/monitoring-feedback-and-recourse-signals.md",
+      "localPath": "source-material/operator/briefing/monitoring-feedback-and-recourse-signals.md",
+      "byteCount": 2061,
+      "sha256": "a5fc1d308394a0bd67015eb6f1798772930ee82ca22d092c10c6d124d4d84741"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W49-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 4618,
+      "sha256": "44145c8755e43b6734d50b0b787fb3017946bb19196207f42de509780aab29ec"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W49-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 6862,
+      "sha256": "2d8129c863654ec83430ee2e867956b8cf27b8db33f430a255546ee18a0e8d7c"
+    }
+  ]
+}

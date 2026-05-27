@@ -1,0 +1,44 @@
+[
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "role": "Primary thesis, title direction, style gates, safe claims, and publication constraints."
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "role": "Evidence warnings, reader boundaries, and unsupported-claim limits."
+  },
+  {
+    "id": "operator:briefing/local-subgroup-and-context-review.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/local-subgroup-and-context-review.md",
+    "role": "Local workflow, subgroup, care-setting, and stakeholder review frame."
+  },
+  {
+    "id": "operator:briefing/access-language-and-workflow-burden.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/access-language-and-workflow-burden.md",
+    "role": "Access burden, language, disability, workflow friction, and fallback-path questions."
+  },
+  {
+    "id": "operator:briefing/data-proxy-and-source-attribute-risk.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/data-proxy-and-source-attribute-risk.md",
+    "role": "Source attributes, proxy variables, missing data, and provenance framing."
+  },
+  {
+    "id": "operator:briefing/monitoring-feedback-and-recourse-signals.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/monitoring-feedback-and-recourse-signals.md",
+    "role": "Post-launch monitoring, feedback channels, and recourse signals."
+  },
+  {
+    "id": "operator:briefing/governance-mitigation-and-ownership.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/governance-mitigation-and-ownership.md",
+    "role": "Mitigation options, ownership model, and decision-record framing."
+  }
+]
