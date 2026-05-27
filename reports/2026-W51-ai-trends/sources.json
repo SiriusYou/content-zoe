@@ -1,0 +1,56 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": "job topic, locales, and confirmation that operator source material is staged locally"
+  },
+  {
+    "id": "research-source-manifest",
+    "kind": "research_source_material",
+    "localPath": "source-material/manifest.json",
+    "usedFor": "verification of available staged entries and local-path-only citation scope"
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": "primary thesis, title direction, style constraints, safe claims, unsafe claims, and publication gate"
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "usedFor": "evidence warnings, reader-boundary posture, and explicit unsupported-claim limits"
+  },
+  {
+    "id": "operator:briefing/update-inventory-and-version-record.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/update-inventory-and-version-record.md",
+    "usedFor": "requirements for what the update record should capture and how to treat release notes"
+  },
+  {
+    "id": "operator:briefing/change-trigger-and-impact-review.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/change-trigger-and-impact-review.md",
+    "usedFor": "material-change triggers, workflow impact questions, and reopened-review conditions"
+  },
+  {
+    "id": "operator:briefing/validation-after-change.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/validation-after-change.md",
+    "usedFor": "validation-refresh framing, local-versus-vendor evidence boundary, and narrowed-use fallback"
+  },
+  {
+    "id": "operator:briefing/user-notice-and-training.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/user-notice-and-training.md",
+    "usedFor": "workflow-specific notice, training updates, and patient/caregiver communication considerations"
+  },
+  {
+    "id": "operator:briefing/rollback-monitoring-and-release-ownership.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/rollback-monitoring-and-release-ownership.md",
+    "usedFor": "post-release monitoring, rollback or narrowing actions, accountable ownership, and scope-creep review"
+  }
+]
