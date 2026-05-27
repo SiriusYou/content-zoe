@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W52-ai-trends",
+  "weekKey": "2026-W52",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 3,
+  "generatedAt": "2026-05-27T05:17:20.577Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W52-ai-trends",
+    "totalByteCount": 22545,
+    "entries": [
+      "source-material/operator/briefing/embedded-indirect-and-shadow-ai.md",
+      "source-material/operator/briefing/inventory-hygiene-review-and-retirement.md",
+      "source-material/operator/briefing/local-ai-inventory-and-status-register.md",
+      "source-material/operator/briefing/ownership-risk-tier-and-use-boundary.md",
+      "source-material/operator/briefing/source-attributes-data-and-workflow-links.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2270,
+      "sha256": "73a4a22de2b071825719933616cbba5b5b60bb994490d1a8643e9b1e4aa09d3b"
+    },
+    {
+      "id": "operator:briefing/embedded-indirect-and-shadow-ai.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W52-ai-trends/briefing/embedded-indirect-and-shadow-ai.md",
+      "localPath": "source-material/operator/briefing/embedded-indirect-and-shadow-ai.md",
+      "byteCount": 1929,
+      "sha256": "99a359ece42e6cc7ed05b6552d128c85076d68eb9b78ff598bcde9f80d4fded4"
+    },
+    {
+      "id": "operator:briefing/inventory-hygiene-review-and-retirement.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W52-ai-trends/briefing/inventory-hygiene-review-and-retirement.md",
+      "localPath": "source-material/operator/briefing/inventory-hygiene-review-and-retirement.md",
+      "byteCount": 1970,
+      "sha256": "3a4b194f7894e739f89720a50b6eacd69ecc6d77ab60667b29bd504623f243ff"
+    },
+    {
+      "id": "operator:briefing/local-ai-inventory-and-status-register.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W52-ai-trends/briefing/local-ai-inventory-and-status-register.md",
+      "localPath": "source-material/operator/briefing/local-ai-inventory-and-status-register.md",
+      "byteCount": 1955,
+      "sha256": "dbb9db3f51633e17a1543738ff6d71e217ebcf634cab9615cea057a91c33e07d"
+    },
+    {
+      "id": "operator:briefing/ownership-risk-tier-and-use-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W52-ai-trends/briefing/ownership-risk-tier-and-use-boundary.md",
+      "localPath": "source-material/operator/briefing/ownership-risk-tier-and-use-boundary.md",
+      "byteCount": 1869,
+      "sha256": "251b9b99ed6f45554eb1e759674f7b2b282621dc2781c23399d4067618e73346"
+    },
+    {
+      "id": "operator:briefing/source-attributes-data-and-workflow-links.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W52-ai-trends/briefing/source-attributes-data-and-workflow-links.md",
+      "localPath": "source-material/operator/briefing/source-attributes-data-and-workflow-links.md",
+      "byteCount": 1988,
+      "sha256": "0825520d29186f539b55f2114b0f6b4c253031362d1ffb3c611f83fd18512eb7"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W52-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 4968,
+      "sha256": "b578a75af8875ad109f5eb6fc82aa69702d0632a8fbdab2e888ab8df69371ea7"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W52-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 7866,
+      "sha256": "6d8b113ab9bdb9d209526e736a5d46eea2063e9e27287696f933bf1366a42931"
+    }
+  ]
+}

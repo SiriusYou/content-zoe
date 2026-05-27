@@ -1,0 +1,56 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "use": "Job metadata, topic, locales, and staged source inventory for this research stage."
+  },
+  {
+    "id": "source-material-manifest",
+    "kind": "generated_manifest",
+    "localPath": "source-material/manifest.json",
+    "use": "Validation of staged source entry set and local source paths."
+  },
+  {
+    "id": "operator:topic-and-source-boundary",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "use": "Primary thesis, title direction, required style, safe claims, unsafe claims, and publication gate."
+  },
+  {
+    "id": "operator:evidence-limits-and-reader-boundaries",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "use": "Evidence limits, unsupported claim boundaries, and required locale-specific warning language."
+  },
+  {
+    "id": "operator:local-ai-inventory-and-status-register",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/local-ai-inventory-and-status-register.md",
+    "use": "Inventory purpose, minimum register fields, status examples, and visibility of unknown fields."
+  },
+  {
+    "id": "operator:embedded-indirect-and-shadow-ai",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/embedded-indirect-and-shadow-ai.md",
+    "use": "Embedded-use discovery angle and examples of indirect or workflow-level AI locations."
+  },
+  {
+    "id": "operator:ownership-risk-tier-and-use-boundary",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/ownership-risk-tier-and-use-boundary.md",
+    "use": "Ownership, approved-use boundary, escalation route, and review-depth framing."
+  },
+  {
+    "id": "operator:source-attributes-data-and-workflow-links",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/source-attributes-data-and-workflow-links.md",
+    "use": "Source attributes, data dependencies, workflow links, and bounded FDA device-context framing."
+  },
+  {
+    "id": "operator:inventory-hygiene-review-and-retirement",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/inventory-hygiene-review-and-retirement.md",
+    "use": "Review cadence, update triggers, retirement state, and lifecycle hygiene guidance."
+  }
+]
