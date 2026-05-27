@@ -1,0 +1,87 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": [
+      "job topic framing",
+      "locale scope"
+    ]
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": [
+      "core thesis",
+      "title constraints",
+      "safe and unsafe claim boundaries",
+      "publication gate"
+    ]
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "usedFor": [
+      "evidence posture",
+      "required evidence warnings",
+      "reader boundaries"
+    ]
+  },
+  {
+    "id": "operator:briefing/renewal-review-and-continued-use.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/renewal-review-and-continued-use.md",
+    "usedFor": [
+      "renewal as governance checkpoint",
+      "continued-use review questions",
+      "decision options"
+    ]
+  },
+  {
+    "id": "operator:briefing/actual-use-and-monitoring-record.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/actual-use-and-monitoring-record.md",
+    "usedFor": [
+      "actual-use evidence themes",
+      "monitoring versus approved-use framing",
+      "evidence-gap cautions"
+    ]
+  },
+  {
+    "id": "operator:briefing/update-support-and-dependency-changes.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/update-support-and-dependency-changes.md",
+    "usedFor": [
+      "change-since-launch section",
+      "support-history checks",
+      "dependency-shift framing"
+    ]
+  },
+  {
+    "id": "operator:briefing/vendor-evidence-and-contract-checkpoints.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/vendor-evidence-and-contract-checkpoints.md",
+    "usedFor": [
+      "vendor evidence questions",
+      "contract-checkpoint framing",
+      "non-legal vendor dependency posture"
+    ]
+  },
+  {
+    "id": "operator:briefing/renewal-decision-and-exit-readiness.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/renewal-decision-and-exit-readiness.md",
+    "usedFor": [
+      "decision-record requirements",
+      "exit-readiness section",
+      "transition-option framing"
+    ]
+  },
+  {
+    "id": "assumption-brief-purpose",
+    "kind": "assumption",
+    "statement": "The requested research artifact should optimize for downstream report drafting, so the brief emphasizes structure, claim discipline, warning strings, and evidence gaps rather than prose expansion."
+  }
+]

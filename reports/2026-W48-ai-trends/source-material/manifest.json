@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W48-ai-trends",
+  "weekKey": "2026-W48",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-27T01:30:31.792Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W48-ai-trends",
+    "totalByteCount": 20178,
+    "entries": [
+      "source-material/operator/briefing/actual-use-and-monitoring-record.md",
+      "source-material/operator/briefing/renewal-decision-and-exit-readiness.md",
+      "source-material/operator/briefing/renewal-review-and-continued-use.md",
+      "source-material/operator/briefing/update-support-and-dependency-changes.md",
+      "source-material/operator/briefing/vendor-evidence-and-contract-checkpoints.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2252,
+      "sha256": "6c7c985678331f9cd909294f60529675fa66b62e7f36c59c054ddca2a4c29788"
+    },
+    {
+      "id": "operator:briefing/actual-use-and-monitoring-record.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W48-ai-trends/briefing/actual-use-and-monitoring-record.md",
+      "localPath": "source-material/operator/briefing/actual-use-and-monitoring-record.md",
+      "byteCount": 1794,
+      "sha256": "43f828fac9c9f80f9f8142362d753d1763481bae8f098891f57e515bed1dd52a"
+    },
+    {
+      "id": "operator:briefing/renewal-decision-and-exit-readiness.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W48-ai-trends/briefing/renewal-decision-and-exit-readiness.md",
+      "localPath": "source-material/operator/briefing/renewal-decision-and-exit-readiness.md",
+      "byteCount": 1763,
+      "sha256": "54720f9bd831f080c167458542d4adabb6220efdca567e2cf081c270439a40b9"
+    },
+    {
+      "id": "operator:briefing/renewal-review-and-continued-use.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W48-ai-trends/briefing/renewal-review-and-continued-use.md",
+      "localPath": "source-material/operator/briefing/renewal-review-and-continued-use.md",
+      "byteCount": 1961,
+      "sha256": "a11157dcc336389f180fda5334e513ef18fb2d78d35740b8af5fb144415ccc83"
+    },
+    {
+      "id": "operator:briefing/update-support-and-dependency-changes.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W48-ai-trends/briefing/update-support-and-dependency-changes.md",
+      "localPath": "source-material/operator/briefing/update-support-and-dependency-changes.md",
+      "byteCount": 1820,
+      "sha256": "ed619d9d81d5da93d4dd6d44add8c780fd00a5e5dd90a44c11fedfbba7a7a335"
+    },
+    {
+      "id": "operator:briefing/vendor-evidence-and-contract-checkpoints.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W48-ai-trends/briefing/vendor-evidence-and-contract-checkpoints.md",
+      "localPath": "source-material/operator/briefing/vendor-evidence-and-contract-checkpoints.md",
+      "byteCount": 2016,
+      "sha256": "b2927b260fe23a2833a192b9e30bdc89b1ad74bab7045983f27b949a31a4e413"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W48-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 4306,
+      "sha256": "8aea80a8c8f2d84d33055e9c9a5df2b086d13dc6d58da546868cf2f1a32779f0"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W48-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 6518,
+      "sha256": "4c54403412909d2043274f6ff6d8c600857f447e080befa122b6368066896568"
+    }
+  ]
+}
