@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2026-W50-ai-trends",
+  "weekKey": "2026-W50",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 1,
+  "generatedAt": "2026-05-27T04:08:00.372Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2026-W50-ai-trends",
+    "totalByteCount": 22053,
+    "entries": [
+      "source-material/operator/briefing/communication-and-recourse-after-events.md",
+      "source-material/operator/briefing/corrective-action-and-ownership.md",
+      "source-material/operator/briefing/near-miss-file-and-event-scope.md",
+      "source-material/operator/briefing/reporting-thresholds-and-triage.md",
+      "source-material/operator/briefing/technical-logs-and-human-context.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2226,
+      "sha256": "07832801e42d518684c01056cc5d04eab172cf9d44a9bc1939dbe506c1c9b1c9"
+    },
+    {
+      "id": "operator:briefing/communication-and-recourse-after-events.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W50-ai-trends/briefing/communication-and-recourse-after-events.md",
+      "localPath": "source-material/operator/briefing/communication-and-recourse-after-events.md",
+      "byteCount": 2012,
+      "sha256": "f7574ca5b7c4dfa616d5e28514c819b13c867916cb480860376018ae12f676d3"
+    },
+    {
+      "id": "operator:briefing/corrective-action-and-ownership.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W50-ai-trends/briefing/corrective-action-and-ownership.md",
+      "localPath": "source-material/operator/briefing/corrective-action-and-ownership.md",
+      "byteCount": 1983,
+      "sha256": "748b4b0be3af50cd1e7cc31cfcddcc7e470a953fc894790943b2664a7ead37d3"
+    },
+    {
+      "id": "operator:briefing/near-miss-file-and-event-scope.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W50-ai-trends/briefing/near-miss-file-and-event-scope.md",
+      "localPath": "source-material/operator/briefing/near-miss-file-and-event-scope.md",
+      "byteCount": 1993,
+      "sha256": "878527ea2c2f857ebaf172fff8679a2ab829474f0e99a5839a84885c5476adc6"
+    },
+    {
+      "id": "operator:briefing/reporting-thresholds-and-triage.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W50-ai-trends/briefing/reporting-thresholds-and-triage.md",
+      "localPath": "source-material/operator/briefing/reporting-thresholds-and-triage.md",
+      "byteCount": 1864,
+      "sha256": "31417268940cfacff8f34641a78ccea5d61a60dbc3052172892b4469f1c78134"
+    },
+    {
+      "id": "operator:briefing/technical-logs-and-human-context.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W50-ai-trends/briefing/technical-logs-and-human-context.md",
+      "localPath": "source-material/operator/briefing/technical-logs-and-human-context.md",
+      "byteCount": 1940,
+      "sha256": "da60624215023a0aeb2f7ea3601aed2f318ae4f97a6e3c39e1d8c20a057f236c"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W50-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 4725,
+      "sha256": "8ca0b5f1d315584217d0873b310062722577257abb934ea26ec97b9cb6a4468e"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2026-W50-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 7536,
+      "sha256": "2d60f47787806e6cbadf106e4c20dafd50f326ead61caa1978592f2831cd7d63"
+    }
+  ]
+}

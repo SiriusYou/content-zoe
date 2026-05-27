@@ -1,0 +1,56 @@
+[
+  {
+    "id": "research-source-manifest",
+    "kind": "research_source_manifest",
+    "localPath": "source-material/manifest.json",
+    "role": "staged source inventory and job metadata"
+  },
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "role": "job topic, locales, and staged source listing"
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "role": "primary thesis, title direction, style constraints, and publication gate"
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "role": "evidence warnings, reader-safe limits, and unsupported-claim boundaries"
+  },
+  {
+    "id": "operator:briefing/near-miss-file-and-event-scope.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/near-miss-file-and-event-scope.md",
+    "role": "event scope and near-miss framing"
+  },
+  {
+    "id": "operator:briefing/reporting-thresholds-and-triage.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/reporting-thresholds-and-triage.md",
+    "role": "triage, urgency, fallback, and escalation framing"
+  },
+  {
+    "id": "operator:briefing/technical-logs-and-human-context.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/technical-logs-and-human-context.md",
+    "role": "technical trace plus human workflow context framing"
+  },
+  {
+    "id": "operator:briefing/communication-and-recourse-after-events.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/communication-and-recourse-after-events.md",
+    "role": "communication and recourse framing"
+  },
+  {
+    "id": "operator:briefing/corrective-action-and-ownership.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/corrective-action-and-ownership.md",
+    "role": "ownership, corrective action, and follow-up framing"
+  }
+]
