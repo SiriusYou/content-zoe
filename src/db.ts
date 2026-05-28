@@ -109,6 +109,7 @@ export interface Job {
   week_key: string;
   topic: string;
   locales: "en" | "en,zh";
+  modality: JobModality;
   attempt_number: number;
   status: string;
   purpose: JobPurpose | null;
@@ -130,6 +131,7 @@ export interface Job {
   updated_at: number;
 }
 
+export type JobModality = "text_report" | "image";
 export type JobPurpose = "production" | "validation";
 
 export interface Event {
@@ -149,6 +151,7 @@ export type NewJob = Pick<
     Pick<
       Job,
       | "locales"
+      | "modality"
       | "attempt_number"
       | "run_dir"
       | "purpose"
@@ -173,6 +176,7 @@ export type JobPatch = Partial<
     | "week_key"
     | "topic"
     | "locales"
+    | "modality"
     | "attempt_number"
     | "status"
     | "purpose"
@@ -252,6 +256,7 @@ const jobPatchColumns = [
   "week_key",
   "topic",
   "locales",
+  "modality",
   "attempt_number",
   "status",
   "purpose",
@@ -394,12 +399,12 @@ export function insertJob(db: DbClient, input: NewJob): Job {
   try {
     db.query(`
       INSERT INTO jobs (
-        id, week_key, topic, locales, attempt_number, status, current_stage,
+        id, week_key, topic, locales, modality, attempt_number, status, current_stage,
         purpose, run_dir, artifact_dir, primary_report_path, translated_report_path,
         sources_path, approval_summary, as_of, reject_scope, reject_type,
         reject_reason, notified_at, last_notify_error, error, created_at, updated_at
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?
@@ -409,6 +414,7 @@ export function insertJob(db: DbClient, input: NewJob): Job {
       input.week_key,
       input.topic,
       input.locales ?? "en,zh",
+      input.modality ?? "text_report",
       input.attempt_number ?? 1,
       input.status,
       input.current_stage,
@@ -900,6 +906,9 @@ function inferConstraintTarget(message: string): {
   }
   if (message.includes("locales")) {
     return { tableName: "jobs", columnHint: "locales" };
+  }
+  if (message.includes("modality")) {
+    return { tableName: "jobs", columnHint: "modality" };
   }
   return {};
 }

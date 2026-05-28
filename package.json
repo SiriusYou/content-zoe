@@ -45,7 +45,8 @@
     "notifier-smoke": "bun scripts/notifier-smoke.ts",
     "bot": "bun src/telegram/bot.ts",
     "bot-smoke": "bun scripts/bot-smoke.ts",
-    "db:smoke": "bun scripts/db-smoke.ts"
+    "db:smoke": "bun scripts/db-smoke.ts",
+    "db-modality-smoke": "bun scripts/db-modality-smoke.ts"
   },
   "devDependencies": {
     "@types/bun": "1.3.14",
