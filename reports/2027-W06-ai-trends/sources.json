@@ -1,0 +1,67 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "note": "Used for local job context: topic, locales, and staged source inventory."
+  },
+  {
+    "id": "source-material-manifest",
+    "kind": "local_manifest",
+    "localPath": "source-material/manifest.json",
+    "note": "Used to confirm staged source ids, local paths, and artifact boundaries."
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "note": "Primary source for thesis, title direction, safe claims, unsafe claims, and publication gates."
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "note": "Source for evidence posture, warning requirements, phrasing discipline, and allowed Selected Source Basis families."
+  },
+  {
+    "id": "operator:briefing/workaround-signal-model.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/workaround-signal-model.md",
+    "note": "Source for the workaround definition, example workaround types, and useful log fields."
+  },
+  {
+    "id": "operator:briefing/nonuse-bypass-and-shadow-workflows.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/nonuse-bypass-and-shadow-workflows.md",
+    "note": "Source for non-use, bypass, duplicate work, peer confirmation, and shadow-workflow framing."
+  },
+  {
+    "id": "operator:briefing/documentation-feedback-and-monitoring.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/documentation-feedback-and-monitoring.md",
+    "note": "Source for documentation questions and the boundary against inventing counts, patterns, outcomes, or incidents."
+  },
+  {
+    "id": "operator:briefing/owner-review-and-next-action.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/owner-review-and-next-action.md",
+    "note": "Source for owner-group, follow-up routing, and next-action categories."
+  },
+  {
+    "id": "operator:briefing/source-attributes-and-local-context.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/source-attributes-and-local-context.md",
+    "note": "Source for workflow-context interpretation, public-language guardrails, and local-context variables."
+  },
+  {
+    "id": "operator:briefing/unknown-invisible-and-normalized-workarounds.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/unknown-invisible-and-normalized-workarounds.md",
+    "note": "Source for unknown, invisible, and normalized workaround behavior as governance review questions."
+  },
+  {
+    "id": "assumption-primary-docs-not-staged",
+    "kind": "assumption",
+    "note": "The underlying public source documents named in the staged materials are not present in this workspace, so the research brief stays at the operator-provided, source-bounded summary level and flags that limitation explicitly."
+  }
+]

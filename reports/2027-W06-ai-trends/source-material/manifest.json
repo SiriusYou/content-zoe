@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "kind": "research_source_material",
+  "jobId": "2027-W06-ai-trends",
+  "weekKey": "2027-W06",
+  "topic": "AI in healthcare - weekly",
+  "locales": [
+    "en",
+    "zh"
+  ],
+  "attemptNumber": 3,
+  "generatedAt": "2026-05-28T02:39:29.583Z",
+  "sourceMaterialDir": "source-material",
+  "contextPath": "source-material/context.md",
+  "operatorSource": {
+    "present": true,
+    "rootPath": ".data/source-material/2027-W06-ai-trends",
+    "totalByteCount": 21725,
+    "entries": [
+      "source-material/operator/briefing/documentation-feedback-and-monitoring.md",
+      "source-material/operator/briefing/nonuse-bypass-and-shadow-workflows.md",
+      "source-material/operator/briefing/owner-review-and-next-action.md",
+      "source-material/operator/briefing/source-attributes-and-local-context.md",
+      "source-material/operator/briefing/unknown-invisible-and-normalized-workarounds.md",
+      "source-material/operator/briefing/workaround-signal-model.md",
+      "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "source-material/operator/topic-and-source-boundary.md"
+    ]
+  },
+  "entries": [
+    {
+      "id": "generated-job-context",
+      "kind": "generated_job_context",
+      "localPath": "source-material/context.md",
+      "byteCount": 2485,
+      "sha256": "b775d8e87989926d0e37d05eafd72ccbf458bf835c190b0b0bbbcc5d53e2e5bf"
+    },
+    {
+      "id": "operator:briefing/documentation-feedback-and-monitoring.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W06-ai-trends/briefing/documentation-feedback-and-monitoring.md",
+      "localPath": "source-material/operator/briefing/documentation-feedback-and-monitoring.md",
+      "byteCount": 1300,
+      "sha256": "1b6e96c853b2c99dd68568cf063cdea21556f44f55a4e79e92933a7226b6ef21"
+    },
+    {
+      "id": "operator:briefing/nonuse-bypass-and-shadow-workflows.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W06-ai-trends/briefing/nonuse-bypass-and-shadow-workflows.md",
+      "localPath": "source-material/operator/briefing/nonuse-bypass-and-shadow-workflows.md",
+      "byteCount": 1428,
+      "sha256": "b90cda41be55524d1d28fd5a4afb8687d90f2f30a2f3880c43c8a2ea7aeda6b6"
+    },
+    {
+      "id": "operator:briefing/owner-review-and-next-action.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W06-ai-trends/briefing/owner-review-and-next-action.md",
+      "localPath": "source-material/operator/briefing/owner-review-and-next-action.md",
+      "byteCount": 1289,
+      "sha256": "265a915b036e108f1f4a1b6499efbb142f7d662b686b884318418a0f3ebb4cd6"
+    },
+    {
+      "id": "operator:briefing/source-attributes-and-local-context.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W06-ai-trends/briefing/source-attributes-and-local-context.md",
+      "localPath": "source-material/operator/briefing/source-attributes-and-local-context.md",
+      "byteCount": 1720,
+      "sha256": "571aa7289857af6ad698a6fc3013d4a1353867f2396d41788b54866b0f8ef5ef"
+    },
+    {
+      "id": "operator:briefing/unknown-invisible-and-normalized-workarounds.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W06-ai-trends/briefing/unknown-invisible-and-normalized-workarounds.md",
+      "localPath": "source-material/operator/briefing/unknown-invisible-and-normalized-workarounds.md",
+      "byteCount": 1350,
+      "sha256": "3e7d3677f70aa5c96b313cee1d436dd31e07fcb93198b3448f877644c4cb9a91"
+    },
+    {
+      "id": "operator:briefing/workaround-signal-model.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W06-ai-trends/briefing/workaround-signal-model.md",
+      "localPath": "source-material/operator/briefing/workaround-signal-model.md",
+      "byteCount": 1644,
+      "sha256": "32963d06b3fffb1c26458c831ab727cac677c61f394423ce9b2c45b31546b9db"
+    },
+    {
+      "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W06-ai-trends/references/evidence-limits-and-reader-boundaries.md",
+      "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+      "byteCount": 3656,
+      "sha256": "2e839fbca8f55d4ee8a6ff51f816bb0d86945195532795afcca34e663e469081"
+    },
+    {
+      "id": "operator:topic-and-source-boundary.md",
+      "kind": "operator_source",
+      "sourcePath": ".data/source-material/2027-W06-ai-trends/topic-and-source-boundary.md",
+      "localPath": "source-material/operator/topic-and-source-boundary.md",
+      "byteCount": 9338,
+      "sha256": "38669cfdcb68449a75cbf2e3ca9d3aa90b752dadd147f42ad5ab2b467052198d"
+    }
+  ]
+}
