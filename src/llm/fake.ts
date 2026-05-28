@@ -1,4 +1,5 @@
-import { LLMProvider, LLMProviderError } from "./provider.ts";
+import { LLMProviderError } from "./provider.ts";
+import type { LLMProvider } from "./provider.ts";
 
 export class FakeProvider implements LLMProvider {
   readonly name = "fake";

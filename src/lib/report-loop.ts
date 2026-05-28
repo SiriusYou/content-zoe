@@ -3,7 +3,7 @@ import path from "node:path";
 
 import type { LLMProvider } from "../llm/provider.ts";
 import { runStage } from "../pipeline/run-stage.ts";
-import { nextStage, STAGES, type TerminalStage } from "../pipeline/stages.ts";
+import { nextStage, STAGES } from "../pipeline/stages.ts";
 import { Stage, type StageResult } from "../pipeline/types.ts";
 
 export type Locale = "en" | "zh";
@@ -97,8 +97,8 @@ export async function runReportLoop(
   assertRealpathInsideCwd(runDir, cwd);
 
   const startedAt = opts.startedAt ?? new Date().toISOString();
-  let current: Stage | TerminalStage = opts.startStage;
-  while (current !== "awaiting_approval") {
+  let current: Stage = opts.startStage;
+  for (;;) {
     const runningState: RunState = {
       schemaVersion: 1,
       jobId: opts.jobId,

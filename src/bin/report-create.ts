@@ -51,7 +51,7 @@ export class ReportCreateError extends Error {
     | "UNSUPPORTED_FORCE"
     | "WEEK_ALREADY_EXISTS";
 
-  constructor(code: ReportCreateError["code"], message = code) {
+  constructor(code: ReportCreateError["code"], message: string = code) {
     super(message);
     this.code = code;
   }

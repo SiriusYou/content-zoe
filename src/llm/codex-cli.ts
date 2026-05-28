@@ -9,9 +9,9 @@ import {
 import { join, resolve } from "node:path";
 
 import { assertCodexAvailable } from "../preflight.ts";
-import {
+import { LLMProviderError } from "./provider.ts";
+import type {
   LLMProvider,
-  LLMProviderError,
   QuiescenceProof,
   Snapshot,
   SnapshotEntry,
