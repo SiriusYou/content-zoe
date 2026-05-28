@@ -1,0 +1,67 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "whyUsed": "Confirmed job topic, week, locales, and the staged operator-source inventory for this attempt."
+  },
+  {
+    "id": "research-source-manifest",
+    "kind": "manifest",
+    "localPath": "source-material/manifest.json",
+    "whyUsed": "Verified the staged source set, local file paths, and source categories used for this research stage."
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "whyUsed": "Provided the article thesis, preferred title direction, required sections, safe and unsafe claims, and publication-gate constraints."
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "whyUsed": "Defined the evidence-limit posture, warning requirements, reader-facing phrasing, and the allowed Selected Source Basis families."
+  },
+  {
+    "id": "operator:briefing/uncertainty-label-model.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/uncertainty-label-model.md",
+    "whyUsed": "Supplied the core definition of an uncertainty label, the label-field inventory, and the warning that the label does not prove performance or safety claims."
+  },
+  {
+    "id": "operator:briefing/confidence-score-is-not-enough.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/confidence-score-is-not-enough.md",
+    "whyUsed": "Supported the angle that a confidence score alone is insufficient without context, reader fit, review triggers, and follow-up routing."
+  },
+  {
+    "id": "operator:briefing/missing-context-and-review-triggers.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/missing-context-and-review-triggers.md",
+    "whyUsed": "Provided examples of missing context and review triggers that can be framed as governance prompts rather than clinical instructions."
+  },
+  {
+    "id": "operator:briefing/fallback-escalation-and-human-review.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/fallback-escalation-and-human-review.md",
+    "whyUsed": "Supported the requirement to connect uncertainty to fallback routes, escalation routes, human review, and next-step action."
+  },
+  {
+    "id": "operator:briefing/source-attributes-and-local-evidence.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/source-attributes-and-local-evidence.md",
+    "whyUsed": "Defined the distinction between public source families and missing local evidence such as validation, calibration, monitoring, and workflow-fit review."
+  },
+  {
+    "id": "operator:briefing/monitoring-updates-and-feedback.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/monitoring-updates-and-feedback.md",
+    "whyUsed": "Supplied the narrow monitoring/update angle: labels should stay connected to feedback and workflow change without turning the piece into a general monitoring article."
+  },
+  {
+    "id": "assumption:no-external-verification",
+    "kind": "assumption",
+    "whyUsed": "This stage is intentionally limited to staged local material, so downstream drafting must treat public source-family references as unverified within the current attempt unless a later stage performs source checking."
+  }
+]
