@@ -1,4 +1,7 @@
 import {
+  createHash,
+} from "node:crypto";
+import {
   cpSync,
   existsSync,
   mkdirSync,
@@ -1456,10 +1459,43 @@ async function runReportRunSourceCarryForward(dir: string): Promise<string[]> {
   mkdirSync(resolve(attempt1, "source-material", "operator"), { recursive: true });
   writeFileSync(resolve(attempt1, "research", "brief.md"), "brief\n");
   writeFileSync(resolve(attempt1, "sources.json"), "[]\n");
-  writeFileSync(resolve(attempt1, "source-material", "context.md"), "job_id: source-carry-forward\n");
+  const contextAttempt1 = `# Research Source Material
+
+## Job Context
+
+- job_id: ${jobId}
+- week_key: smoke-${jobId}
+- topic: Smoke ${jobId}
+- locales: en,zh
+- attempt_number: 1
+
+`;
+  writeFileSync(resolve(attempt1, "source-material", "context.md"), contextAttempt1);
   writeFileSync(
     resolve(attempt1, "source-material", "manifest.json"),
-    `${JSON.stringify({ schemaVersion: 1, entries: [] })}\n`,
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        kind: "research_source_material",
+        jobId,
+        weekKey: `smoke-${jobId}`,
+        topic: `Smoke ${jobId}`,
+        locales: ["en", "zh"],
+        attemptNumber: 1,
+        contextPath: "source-material/context.md",
+        entries: [
+          {
+            id: "generated-job-context",
+            kind: "generated_job_context",
+            localPath: "source-material/context.md",
+            byteCount: Buffer.byteLength(contextAttempt1, "utf8"),
+            sha256: sha256Text(contextAttempt1),
+          },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
   );
   writeFileSync(resolve(attempt1, "source-material", "operator", "facts.md"), "carried source\n");
   writeState(attempt1, {
@@ -1488,9 +1524,27 @@ async function runReportRunSourceCarryForward(dir: string): Promise<string[]> {
     readFileSync(resolve(dir, ".runs", jobId, "attempt-2", "source-material", "operator", "facts.md"), "utf8") === "carried source\n",
     "source-material was not carried forward",
   );
+  const contextAttempt2 = readFileSync(
+    resolve(dir, ".runs", jobId, "attempt-2", "source-material", "context.md"),
+    "utf8",
+  );
+  const manifestAttempt2 = readSourceManifest(dir, jobId, 2);
+  assert(contextAttempt2.includes("attempt_number: 2"), "carried context.md was not re-stamped");
+  assert(!contextAttempt2.includes("attempt_number: 1"), "carried context.md kept stale attempt number");
+  assert(manifestAttempt2.attemptNumber === 2, "carried manifest.json was not re-stamped");
+  const contextEntry = manifestAttempt2.entries.find(
+    (entry) => entry.id === "generated-job-context",
+  );
+  assert(contextEntry !== undefined, "carried manifest missing generated context entry");
+  assert(
+    contextEntry.byteCount === Buffer.byteLength(contextAttempt2, "utf8") &&
+      contextEntry.sha256 === sha256Text(contextAttempt2),
+    "carried manifest generated context hash was not refreshed",
+  );
 
   return [
     "Resume from completed research carried source-material alongside research/ and sources.json.",
+    "Carried source-material/context.md and manifest.json were re-stamped to attempt-2 with a refreshed generated-context hash.",
     "Missing research prompt was never called, preserving Slice 4.22 downstream resume behavior.",
   ];
 }
@@ -1709,6 +1763,7 @@ function readSourceManifest(
   jobId: string,
   attemptNumber: number,
 ): {
+  attemptNumber?: number;
   operatorSource: { present: boolean; entries: string[] };
   entries: Array<Record<string, string | number | boolean>>;
 } {
@@ -1718,6 +1773,10 @@ function readSourceManifest(
       "utf8",
     ),
   );
+}
+
+function sha256Text(input: string): string {
+  return createHash("sha256").update(input).digest("hex");
 }
 
 function expectSourceStagingFailure(

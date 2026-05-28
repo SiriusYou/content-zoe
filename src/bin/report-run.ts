@@ -933,6 +933,14 @@ function publishResumeBootstrap(params: {
       fsOps.mkdirSync(path.dirname(to), { recursive: true });
       fsOps.cpSync(from, to, { recursive: true, force: true });
     }
+    if (carryForward.includes(SOURCE_MATERIAL_DIR)) {
+      restampCarriedSourceMaterial({
+        cwd,
+        runDir: bootstrapDir,
+        attemptNumber,
+        fsOps,
+      });
+    }
     for (const relPath of deletedFiles) {
       const target = path.resolve(bootstrapDir, relPath);
       assertInsideCwd(target, cwd);
@@ -1178,6 +1186,67 @@ function carryForwardPathsForStartStage(stage: Stage): string[] {
     case Stage.TRANSLATE_ZH:
       return ["research", "sources.json", SOURCE_MATERIAL_DIR, "report.en.md"];
   }
+}
+
+function restampCarriedSourceMaterial(params: {
+  cwd: string;
+  runDir: string;
+  attemptNumber: number;
+  fsOps: FileSystemOps;
+}): void {
+  const sourceMaterialDir = path.resolve(params.runDir, SOURCE_MATERIAL_DIR);
+  const contextPath = path.resolve(sourceMaterialDir, SOURCE_MATERIAL_CONTEXT);
+  const manifestPath = path.resolve(sourceMaterialDir, SOURCE_MATERIAL_MANIFEST);
+  assertPathInsideRoot(sourceMaterialDir, params.runDir, "source-material directory");
+  assertPathInsideRoot(contextPath, sourceMaterialDir, SOURCE_MATERIAL_CONTEXT);
+  assertPathInsideRoot(manifestPath, sourceMaterialDir, SOURCE_MATERIAL_MANIFEST);
+  assertInsideCwd(contextPath, params.cwd);
+  assertInsideCwd(manifestPath, params.cwd);
+
+  if (!existsSync(contextPath) || !existsSync(manifestPath)) return;
+
+  const context = readFileSync(contextPath, "utf8");
+  if (!/(^- attempt_number: )\d+$/m.test(context)) {
+    throw new Error("source-material context missing attempt_number during recovery restamp");
+  }
+  const restampedContext = context.replace(
+    /(^- attempt_number: )\d+$/m,
+    `$1${params.attemptNumber}`,
+  );
+  const contextBytes = Buffer.byteLength(restampedContext, "utf8");
+  const contextSha = sha256Text(restampedContext);
+  params.fsOps.writeFileSync(contextPath, restampedContext);
+
+  const manifest = readSourceMaterialManifestForRestamp(manifestPath);
+  manifest.attemptNumber = params.attemptNumber;
+  if (!Array.isArray(manifest.entries)) {
+    throw new Error("source-material manifest entries invalid during recovery restamp");
+  }
+  const contextEntry = manifest.entries.find(
+    (entry) =>
+      isRecord(entry) &&
+      entry.id === "generated-job-context" &&
+      entry.kind === "generated_job_context" &&
+      entry.localPath === `${SOURCE_MATERIAL_DIR}/${SOURCE_MATERIAL_CONTEXT}`,
+  );
+  if (!isRecord(contextEntry)) {
+    throw new Error("source-material manifest context entry missing during recovery restamp");
+  }
+  contextEntry.byteCount = contextBytes;
+  contextEntry.sha256 = contextSha;
+  params.fsOps.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+function readSourceMaterialManifestForRestamp(manifestPath: string): Record<string, unknown> {
+  const parsed = JSON.parse(readFileSync(manifestPath, "utf8")) as unknown;
+  if (!isRecord(parsed)) {
+    throw new Error("source-material manifest invalid during recovery restamp");
+  }
+  return parsed;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function failedStageOutputPaths(stage: Stage): string[] {

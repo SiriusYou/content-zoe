@@ -1,9 +1,9 @@
 # report-run smoke evidence
 
 - Command: `bun run report-run-smoke`
-- Started: 2026-05-25T06:37:16.128Z
-- Finished: 2026-05-25T06:37:17.021Z
-- Scenario root: /Users/youjia/.openclaw-worktrees/QgwGy6YaJw8Mq7JkPdPnI/target/.runs/report-run-smoke/2026-05-25T06-37-16.128Z (removed by finally-cleanup)
+- Started: 2026-05-28T05:22:27.326Z
+- Finished: 2026-05-28T05:22:28.240Z
+- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-28T05-22-27.326Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
@@ -39,5 +39,5 @@
 | report-run-source-per-file-bound | PASS | A single operator source file over 256 KiB failed before provider invocation.<br>Failure happened before fake-provider research artifacts, lifecycle stage_enter, or stage_complete.<br>The DB job status/current_stage/attempt_number remained unchanged. |
 | report-run-source-total-bound | PASS | Aggregate operator source content over 1 MiB failed before provider invocation.<br>Failure happened before fake-provider research artifacts, lifecycle stage_enter, or stage_complete.<br>The DB job status/current_stage/attempt_number remained unchanged. |
 | report-run-source-symlink-escape | PASS | Symlink escape in operator source material failed before provider invocation.<br>Failure happened before fake-provider research artifacts, lifecycle stage_enter, or stage_complete.<br>The DB job status/current_stage/attempt_number remained unchanged. |
-| report-run-source-carry-forward | PASS | Resume from completed research carried source-material alongside research/ and sources.json.<br>Missing research prompt was never called, preserving Slice 4.22 downstream resume behavior. |
+| report-run-source-carry-forward | PASS | Resume from completed research carried source-material alongside research/ and sources.json.<br>Carried source-material/context.md and manifest.json were re-stamped to attempt-2 with a refreshed generated-context hash.<br>Missing research prompt was never called, preserving Slice 4.22 downstream resume behavior. |
 | report-run-boundary-static-check | PASS | Approval-label-anchor diff inspected (84ce0cd784ccc1231cc9717cff6885967b55a16e..HEAD plus implementation working files, excluding pre-existing README/reports runtime evidence): docs/preflight/report-run-smoke.md, scripts/report-run-smoke.ts, src/bin/report-run.ts.<br>Only Slice 4.29 allowed implementation/evidence files were present in the boundary diff.<br>Static source inspection found the non-resume refusal, --resume guidance, lifecycle-event orphan classifier, and orphan directory cleanup path.<br>Static hard-out scan found no package/schema/runtime/provider/downstream prompt/publish/Telegram/governance surfaces in the implementation range. |
