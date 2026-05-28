@@ -931,7 +931,7 @@ async function runRejectSuccessRequeues(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 1_900_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     const job = requireJob(db, "reject-success");
@@ -977,7 +977,7 @@ async function runRejectZhRewindsTranslate(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 2_000_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     const job = requireJob(db, "reject-zh");
@@ -1009,7 +1009,7 @@ async function runRejectInvalidCombo(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 3_000_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     const job = requireJob(db, "reject-invalid-combo");
@@ -1040,7 +1040,7 @@ async function runRejectStaleAttempt(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 4_000_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(replies[0]?.includes("STALE_ATTEMPT"), "stale reply omitted code");
@@ -1068,7 +1068,7 @@ async function runRejectStatusMismatch(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 5_000_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(replies[0]?.includes("STATUS_MISMATCH"), "status reply omitted code");
@@ -1098,7 +1098,7 @@ async function runRejectDuplicatePrevention(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 6_000_000_000,
-      reply: (text) => firstReplies.push(text),
+      reply: captureReply(firstReplies),
     });
     await handleRejectCommand({
       db,
@@ -1106,7 +1106,7 @@ async function runRejectDuplicatePrevention(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 6_000_000_001,
-      reply: (text) => secondReplies.push(text),
+      reply: captureReply(secondReplies),
     });
 
     assert(firstReplies[0]?.startsWith("Rejected attempt 1."), "first reject did not succeed");
@@ -1141,7 +1141,7 @@ async function runRejectRaceLostAfterRead(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 7_000_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
       beforeCas: () => {
         updateJob(db, "reject-race", {
           status: "queued",
@@ -1190,7 +1190,7 @@ async function runRejectUnauthorizedKnownJob(dir: string): Promise<string[]> {
       chatId: 999,
       operatorChatIds: [123],
       now: () => 8_000_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     const job = requireJob(db, "reject-unauthorized");
@@ -1227,7 +1227,7 @@ async function runRejectUnauthorizedUnknownJob(dir: string): Promise<string[]> {
       chatId: 999,
       operatorChatIds: [123],
       now: () => 8_500_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(result.status === "unauthorized_ignored", "unknown unauthorized command was not ignored");
@@ -1253,7 +1253,7 @@ async function runRejectAllowlistedMalformedVisible(dir: string): Promise<string
       chatId: 123,
       operatorChatIds: [123],
       now: () => 8_600_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
     await handleRejectCommand({
       db,
@@ -1261,7 +1261,7 @@ async function runRejectAllowlistedMalformedVisible(dir: string): Promise<string
       chatId: 123,
       operatorChatIds: [123],
       now: () => 8_600_000_001,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(
@@ -1343,7 +1343,7 @@ async function runApproveMalformedJobIdPreserved(dir: string): Promise<string[]>
       operatorChatIds: [123],
       cwd: dir,
       now: () => 8_700_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
     await handleApproveCommand({
       db,
@@ -1352,7 +1352,7 @@ async function runApproveMalformedJobIdPreserved(dir: string): Promise<string[]>
       operatorChatIds: [123],
       cwd: dir,
       now: () => 8_700_000_001,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(
@@ -1391,7 +1391,7 @@ async function runApproveUnauthorizedKnownJob(dir: string): Promise<string[]> {
       operatorChatIds: [123],
       cwd: dir,
       now: () => 8_800_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     const job = requireJob(db, "approve-unauthorized");
@@ -1428,7 +1428,7 @@ async function runApproveUnauthorizedUnknownJob(dir: string): Promise<string[]> 
       operatorChatIds: [123],
       cwd: dir,
       now: () => 8_900_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(result.status === "unauthorized_ignored", "unknown unauthorized approve was not ignored");
@@ -1455,7 +1455,7 @@ async function runApproveUnknownJobVisible(dir: string): Promise<string[]> {
       operatorChatIds: [123],
       cwd: dir,
       now: () => 9_100_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(replies[0] === "UNKNOWN_JOB: missing-job", "unknown-job reply was not visible with job ID");
@@ -1488,7 +1488,7 @@ async function runApproveStaleAttempt(dir: string): Promise<string[]> {
       operatorChatIds: [123],
       cwd: dir,
       now: () => 9_200_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(replies[0]?.includes("STALE_ATTEMPT"), "stale approve reply omitted code");
@@ -1523,7 +1523,7 @@ async function runApproveStatusMismatch(dir: string): Promise<string[]> {
       operatorChatIds: [123],
       cwd: dir,
       now: () => 9_300_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(replies[0]?.includes("STATUS_MISMATCH"), "status approve reply omitted code");
@@ -1563,7 +1563,7 @@ async function runApproveSourceValidation(dir: string): Promise<string[]> {
         operatorChatIds: [123],
         cwd: dir,
         now: () => 9_400_000_000,
-        reply: (text) => replies.push(text),
+        reply: captureReply(replies),
       });
       assert(replies[0]?.includes("PUBLISH_SOURCE_MISSING"), `${scenario.omit} did not fail as missing source`);
       assert(findEventsByJob(db, scenario.jobId).length === 0, `${scenario.omit} wrote event`);
@@ -1615,7 +1615,7 @@ async function runApproveSuccessPublishesBundle(dir: string): Promise<string[]> 
         plans.push(plan);
         assertPathBoundedGitPlan(plan, "reports/2026-W47-ai-trends");
       },
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     const job = requireJob(db, "approve-success");
@@ -1692,7 +1692,7 @@ async function runApproveWithoutSourceMaterialOptional(dir: string): Promise<str
       operatorChatIds: [123],
       cwd: dir,
       now: () => 10_500_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     const manifest = promotedManifest(findEventsByJob(db, "approve-no-source-material", "promoted")[0]);
@@ -1882,7 +1882,7 @@ async function runApprovePreconditionFailureCase(
       operatorChatIds: [123],
       cwd: dir,
       now: () => 10_510_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(replies[0]?.includes(params.expectedCode), `${params.jobId} reply omitted ${params.expectedCode}`);
@@ -1919,7 +1919,7 @@ async function runApproveIdempotentRepromote(dir: string): Promise<string[]> {
       operatorChatIds: [123],
       cwd: dir,
       now: () => 9_600_000_000,
-      reply: (text) => firstReplies.push(text),
+      reply: captureReply(firstReplies),
     });
     assert(!existsSync(resolve(dir, ".runs", "approve-idempotent", "attempt-1")), "first publish did not clean source");
 
@@ -1930,7 +1930,7 @@ async function runApproveIdempotentRepromote(dir: string): Promise<string[]> {
       operatorChatIds: [123],
       cwd: dir,
       now: () => 9_600_000_001,
-      reply: (text) => secondReplies.push(text),
+      reply: captureReply(secondReplies),
     });
 
     assert(result.status === "idempotent", "second approve after cleanup was not idempotent");
@@ -1986,7 +1986,7 @@ async function runApproveRenameBeforeDbRecovery(dir: string): Promise<string[]> 
       operatorChatIds: [123],
       cwd: dir,
       now: () => 9_700_000_001,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(replies[0]?.startsWith("Approved attempt 1."), "retry did not recover crash publish");
@@ -2028,7 +2028,7 @@ async function runApproveRenameSucceededCasLost(dir: string): Promise<string[]> 
           });
         },
       },
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(replies[0]?.includes("STATUS_MISMATCH"), "CAS-lost reply omitted status mismatch");
@@ -2068,7 +2068,7 @@ async function runApproveExistingDestinationCasLost(dir: string): Promise<string
       operatorChatIds: [123],
       cwd: dir,
       now: () => 10_400_000_002,
-      reply: (text) => alphaReplies.push(text),
+      reply: captureReply(alphaReplies),
     });
 
     assert(alphaReplies[0]?.includes("STATUS_MISMATCH"), "pre-retry drift reply omitted status mismatch");
@@ -2100,7 +2100,7 @@ async function runApproveExistingDestinationCasLost(dir: string): Promise<string
           });
         },
       },
-      reply: (text) => betaReplies.push(text),
+      reply: captureReply(betaReplies),
     });
 
     assert(betaReplies[0]?.includes("STATUS_MISMATCH"), "retry CAS drift reply omitted status mismatch");
@@ -2140,7 +2140,7 @@ async function runApproveChecksumDivergenceRefused(dir: string): Promise<string[
       operatorChatIds: [123],
       cwd: dir,
       now: () => 9_900_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(replies[0]?.includes("PUBLISH_ARTIFACT_DIVERGED"), "divergence reply omitted code");
@@ -2174,7 +2174,7 @@ async function runApproveDuplicatePrevention(dir: string): Promise<string[]> {
       operatorChatIds: [123],
       cwd: dir,
       now: () => 10_000_000_000,
-      reply: (text) => firstReplies.push(text),
+      reply: captureReply(firstReplies),
     });
     await handleApproveCommand({
       db,
@@ -2183,7 +2183,7 @@ async function runApproveDuplicatePrevention(dir: string): Promise<string[]> {
       operatorChatIds: [123],
       cwd: dir,
       now: () => 10_000_000_001,
-      reply: (text) => secondReplies.push(text),
+      reply: captureReply(secondReplies),
     });
 
     assert(firstReplies[0]?.startsWith("Approved attempt 1."), "first duplicate approve failed");
@@ -2224,7 +2224,7 @@ async function runApproveRaceLostAfterRead(dir: string): Promise<string[]> {
           });
         },
       },
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(replies[0]?.includes("STALE_ATTEMPT"), "race-lost reply omitted stale code");
@@ -2259,7 +2259,7 @@ async function runApproveRunsCleanup(dir: string): Promise<string[]> {
       operatorChatIds: [123],
       cwd: dir,
       now: () => 10_200_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(!existsSync(resolve(dir, ".runs", "approve-cleanup", "attempt-1")), "approved attempt was not cleaned");
@@ -2278,7 +2278,7 @@ async function runApproveRunsCleanup(dir: string): Promise<string[]> {
       operatorChatIds: [123],
       cwd: dir,
       now: () => 10_200_000_001,
-      reply: (text) => failedReplies.push(text),
+      reply: captureReply(failedReplies),
     });
     assert(failedReplies[0]?.includes("PUBLISH_SOURCE_MISSING"), "failed cleanup guard did not fail source validation");
     assert(existsSync(resolve(dir, ".runs", "approve-cleanup-failed", "attempt-1")), "failed approve deleted source");
@@ -2314,7 +2314,7 @@ async function runApproveCleanupFailureVisible(dir: string): Promise<string[]> {
           rmSync(context.sourceAttemptDir, { recursive: true, force: true });
         },
       },
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     const cleanupEvents = findEventsByJob(db, "approve-cleanup-visible", "cleanup_failed");
@@ -2392,7 +2392,7 @@ async function runApproveGitCommitFailureNonblocking(dir: string): Promise<strin
         assertPathBoundedGitPlan(plan, "reports/2026-W56-ai-trends");
         throw new Error("fake git failed");
       },
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     const gitEvents = findEventsByJob(db, "approve-git-fail", "git_commit_failed");
@@ -2448,7 +2448,7 @@ async function runStatusMalformedJobIdPreserved(dir: string): Promise<string[]> 
       chatId: 123,
       operatorChatIds: [123],
       now: () => 10_500_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(
@@ -2477,7 +2477,7 @@ async function runStatusBareInvalidNoFakeJobId(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 10_500_000_001,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(
@@ -2514,7 +2514,7 @@ async function runStatusKnownJobSummary(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 10_600_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     const reply = replies[0] ?? "";
@@ -2547,7 +2547,7 @@ async function runStatusUnknownJobVisible(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 10_700_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(result.status === "error", "unknown status was not an error");
@@ -2577,7 +2577,7 @@ async function runStatusUnauthorizedKnownJob(dir: string): Promise<string[]> {
       chatId: 999,
       operatorChatIds: [123],
       now: () => 10_800_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     const after = requireJob(db, "status-unauthorized");
@@ -2612,7 +2612,7 @@ async function runStatusUnauthorizedUnknownJob(dir: string): Promise<string[]> {
       chatId: 999,
       operatorChatIds: [123],
       now: () => 10_900_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(result.status === "unauthorized_ignored", "unknown unauthorized status was not ignored");
@@ -2656,7 +2656,7 @@ async function runStatusReadOnlyNoMutation(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 11_000_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(replies[0]?.includes("job_id=status-readonly"), "readonly status did not reply");
@@ -2709,7 +2709,7 @@ async function runStatusPublishedManifestAuthority(dir: string): Promise<string[
       chatId: 123,
       operatorChatIds: [123],
       now: () => 11_100_000_001,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     const reply = replies[0] ?? "";
@@ -2746,7 +2746,7 @@ async function runStatusFailedJobErrorVisible(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 11_200_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(replies[0]?.includes("status=failed"), "failed status omitted failed state");
@@ -2774,7 +2774,7 @@ async function runStatusLastNotifyErrorVisible(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 11_300_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(
@@ -2808,7 +2808,7 @@ async function runStatusApprovalSummaryVisible(dir: string): Promise<string[]> {
       chatId: 123,
       operatorChatIds: [123],
       now: () => 11_400_000_000,
-      reply: (text) => replies.push(text),
+      reply: captureReply(replies),
     });
 
     assert(
@@ -2830,10 +2830,10 @@ async function runCommandLongPollTimeout(): Promise<string[]> {
   const transport = createTelegramHttpCommandTransport({
     token: "token",
     timer,
-    fetchImpl: async (input) => {
+    fetchImpl: testFetch(async (input) => {
       requests.push(toUrl(input));
       return telegramResponse([]);
-    },
+    }),
   });
 
   transport.start();
@@ -2871,7 +2871,7 @@ async function runCommandLongPollOffset(): Promise<string[]> {
   const transport = createTelegramHttpCommandTransport({
     token: "token",
     timer,
-    fetchImpl: async (input) => {
+    fetchImpl: testFetch(async (input) => {
       requests.push(toUrl(input));
       if (requests.length === 1) {
         return telegramResponse([
@@ -2882,7 +2882,7 @@ async function runCommandLongPollOffset(): Promise<string[]> {
         ]);
       }
       return telegramResponse([]);
-    },
+    }),
   });
 
   transport.start();
@@ -2911,11 +2911,11 @@ async function runCommandLongPollMalformedOnError(): Promise<string[]> {
     token: "token",
     timer: new FakeTimer(),
     onError: (err) => errors.push(err),
-    fetchImpl: async () =>
+    fetchImpl: testFetch(async () =>
       new Response(JSON.stringify({ ok: false, result: [] }), {
         status: 200,
         headers: { "content-type": "application/json" },
-      }),
+      })),
   });
 
   transport.start();
@@ -2943,13 +2943,13 @@ async function runCommandLongPollOverlapGuard(): Promise<string[]> {
     token: "token",
     timer,
     onError: (err) => errors.push(err),
-    fetchImpl: async (input) => {
+    fetchImpl: testFetch(async (input) => {
       requests.push(toUrl(input));
       if (requests.length === 1) {
         return firstResponse.promise;
       }
       return telegramResponse([]);
-    },
+    }),
   });
 
   transport.start();
@@ -2964,7 +2964,8 @@ async function runCommandLongPollOverlapGuard(): Promise<string[]> {
   await settlePromises();
   transport.stop();
 
-  assert(requests.length === 2, "poll did not resume after pending long poll settled");
+  const resumedRequestCount: number = requests.length;
+  assert(resumedRequestCount === 2, "poll did not resume after pending long poll settled");
   assert(errors.length === 0, "overlap guard produced unexpected errors");
 
   return [
@@ -2979,16 +2980,16 @@ async function runCommandLongPollStopClearsFuturePolls(): Promise<string[]> {
   const transport = createTelegramHttpCommandTransport({
     token: "token",
     timer,
-    fetchImpl: async (input) => {
+    fetchImpl: testFetch(async (input) => {
       requests.push(toUrl(input));
       return telegramResponse([]);
-    },
+    }),
   });
 
   const neverStarted = createTelegramHttpCommandTransport({
     token: "token",
     timer: new FakeTimer(),
-    fetchImpl: async () => telegramResponse([]),
+    fetchImpl: testFetch(async () => telegramResponse([])),
   });
   neverStarted.stop();
 
@@ -3702,6 +3703,23 @@ function telegramResponse(result: readonly unknown[]): Response {
     status: 200,
     headers: { "content-type": "application/json" },
   });
+}
+
+function captureReply(replies: string[]): (text: string) => void {
+  return (text) => {
+    replies.push(text);
+  };
+}
+
+function testFetch(
+  handler: (
+    input: Parameters<typeof fetch>[0],
+    init: Parameters<typeof fetch>[1],
+  ) => Response | Promise<Response>,
+): typeof fetch {
+  const fetchImpl = ((input, init) => handler(input, init)) as typeof fetch;
+  fetchImpl.preconnect = () => {};
+  return fetchImpl;
 }
 
 function toUrl(input: Parameters<typeof fetch>[0]): URL {

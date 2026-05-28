@@ -22,6 +22,7 @@ import {
   recordStageEnter,
   runMigrations,
   updateJob,
+  type RecoveryCleanup,
 } from "../src/db.ts";
 import { Stage } from "../src/pipeline/types.ts";
 
@@ -775,13 +776,13 @@ async function runRecoveryCleanup(dir: string): Promise<string[]> {
       updated_at: now,
     });
 
-    const recoveryCleanup = {
+    const recoveryCleanup: RecoveryCleanup = {
       fromAttempt: 1,
       copiedFromAttempt: 1,
       deletedFiles: ["stale.md"],
       restartStage: Stage.EDIT_EN,
       carryForward: ["research/", "sources.json"],
-    } as const;
+    };
     const payload = JSON.stringify(recoveryCleanup);
     const first = recordRecoveryCleanup(db, {
       jobId: "job-recovery",

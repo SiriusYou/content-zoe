@@ -1,8 +1,49 @@
 # Typecheck Gate Evidence
 
-**Slice:** V2 Slice 0.5a: src typecheck gate
-**Authority:** `PLAN.md:38` and approved draft `slice-v2-0.5a-typecheck-gate-src-v1.1.md`
+**Slice:** V2 Slice 0.5a: src typecheck gate; V2 Slice 0.5b: scripts typecheck gate
+**Authority:** `PLAN.md` approved-slice labels and approved drafts `slice-v2-0.5a-typecheck-gate-src-v1.1.md` / `slice-v2-0.5b-typecheck-gate-scripts-v1.3.md`
 **Generated:** 2026-05-28T14:29:48Z
+**Updated:** 2026-05-28 for V2 Slice 0.5b
+
+## Slice 0.5b Scripts Gate
+
+- Slice: V2 Slice 0.5b: scripts typecheck gate.
+- Authority: `PLAN.md` approved-slice label and approved draft `slice-v2-0.5b-typecheck-gate-scripts-v1.3.md`.
+- Draft SHA-256: `ee34cf8082901b6152efc60389627e1996dd504924cdf54f359c74565c509866`.
+- Review artifacts:
+  - cz-Claude r3: `claude-slice-v2-0.5b-review-2026-05-28-r3.md`, verdict `APPROVE-WITH-AMENDMENTS-MET`, SHA-256 `b93b0ca6e78b18f5ffa138b48a946b37c4b15fe926cdb7384e8238c70a90b07f`.
+  - cz-Codex r2: `codex-slice-v2-0.5b-review-2026-05-28-r2.md`, verdict `APPROVE`, SHA-256 `1df3801fbe9e921791daa52ceaa81863da59ab88abd40cc81fc484a01eb91cff`.
+
+### Gate Configuration Delta
+
+- `tsconfig.json` now includes `scripts/**/*.ts` in addition to `src/**/*.ts`.
+- No compiler-option changes were made from Slice 0.5a.
+- `src/**` stayed unchanged for this slice.
+- `src/preflight.ts` stayed untouched; the typecheck gate remains wired at the package script layer.
+
+### Scripts Baseline And Dispositions
+
+Measured pre-fix `scripts/**` baseline under the pinned Slice 0.5a toolchain:
+
+| Class | Count | Site | Disposition |
+|---|---:|---|---|
+| `TS2322` | 48 | `scripts/bot-smoke.ts` command reply stubs | Added `captureReply(replies)`, a block-bodied helper that pushes text and returns `void`. Runtime behavior is unchanged because the previous `push()` return value was unused. |
+| `TS2741` | 6 | `scripts/bot-smoke.ts` `fetchImpl` stubs | Added `testFetch(handler)`, which returns a typed `typeof fetch` test double and supplies Bun's `preconnect` property. Request/response behavior is unchanged. |
+| `TS2367` | 1 | `scripts/bot-smoke.ts` long-poll overlap guard | Preserved the assertion by assigning `requests.length` to a widened `number` before comparing to `2`; the runtime condition and error text remain unchanged. |
+| `TS2322` | 4 | `scripts/db-smoke.ts` recovery cleanup payload | Typed the fixture as `RecoveryCleanup` instead of freezing it with `as const`, matching the production payload shape without changing the tested values. |
+
+### Slice 0.5b Verification
+
+- `bun run typecheck`: PASS over `src/**/*.ts` and `scripts/**/*.ts`.
+- `bun run db:smoke`: PASS, `11/11`.
+- `bun run bot-smoke`: expected inherited static-boundary result, `68/69 PASS`; the sole failing row is `boundary-static-check`. All behavioral and dependency rows pass, including `command-long-poll-malformed-onerror`, `command-long-poll-overlap-guard`, and `dependency-boundary-check`.
+- The `boundary-static-check` row is still the pre-existing slice-anchor mismatch and was not retasked by Slice 0.5b.
+
+### Slice 0.5b Anti-Gaming Evidence
+
+- No net-new `@ts-nocheck`, broad `@ts-ignore`, or `any`.
+- No `@ts-expect-error` was needed.
+- No runtime or production source edits were used to make the scripts gate green.
 
 ## Scope Repair
 
