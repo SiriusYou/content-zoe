@@ -1,0 +1,67 @@
+[
+  {
+    "id": "generated-job-context",
+    "kind": "generated_job_context",
+    "localPath": "source-material/context.md",
+    "usedFor": "Confirmed job topic, locales, week key, and the inventory of staged operator-source files."
+  },
+  {
+    "id": "source-material-manifest",
+    "kind": "manifest",
+    "localPath": "source-material/manifest.json",
+    "usedFor": "Validated the staged source inventory, local source paths, and source ids used in this attempt."
+  },
+  {
+    "id": "operator:topic-and-source-boundary.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/topic-and-source-boundary.md",
+    "usedFor": "Primary thesis, preferred title direction, required style, safe claims, unsafe claims, and publication gate."
+  },
+  {
+    "id": "operator:references/evidence-limits-and-reader-boundaries.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/references/evidence-limits-and-reader-boundaries.md",
+    "usedFor": "Evidence-limit posture, reader-boundary constraints, locale-pure warning requirements, and permitted source-family naming."
+  },
+  {
+    "id": "operator:briefing/handoff-note-model.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/handoff-note-model.md",
+    "usedFor": "Core definition of a healthcare AI handoff note and the list of useful handoff fields."
+  },
+  {
+    "id": "operator:briefing/context-fields-and-evidence-limits.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/context-fields-and-evidence-limits.md",
+    "usedFor": "Questions the handoff context should answer and the distinction between output meaning and reviewed evidence."
+  },
+  {
+    "id": "operator:briefing/receiving-user-and-workflow-transfer.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/receiving-user-and-workflow-transfer.md",
+    "usedFor": "Receiving-user framing and examples of transfer situations across teams, shifts, and settings."
+  },
+  {
+    "id": "operator:briefing/fallback-escalation-and-next-action.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/fallback-escalation-and-next-action.md",
+    "usedFor": "Fallback, escalation, and next-action categories as governance routing tools."
+  },
+  {
+    "id": "operator:briefing/source-attributes-and-local-context.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/source-attributes-and-local-context.md",
+    "usedFor": "Workflow-specific context fields and public-facing phrasing guidance for evidence limits."
+  },
+  {
+    "id": "operator:briefing/unknown-stale-and-missing-context.md",
+    "kind": "operator_source",
+    "localPath": "source-material/operator/briefing/unknown-stale-and-missing-context.md",
+    "usedFor": "Requirements to keep unknown, stale, and missing context visible rather than silently assumed."
+  },
+  {
+    "id": "assumption-no-primary-excerpts",
+    "kind": "assumption",
+    "content": "Because this attempt includes only staged summaries and source-family names, the research brief treats the named public source families as high-level source-basis labels and does not attribute detailed substantive claims to unseen primary documents."
+  }
+]
