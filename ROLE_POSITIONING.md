@@ -104,9 +104,11 @@ Cross-repo merge to the target base branch is gated on both Gate 1 and Gate 2 ap
 
 content-zoe Claude and content-zoe Codex operate in two states based on repo maturity.
 
+Active state: post-bootstrap — operator-declared 2026-05-28. Predicate satisfied: `package.json` is present; weekly-report bundles have been approved through the content-zoe Telegram approval flow and published under `reports/YYYY-Www-ai-trends/` through `2027-W07`; and the jobs are recorded with `status=published` in the local DB. The Post-Bootstrap role variants below are now operative. The Pre-Bootstrap subsection is retained as historical definition.
+
 ### Pre-Bootstrap
 
-Current state: content-zoe is a planning workspace and has no `package.json`. The authoritative state marker is this file.
+Historical pre-bootstrap state (superseded — see Active state above): content-zoe began as a planning workspace with no `package.json`. The authoritative state marker remains this file.
 
 Transition to post-bootstrap state requires an explicit operator declaration recorded as a commit to this file. The recommended predicate is: `package.json` exists, `bun run report:run` has produced at least one published weekly-report bundle under `reports/YYYY-Www-ai-trends/`, and the bundle was approved through content-zoe Telegram approval flow with `status=published` in the local DB. Operator owns the transition decision and may declare earlier or later based on observed reliability.
 
@@ -127,8 +129,9 @@ openclaw-healthcare workers committing to content-zoe are the only currently per
 
 - Pre-bootstrap content-zoe target: only Markdown, planning, docs, or scaffolding files. Code commits to content-zoe require an explicit approved scaffolding-plan slice in `PLAN.md` or `TODOS.md`. The slice must be checked or marked approved by content-zoe Claude with declared file scope listed inline, for example: `[x] (cz-Claude approved 2026-04-XX) Slice 1: bootstrap report runner — file scope: package.json, src/preflight.ts, scripts/report-run.ts`. Workers verify the approved slice exists before writing code; harness scope guard fires if the worker writes code outside the listed file scope.
 - Post-bootstrap content-zoe target: code commits are permitted, scoped per spec.
+- V2 modality slices are permitted after the committed `PLAN.md` V2 scope-expansion section. hc-workers MAY write content-zoe `src/` code for V2 modality work only when the slice is declared in `PLAN.md` or `TODOS.md`, carries declared file scope, and has the required slice approval: cz-Claude for handler slices, and both cz-Claude plus cz-Codex for framework slices.
 - Always: only declared-file-scope changes, never harness artifacts.
-- Never edit `~/dev/content-zoe/AGENTS.md`; it is a thin pointer per `f2f8a6b`.
+- Never edit `~/dev/content-zoe/AGENTS.md` through worker execution. It originated as a thin pointer per `f2f8a6b` but now also carries operator-lane runbook and operator-only execution rules; those are edited by the operator/driver lane, never by hc-workers.
 - Never edit `~/dev/content-zoe/ROLE_POSITIONING.md` through worker execution.
 - Never edit `~/dev/content-zoe/CLAUDE.md` through worker execution.
 
@@ -256,7 +259,7 @@ Slice approval artifacts remain gitignored (per cz `.gitignore` for `.omx/`) —
 The full hc-driven content system involves three repos:
 
 - **openclaw-healthcare**: engineering engine, source of hc-workers, host of SDD lane and harness/swarm.
-- **content-zoe**: target of hc-worker commits; will become a Bun and TypeScript standalone weekly-report worker per content-zoe `PLAN.md`.
+- **content-zoe**: target of hc-worker commits; is a Bun and TypeScript standalone weekly-report worker for V1 and a multi-modal content kernel for V2 per content-zoe `PLAN.md`.
 - **openclaw-market**: provides content-zoe Layer 0 triggers such as Cron, Standing Orders, RSS, Telegram, and Webchat. It is read-only reference from content-zoe and is not a cross-repo commit target under the current charter.
 
 Adding new cross-repo targets requires charter extension.

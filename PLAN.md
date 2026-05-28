@@ -20,6 +20,19 @@ Four pivots and six review rounds produced this plan. Key flips to acknowledge:
 - **Approval:** Telegram only, bundle-level, scoped `RejectType` (en / zh / bundle) with targeted rewind.
 - **"Published"** = atomic rename to `reports/YYYY-Www-ai-trends/` + DB `status='published'` in a single `BEGIN IMMEDIATE` tx. Post-step: best-effort `git add && git commit` (failure logged as `git_commit_failed` event; does NOT revert publish).
 
+## V2 scope (multi-modal content kernel)
+
+V1 remains locked and unchanged: the weekly bilingual markdown report worker continues to be governed by the V1 scope and its existing report pipeline contracts.
+
+V2 adds a modality-agnostic content kernel for turning vague prompts into precise, gated content artifacts with SDD/TDD/harness-style rigor. The first V2 target is standalone image generation: a vague prompt is elaborated into an explicit image spec, generated through an image provider, judged against machine-checkable acceptance criteria, and then surfaced for human approval before publication.
+
+The V2 design and roadmap live in openclaw-healthcare driver-lane artifacts:
+
+- `file:///Users/youjia/dev/openclaw-healthcare/docs/superpowers/specs/2026-05-27-content-zoe-v2-image-kernel-design.md`
+- `file:///Users/youjia/dev/openclaw-healthcare/docs/superpowers/plans/2026-05-27-content-zoe-v2-image-kernel.md`
+
+V2 slices are authorized only through the cross-repo SDD lane described in `ROLE_POSITIONING.md`: each slice must carry declared file scope and the required cz-Claude approval, with cz-Codex approval also required for framework slices. Video, audio, slides, papers, and other modalities remain future V2+ work until separately specified and approved.
+
 ## Stack (locked)
 
 | Layer | Choice | Rationale |

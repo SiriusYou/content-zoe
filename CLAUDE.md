@@ -2,9 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> [!IMPORTANT]
+> Historical pre-bootstrap guidance. The current governance authorities are `AGENTS.md`, `PLAN.md`, and `ROLE_POSITIONING.md`. This file predates the shipped Bun/TypeScript worker, report pipeline, and published bundles; historical implementation assumptions below must not override the current governance files.
+
 ## What this repository is
 
-A **planning & design workspace** (no code, no package manifest, no tests) for a new project that adapts the `Zoe` orchestration system from `openclaw-healthcare` to a content-creation-and-publishing workflow, using `openclaw-market` as the channel/tooling substrate.
+Historical pre-bootstrap description: this repository began as a **planning & design workspace** for a new project that adapts the `Zoe` orchestration system from `openclaw-healthcare` to a content-creation-and-publishing workflow, using `openclaw-market` as the channel/tooling substrate.
 
 Working language is Chinese + English technical terms. All files here are Markdown.
 
@@ -18,9 +21,9 @@ Three-layer target architecture:
 - **Layer 1 — Orchestration** (new, borrowed from Zoe): Intake Decision → Content Spec → Pipeline Manager → Worker Loops (research / draft / review / publish).
 - **Layer 2 — Execution** (new adapters): `researcher`, `writer`, `editor`, `publisher` Agent Adapters, routed through existing Agent Adapter interface but **skipping git worktree logic**.
 
-## Source-of-truth documents (read these first)
+## Historical planning documents
 
-Order matters — read top to bottom for the full picture:
+These documents were the original planning sources. For current governance, read `AGENTS.md`, `PLAN.md`, and `ROLE_POSITIONING.md` first.
 
 | File | Role |
 |---|---|
@@ -78,7 +81,7 @@ When implementing the Editor/Review stages, use these four patterns from `harnes
 
 ## Conventions that apply here
 
-- **No build commands exist.** Do not invent `bun run`, `npm test`, etc. — there is no `package.json`. If asked to "run" something, the only correct action is editing these Markdown files.
+- **Historical pre-bootstrap note:** build commands did not exist when this file was written. Current commands are governed by `package.json`, `AGENTS.md`, and `PLAN.md`; do not use this historical note to override them.
 - **Markdown admonition style** — the existing docs use GitHub `> [!NOTE]`, `> [!IMPORTANT]`, `> [!TIP]`, `> [!WARNING]` blocks. Match this style when editing.
 - **File references use `file:///` absolute URLs** when pointing into the sibling repos (see the reference tables at the bottom of each doc). Preserve that format.
 - **Architectural tables are the primary artifact** — most documents use side-by-side tables (Zoe component ↔ content equivalent) as the core explanatory device. Favor this format over prose when adding new mappings.
