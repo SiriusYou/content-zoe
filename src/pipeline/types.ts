@@ -8,7 +8,7 @@ export enum Stage {
 }
 
 export interface StageDef {
-  stage: Stage;
+  stage: string;
   prompt: string;
   buildPrompt?: (context: StagePromptContext) => string;
   timeoutMs: number;
@@ -16,7 +16,7 @@ export interface StageDef {
 }
 
 export interface StagePromptContext {
-  stage: Stage;
+  stage: string;
   runDir: string;
   cwd?: string;
 }
@@ -51,6 +51,26 @@ export type ManifestRule =
       kind: "files_match_glob";
       glob: string;
       minCount?: number;
+    }
+  | {
+      kind: "image_exists";
+      path: string;
+    }
+  | {
+      kind: "image_dimensions";
+      path: string;
+      width: number;
+      height: number;
+    }
+  | {
+      kind: "image_format";
+      path: string;
+      formats: readonly string[];
+      maxBytes?: number;
+    }
+  | {
+      kind: "judge_verdict_pass";
+      path: string;
     };
 
 export type ManifestErrorCode =
@@ -59,6 +79,10 @@ export type ManifestErrorCode =
   | "MANIFEST_JSON_UNPARSEABLE"
   | "MANIFEST_JSON_PROVENANCE_INVALID"
   | "MANIFEST_GLOB_NO_MATCH"
+  | "MANIFEST_IMAGE_MISSING"
+  | "MANIFEST_IMAGE_DIMENSIONS"
+  | "MANIFEST_IMAGE_FORMAT"
+  | "MANIFEST_JUDGE_FAILED"
   | "MANIFEST_PATH_OUTSIDE_RUNDIR";
 
 export interface ManifestError {
@@ -72,7 +96,7 @@ export interface ManifestError {
 }
 
 interface StageResultBase {
-  stage: Stage;
+  stage: string;
   runDir: string;
   elapsedMs: number;
 }

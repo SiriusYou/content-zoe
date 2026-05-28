@@ -30,6 +30,8 @@ interface FileCandidate {
   relPath: string;
 }
 
+type PathManifestRule = Extract<ManifestRule, { path: string }>;
+
 // runStage depends only on src/llm/provider.ts:LLMProvider. It inherits Slice 2's
 // constructor-injection/no-env-reads pattern so subprocess work remains provider-owned.
 export async function runStage(
@@ -188,9 +190,12 @@ function validateManifestRule(
     );
   }
   if (!boundary.exists) {
+    const imageMissing = isImagePathRule(rule);
     return manifestError(
-      "MANIFEST_FILE_MISSING",
-      `manifest file is missing: ${rule.path}`,
+      imageMissing ? "MANIFEST_IMAGE_MISSING" : "MANIFEST_FILE_MISSING",
+      imageMissing
+        ? `manifest image is missing: ${rule.path}`
+        : `manifest file is missing: ${rule.path}`,
       rule,
       { path: boundary.absPath, cause: boundary.cause },
     );
@@ -200,9 +205,12 @@ function validateManifestRule(
 
   const stats = statSync(boundary.realPath);
   if (!stats.isFile()) {
+    const imageMissing = isImagePathRule(rule);
     return manifestError(
-      "MANIFEST_FILE_MISSING",
-      `manifest path is not a file: ${rule.path}`,
+      imageMissing ? "MANIFEST_IMAGE_MISSING" : "MANIFEST_FILE_MISSING",
+      imageMissing
+        ? `manifest image path is not a file: ${rule.path}`
+        : `manifest path is not a file: ${rule.path}`,
       rule,
       { path: boundary.realPath },
     );
@@ -218,6 +226,20 @@ function validateManifestRule(
       );
     }
     return undefined;
+  }
+
+  if (rule.kind === "image_exists") return undefined;
+
+  if (rule.kind === "image_format") {
+    return validateImageFormatRule(rule, boundary.realPath, stats.size);
+  }
+
+  if (rule.kind === "image_dimensions") {
+    return validateImageDimensionsRule(rule, boundary.realPath);
+  }
+
+  if (rule.kind === "judge_verdict_pass") {
+    return validateJudgeVerdictRule(rule, boundary.realPath);
   }
 
   try {
@@ -246,10 +268,7 @@ function validateManifestRule(
 }
 
 function resolvePathRule(
-  rule: Extract<
-    ManifestRule,
-    { kind: "file_exists" | "file_non_empty" | "json_parseable" | "sources_provenance_allowlist" }
-  >,
+  rule: PathManifestRule,
   canonicalRunDir: string,
 ): {
   absPath: string;
@@ -276,6 +295,126 @@ function resolvePathRule(
       cause: err,
     };
   }
+}
+
+function validateImageFormatRule(
+  rule: Extract<ManifestRule, { kind: "image_format" }>,
+  realPath: string,
+  size: number,
+): ManifestError | undefined {
+  if (rule.formats.length !== 1 || rule.formats[0] !== "png") {
+    return manifestError(
+      "MANIFEST_IMAGE_FORMAT",
+      `manifest image_format supports only png: ${rule.path}`,
+      rule,
+      { path: realPath },
+    );
+  }
+
+  if (rule.maxBytes !== undefined && size > rule.maxBytes) {
+    return manifestError(
+      "MANIFEST_IMAGE_FORMAT",
+      `manifest image exceeds maxBytes ${rule.maxBytes}: ${rule.path} (${size} bytes)`,
+      rule,
+      { path: realPath },
+    );
+  }
+
+  const bytes = readFileSync(realPath);
+  if (!isPng(bytes)) {
+    return manifestError(
+      "MANIFEST_IMAGE_FORMAT",
+      `manifest image is not png: ${rule.path}`,
+      rule,
+      { path: realPath },
+    );
+  }
+
+  return undefined;
+}
+
+function validateImageDimensionsRule(
+  rule: Extract<ManifestRule, { kind: "image_dimensions" }>,
+  realPath: string,
+): ManifestError | undefined {
+  const dimensions = readPngDimensions(readFileSync(realPath));
+  if (!dimensions) {
+    return manifestError(
+      "MANIFEST_IMAGE_DIMENSIONS",
+      `manifest image dimensions require png IHDR: ${rule.path}`,
+      rule,
+      { path: realPath },
+    );
+  }
+
+  if (dimensions.width !== rule.width || dimensions.height !== rule.height) {
+    return manifestError(
+      "MANIFEST_IMAGE_DIMENSIONS",
+      `manifest image dimensions mismatch for ${rule.path}: expected ${rule.width}x${rule.height}, got ${dimensions.width}x${dimensions.height}`,
+      rule,
+      { path: realPath },
+    );
+  }
+
+  return undefined;
+}
+
+function validateJudgeVerdictRule(
+  rule: Extract<ManifestRule, { kind: "judge_verdict_pass" }>,
+  realPath: string,
+): ManifestError | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(realPath, "utf8"));
+  } catch (err) {
+    return manifestError(
+      "MANIFEST_JSON_UNPARSEABLE",
+      `judge verdict is not parseable JSON: ${rule.path}`,
+      rule,
+      { path: realPath, cause: err },
+    );
+  }
+
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    !("overallPass" in parsed) ||
+    parsed.overallPass !== true
+  ) {
+    return manifestError(
+      "MANIFEST_JUDGE_FAILED",
+      `judge verdict did not pass: ${rule.path}`,
+      rule,
+      { path: realPath },
+    );
+  }
+
+  return undefined;
+}
+
+function isImagePathRule(rule: ManifestRule): boolean {
+  return (
+    rule.kind === "image_exists" ||
+    rule.kind === "image_dimensions" ||
+    rule.kind === "image_format"
+  );
+}
+
+function isPng(bytes: Buffer): boolean {
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  return signature.every((byte, index) => bytes[index] === byte);
+}
+
+function readPngDimensions(
+  bytes: Buffer,
+): { width: number; height: number } | undefined {
+  if (bytes.length < 24 || !isPng(bytes)) return undefined;
+  if (bytes.toString("ascii", 12, 16) !== "IHDR") return undefined;
+
+  return {
+    width: bytes.readUInt32BE(16),
+    height: bytes.readUInt32BE(20),
+  };
 }
 
 function validateGlobRule(

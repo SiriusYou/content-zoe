@@ -13,8 +13,9 @@ export function createReportRunFakeProvider(
   options: ReportRunFakeProviderOptions = {},
 ): FakeProvider {
   const omitted = new Set(options.omitStages ?? []);
-  const enabledStages = new Set(
-    Object.values(Stage).filter((stage) => !omitted.has(stage)),
+  const textStages: readonly Stage[] = Object.values(Stage);
+  const enabledStages = new Set<string>(
+    textStages.filter((stage) => !omitted.has(stage)),
   );
   return new ReportRunFakeProvider(
     new Map(
@@ -29,7 +30,7 @@ export function createReportRunFakeProvider(
 class ReportRunFakeProvider extends FakeProvider {
   constructor(
     responses: Map<string, string>,
-    private readonly enabledStages: ReadonlySet<Stage>,
+    private readonly enabledStages: ReadonlySet<string>,
   ) {
     super(responses);
   }
