@@ -1,12 +1,12 @@
 # Modality Registry Smoke
 
-Generated: 2026-05-28T18:10:56.882Z
+Generated: 2026-05-29T06:07:46.818Z
 
 | Scenario | Status | Details |
 | --- | --- | --- |
 | text-pipeline-unchanged | PASS | Text pipeline registry delegates to the existing STAGES and nextStage contract. |
 | en-only-skips-zh | PASS | Text pipeline preserved locales=['en'] translation skip. |
-| registry-has-image | PASS | Image registry exposes stage order, transitions, reject rewind, and slice-6 stageDef sentinel. |
+| registry-has-image | PASS | Image registry exposes stage order, transitions, reject rewind, and provider-gated stage defs. |
 | unknown-modality-throws | PASS | Unknown modalities, including prototype-key strings, failed closed. |
 | text-stagedef-unknown-throws | PASS | Text stageDef resolver throws on unknown ids, including prototype-key strings. |
 

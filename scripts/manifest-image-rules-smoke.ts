@@ -153,9 +153,21 @@ async function scenarioImpl(
       );
       return ["Valid PNG over maxBytes returned MANIFEST_IMAGE_FORMAT with oversize detail."];
     case "judge-verdict-pass":
-      writeFileSync(resolve(runDir, "verdict.json"), '{"overallPass":true}\n');
+      writeFileSync(
+        resolve(runDir, "verdict.json"),
+        JSON.stringify({
+          overallPass: true,
+          criteria: [
+            {
+              id: "subject-visible",
+              pass: true,
+              rationale: "subject is visible",
+            },
+          ],
+        }) + "\n",
+      );
       await assertOk(runDir, [{ kind: "judge_verdict_pass", path: "verdict.json" }]);
-      return ["Judge verdict passed only with overallPass strictly true."];
+      return ["Judge verdict passed only with a valid full JudgeVerdict and overallPass strictly true."];
     case "judge-verdict-fail":
       writeFileSync(resolve(runDir, "verdict.json"), '{"overallPass":false}\n');
       await assertManifestCode(

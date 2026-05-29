@@ -15,6 +15,7 @@
     "llm-smoke": "bun scripts/llm-smoke.ts",
     "run-stage-smoke": "bun scripts/run-stage-smoke.ts",
     "executor-seam-smoke": "bun scripts/executor-seam-smoke.ts",
+    "image-pipeline-smoke": "bun scripts/image-pipeline-smoke.ts",
     "image-contracts-smoke": "bun scripts/image-contracts-smoke.ts",
     "image-provider-fake-smoke": "bun scripts/image-provider-fake-smoke.ts",
     "vision-judge-fake-smoke": "bun scripts/vision-judge-fake-smoke.ts",

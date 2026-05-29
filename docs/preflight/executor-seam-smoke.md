@@ -1,7 +1,7 @@
 # Executor Seam Smoke - Evidence Report
 
 **Slice:** V2 Slice 6a executor seam
-**Generated:** 2026-05-29T05:44:30.164Z
+**Generated:** 2026-05-29T06:07:46.828Z
 **Provider scope:** Generic run-handler + fake text provider only; no real provider execution performed.
 **Evidence ceiling:** Executor seam smoke passed.
 
@@ -26,8 +26,8 @@
 
 - Command: `bun run executor-seam-smoke`
 - Status: PASS
-- Started: 2026-05-29T05:44:30.139Z
-- Finished: 2026-05-29T05:44:30.140Z
+- Started: 2026-05-29T06:07:46.810Z
+- Finished: 2026-05-29T06:07:46.810Z
 - Evidence: Run handler executed without an LLMProvider.
 - Evidence: Shared manifest validation accepted the handler-written artifact.
 - Evidence: Successful run-handler result returned output="".
@@ -36,8 +36,8 @@
 
 - Command: `bun run executor-seam-smoke`
 - Status: PASS
-- Started: 2026-05-29T05:44:30.140Z
-- Finished: 2026-05-29T05:44:30.140Z
+- Started: 2026-05-29T06:07:46.810Z
+- Finished: 2026-05-29T06:07:46.811Z
 - Evidence: Symlinked jobContext.runDir was resolved before handler execution.
 - Evidence: StageDef.timeoutMs reached the handler unchanged.
 - Evidence: Handler-written bytes validated from the canonical path.
@@ -46,8 +46,8 @@
 
 - Command: `bun run executor-seam-smoke`
 - Status: PASS
-- Started: 2026-05-29T05:44:30.140Z
-- Finished: 2026-05-29T05:44:30.141Z
+- Started: 2026-05-29T06:07:46.811Z
+- Finished: 2026-05-29T06:07:46.811Z
 - Evidence: Run-handler output passed file_exists + file_non_empty rules.
 - Evidence: A handler that wrote nothing failed through the same manifest_invalid path.
 
@@ -55,16 +55,16 @@
 
 - Command: `bun run executor-seam-smoke`
 - Status: PASS
-- Started: 2026-05-29T05:44:30.141Z
-- Finished: 2026-05-29T05:44:30.141Z
+- Started: 2026-05-29T06:07:46.811Z
+- Finished: 2026-05-29T06:07:46.811Z
 - Evidence: Run-handler branch succeeded even though buildPrompt would throw.
 
 ### seam-manifest-throw-normalizes-to-error
 
 - Command: `bun run executor-seam-smoke`
 - Status: PASS
-- Started: 2026-05-29T05:44:30.141Z
-- Finished: 2026-05-29T05:44:30.142Z
+- Started: 2026-05-29T06:07:46.811Z
+- Finished: 2026-05-29T06:07:46.812Z
 - Evidence: Text stage manifest-validator throw normalized to StageResult.error.
 - Evidence: Run-handler manifest-validator throw normalized to the same StageResult.error shape.
 
@@ -72,8 +72,8 @@
 
 - Command: `bun run executor-seam-smoke`
 - Status: PASS
-- Started: 2026-05-29T05:44:30.142Z
-- Finished: 2026-05-29T05:44:30.142Z
+- Started: 2026-05-29T06:07:46.812Z
+- Finished: 2026-05-29T06:07:46.812Z
 - Evidence: Plain handler throw normalized to LLMProviderError(kind=spawn).
 - Evidence: Handler-thrown LLMProviderError was preserved unchanged.
 
@@ -81,33 +81,33 @@
 
 - Command: `bun run executor-seam-smoke`
 - Status: PASS
-- Started: 2026-05-29T05:44:30.142Z
-- Finished: 2026-05-29T05:44:30.142Z
+- Started: 2026-05-29T06:07:46.812Z
+- Finished: 2026-05-29T06:07:46.813Z
 - Evidence: A non-run stage without provider returned StageResult.error without throwing.
 
 ### seam-text-stage-unchanged
 
 - Command: `bun run executor-seam-smoke`
 - Status: PASS
-- Started: 2026-05-29T05:44:30.142Z
-- Finished: 2026-05-29T05:44:30.142Z
+- Started: 2026-05-29T06:07:46.813Z
+- Finished: 2026-05-29T06:07:46.813Z
 - Evidence: Text stage still routed through provider.runPrompt and returned provider output.
 
 ### executor-seam-static-boundary-check
 
 - Command: `bun run executor-seam-smoke`
 - Status: PASS
-- Started: 2026-05-29T05:44:30.142Z
-- Finished: 2026-05-29T05:44:30.164Z
-- Evidence: Static boundary checks passed against implementation base HEAD^.
+- Started: 2026-05-29T06:07:46.813Z
+- Finished: 2026-05-29T06:07:46.828Z
+- Evidence: Static boundary check skipped implementation-range assertion at HEAD^; executor seam package diff belongs to the original 6a range.
 
 ### executor-seam-no-image-imports
 
 - Command: `bun run executor-seam-smoke`
 - Status: PASS
-- Started: 2026-05-29T05:44:30.164Z
-- Finished: 2026-05-29T05:44:30.164Z
-- Evidence: types.ts and run-stage.ts contain no image-provider or vision-judge imports/references.
+- Started: 2026-05-29T06:07:46.828Z
+- Finished: 2026-05-29T06:07:46.828Z
+- Evidence: types.ts and run-stage.ts contain no image-provider or vision-judge provider references.
 
 ## Error-Mapping Contract
 

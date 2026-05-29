@@ -3,6 +3,11 @@ import {
   STAGES,
   type TerminalStage,
 } from "./stages.ts";
+import type { ImageProvider } from "../llm/image-provider.ts";
+import type { VisionJudge } from "../llm/vision-judge.ts";
+import { ELABORATE_SPEC_STAGE } from "./image/elaborate-spec.ts";
+import { makeGenerateStage } from "./image/generate.ts";
+import { makeJudgeStage } from "./image/judge.ts";
 import { Stage, type StageDef } from "./types.ts";
 
 export enum Modality {
@@ -18,10 +23,17 @@ export const IMAGE_STAGE = {
 
 export type RejectScope = "en" | "zh" | "bundle";
 
+export const IMAGE_MAX_REGEN_ROUNDS = 3;
+
+export interface PipelineStageDeps {
+  imageProvider?: ImageProvider;
+  visionJudge?: VisionJudge;
+}
+
 export interface PipelineDef {
   readonly modality: Modality;
   readonly stageIds: readonly string[];
-  stageDef(stageId: string): StageDef;
+  stageDef(stageId: string, deps?: PipelineStageDeps): StageDef;
   nextStage(current: string, locales: readonly string[]): string | TerminalStage;
   rewindStageForReject(scope: RejectScope): string;
 }
@@ -59,8 +71,23 @@ export const PIPELINES: Record<Modality, PipelineDef> = {
   [Modality.IMAGE]: {
     modality: Modality.IMAGE,
     stageIds: IMAGE_STAGE_IDS,
-    stageDef() {
-      throw new Error("image stage defs not yet implemented (slice 6)");
+    stageDef(stageId, deps = {}) {
+      switch (stageId) {
+        case IMAGE_STAGE.ELABORATE_SPEC:
+          return ELABORATE_SPEC_STAGE;
+        case IMAGE_STAGE.GENERATE:
+          if (!deps.imageProvider) {
+            throw new Error("image provider is required for generate stage");
+          }
+          return makeGenerateStage(deps.imageProvider);
+        case IMAGE_STAGE.JUDGE:
+          if (!deps.visionJudge) {
+            throw new Error("vision judge is required for judge stage");
+          }
+          return makeJudgeStage(deps.visionJudge);
+        default:
+          throw new Error(`unknown image stage: ${stageId}`);
+      }
     },
     nextStage(current) {
       switch (current) {

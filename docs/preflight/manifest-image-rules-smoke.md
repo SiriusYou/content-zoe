@@ -1,6 +1,6 @@
 # Manifest Image Rules Smoke
 
-Generated: 2026-05-28T18:10:56.885Z
+Generated: 2026-05-29T06:07:46.825Z
 
 | Scenario | Status | Details |
 | --- | --- | --- |
@@ -10,7 +10,7 @@ Generated: 2026-05-28T18:10:56.885Z
 | image-dimensions-mismatch | PASS | PNG IHDR mismatch returned MANIFEST_IMAGE_DIMENSIONS. |
 | image-format-bad-magic | PASS | Bad magic bytes returned MANIFEST_IMAGE_FORMAT. |
 | image-format-oversize | PASS | Valid PNG over maxBytes returned MANIFEST_IMAGE_FORMAT with oversize detail. |
-| judge-verdict-pass | PASS | Judge verdict passed only with overallPass strictly true. |
+| judge-verdict-pass | PASS | Judge verdict passed only with a valid full JudgeVerdict and overallPass strictly true. |
 | judge-verdict-fail | PASS | overallPass false returned MANIFEST_JUDGE_FAILED. |
 | judge-verdict-missing-overallPass | PASS | Missing overallPass returned MANIFEST_JUDGE_FAILED. |
 | judge-verdict-unparseable | PASS | Unparseable judge JSON reused MANIFEST_JSON_UNPARSEABLE. |

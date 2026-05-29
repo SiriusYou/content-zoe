@@ -1,9 +1,27 @@
-import { realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
+import {
+  readFileSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 
+import type { ImageProvider } from "../llm/image-provider.ts";
 import type { LLMProvider } from "../llm/provider.ts";
+import {
+  VisionJudgeError,
+  type VisionJudge,
+} from "../llm/vision-judge.ts";
+import {
+  getPipeline,
+  IMAGE_MAX_REGEN_ROUNDS,
+  IMAGE_STAGE,
+  Modality,
+} from "../pipeline/modality.ts";
+import { parseImageSpec } from "../pipeline/image/spec.ts";
+import { parseJudgeVerdict } from "../pipeline/image/verdict.ts";
 import { runStage } from "../pipeline/run-stage.ts";
-import { nextStage, STAGES } from "../pipeline/stages.ts";
 import { Stage, type StageResult } from "../pipeline/types.ts";
 
 export type Locale = "en" | "zh";
@@ -32,6 +50,7 @@ export interface RunState {
   startedAt: string;
   finishedAt?: string;
   recoveryCleanup?: RecoveryCleanup;
+  regenRound?: number;
 }
 
 export interface ReportLoopOptions {
@@ -41,7 +60,11 @@ export interface ReportLoopOptions {
   cwd: string;
   runDir: string;
   attemptNumber: number;
-  startStage: Stage;
+  startStage: string;
+  modality?: Modality | string;
+  imageProvider?: ImageProvider;
+  visionJudge?: VisionJudge;
+  regenRound?: number;
   startedAt?: string;
   recoveryCleanup?: RecoveryCleanup;
   lifecycle?: Partial<StageLifecycleHooks>;
@@ -59,7 +82,7 @@ export type ReportLoopResult =
       status: "stage_failed";
       runDir: string;
       attemptNumber: number;
-      stage: Stage;
+      stage: string;
       stageStatus: Exclude<StageResult["status"], "ok">;
       error: string;
     };
@@ -79,6 +102,26 @@ export interface StageLifecycleEvent {
 export interface StageLifecycleHooks {
   onStageEnter: (event: StageLifecycleEvent) => Promise<void> | void;
   onStageComplete: (event: StageLifecycleEvent) => Promise<void> | void;
+  onImageRegen?: (event: ImageRegenEvent) => Promise<void> | void;
+  onImageAutoGate?: (event: ImageAutoGateEvent) => Promise<void> | void;
+}
+
+export interface ImageRegenEvent {
+  jobId: string;
+  attemptNumber: number;
+  stage: string;
+  runDir: string;
+  regenRound: number;
+  fromStage: string;
+}
+
+export interface ImageAutoGateEvent {
+  jobId: string;
+  attemptNumber: number;
+  stage: string;
+  runDir: string;
+  reason: "exhausted" | "safety";
+  regenRound: number;
 }
 
 const RUN_STATE_FILE = "run-state.json";
@@ -96,33 +139,65 @@ export async function runReportLoop(
   assertInsideCwd(runDir, cwd);
   assertRealpathInsideCwd(runDir, cwd);
 
+  const modality = opts.modality ?? Modality.TEXT_REPORT;
+  const pipeline = getPipeline(modality);
+  let regenRound = opts.regenRound ?? 0;
   const startedAt = opts.startedAt ?? new Date().toISOString();
-  let current: Stage = opts.startStage;
+  let current = opts.startStage;
   for (;;) {
     const runningState: RunState = {
       schemaVersion: 1,
       jobId: opts.jobId,
       attemptNumber: opts.attemptNumber,
-      lastStage: current,
+      lastStage: current as Stage,
       status: "running",
       startedAt,
       recoveryCleanup: opts.recoveryCleanup,
+      regenRound: modality === Modality.IMAGE ? regenRound : undefined,
     };
     writeRunState(runDir, runningState, fsOps);
 
     await opts.lifecycle?.onStageEnter?.({
       jobId: opts.jobId,
       attemptNumber: opts.attemptNumber,
-      stage: current,
+      stage: current as Stage,
       runDir,
     });
 
-    const result = await runStage(STAGES[current], opts.provider, {
+    const stageDef = pipeline.stageDef(current, {
+      imageProvider: opts.imageProvider,
+      visionJudge: opts.visionJudge,
+    });
+    const result = await runStage(stageDef, opts.provider, {
       runDir,
       cwd,
     });
 
     if (result.status !== "ok") {
+      if (modality === Modality.IMAGE && current === IMAGE_STAGE.JUDGE) {
+        const imageTransition = await handleImageJudgeNonOk({
+          result,
+          runningState,
+          fsOps,
+          runDir,
+          opts,
+          regenRound,
+        });
+        if (imageTransition.kind === "regen") {
+          regenRound = imageTransition.regenRound;
+          current = IMAGE_STAGE.GENERATE;
+          continue;
+        }
+        if (imageTransition.kind === "awaiting_approval") {
+          return {
+            status: "awaiting_approval",
+            runDir,
+            attemptNumber: opts.attemptNumber,
+            alreadyComplete: false,
+          };
+        }
+      }
+
       writeRunState(
         runDir,
         {
@@ -146,11 +221,11 @@ export async function runReportLoop(
     await opts.lifecycle?.onStageComplete?.({
       jobId: opts.jobId,
       attemptNumber: opts.attemptNumber,
-      stage: current,
+      stage: current as Stage,
       runDir,
     });
 
-    const following = nextStage(current, opts.locales);
+    const following = pipeline.nextStage(current, opts.locales);
     if (following === "awaiting_approval") {
       writeRunState(
         runDir,
@@ -158,6 +233,7 @@ export async function runReportLoop(
           ...runningState,
           status: "awaiting_approval",
           finishedAt: new Date().toISOString(),
+          regenRound: modality === Modality.IMAGE ? regenRound : undefined,
         },
         fsOps,
       );
@@ -174,6 +250,7 @@ export async function runReportLoop(
       {
         ...runningState,
         status: "ok",
+        regenRound: modality === Modality.IMAGE ? regenRound : undefined,
       },
       fsOps,
     );
@@ -181,6 +258,136 @@ export async function runReportLoop(
   }
 
   throw new Error("unreachable report loop terminal state");
+}
+
+async function handleImageJudgeNonOk(params: {
+  result: Exclude<StageResult, { status: "ok" }>;
+  runningState: RunState;
+  fsOps: FileSystemOps;
+  runDir: string;
+  opts: ReportLoopOptions;
+  regenRound: number;
+}): Promise<
+  | { kind: "none" }
+  | { kind: "regen"; regenRound: number }
+  | { kind: "awaiting_approval" }
+> {
+  const safetyError =
+    params.result.status === "error" &&
+    params.result.error.cause instanceof VisionJudgeError &&
+    params.result.error.cause.code === "safety";
+  if (safetyError) {
+    await recordImageAutoGate(params, "safety");
+    return { kind: "awaiting_approval" };
+  }
+
+  if (
+    params.result.status !== "manifest_invalid" ||
+    params.result.error.errorCode !== "MANIFEST_JUDGE_FAILED"
+  ) {
+    return { kind: "none" };
+  }
+
+  const failingVerdict = readFailingJudgeVerdict(params.runDir);
+  if (!failingVerdict) return { kind: "none" };
+
+  if (isSafetyCriterionFailure(params.runDir, failingVerdict)) {
+    await recordImageAutoGate(params, "safety");
+    return { kind: "awaiting_approval" };
+  }
+
+  if (params.regenRound >= IMAGE_MAX_REGEN_ROUNDS) {
+    await recordImageAutoGate(params, "exhausted");
+    return { kind: "awaiting_approval" };
+  }
+
+  const nextRound = params.regenRound + 1;
+  await params.opts.lifecycle?.onImageRegen?.({
+    jobId: params.opts.jobId,
+    attemptNumber: params.opts.attemptNumber,
+    stage: IMAGE_STAGE.JUDGE,
+    runDir: params.runDir,
+    regenRound: nextRound,
+    fromStage: IMAGE_STAGE.GENERATE,
+  });
+  writeRunState(
+    params.runDir,
+    {
+      ...params.runningState,
+      status: "ok",
+      lastStage: IMAGE_STAGE.GENERATE as Stage,
+      regenRound: nextRound,
+    },
+    params.fsOps,
+  );
+  return { kind: "regen", regenRound: nextRound };
+}
+
+async function recordImageAutoGate(
+  params: {
+    runningState: RunState;
+    fsOps: FileSystemOps;
+    runDir: string;
+    opts: ReportLoopOptions;
+    regenRound: number;
+  },
+  reason: ImageAutoGateEvent["reason"],
+): Promise<void> {
+  await params.opts.lifecycle?.onImageAutoGate?.({
+    jobId: params.opts.jobId,
+    attemptNumber: params.opts.attemptNumber,
+    stage: IMAGE_STAGE.JUDGE,
+    runDir: params.runDir,
+    reason,
+    regenRound: params.regenRound,
+  });
+  writeRunState(
+    params.runDir,
+    {
+      ...params.runningState,
+      status: "awaiting_approval",
+      finishedAt: new Date().toISOString(),
+      regenRound: params.regenRound,
+    },
+    params.fsOps,
+  );
+}
+
+function readFailingJudgeVerdict(
+  runDir: string,
+): ReturnType<typeof parseJudgeVerdict> | undefined {
+  try {
+    const verdict = parseJudgeVerdict(
+      JSON.parse(readFileSync(path.resolve(runDir, "verdict.json"), "utf8")),
+    );
+    return verdict.overallPass ? undefined : verdict;
+  } catch {
+    return undefined;
+  }
+}
+
+function isSafetyCriterionFailure(
+  runDir: string,
+  verdict: ReturnType<typeof parseJudgeVerdict>,
+): boolean {
+  try {
+    const spec = parseImageSpec(
+      JSON.parse(readFileSync(path.resolve(runDir, "spec.json"), "utf8")),
+    );
+    const safetyIds = new Set(
+      spec.acceptanceCriteria
+        .filter((criterion) => {
+          const haystack = `${criterion.id} ${criterion.description}`.toLowerCase();
+          return criterion.tier === "judged" && haystack.includes("safety");
+        })
+        .map((criterion) => criterion.id),
+    );
+    return verdict.criteria.some(
+      (criterion) => safetyIds.has(criterion.id) && !criterion.pass,
+    );
+  } catch {
+    return false;
+  }
 }
 
 function writeRunState(

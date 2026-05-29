@@ -13,6 +13,10 @@ import {
 } from "../llm/provider.ts";
 import { validateSourcesProvenanceText } from "../lib/sources-provenance.ts";
 import {
+  JudgeVerdictParseError,
+  parseJudgeVerdict,
+} from "./image/verdict.ts";
+import {
   type JobContext,
   type ManifestError,
   type ManifestErrorCode,
@@ -435,12 +439,22 @@ function validateJudgeVerdictRule(
     );
   }
 
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    !("overallPass" in parsed) ||
-    parsed.overallPass !== true
-  ) {
+  try {
+    const verdict = parseJudgeVerdict(parsed);
+    if (verdict.overallPass) return undefined;
+  } catch (err) {
+    if (err instanceof JudgeVerdictParseError) {
+      return manifestError(
+        "MANIFEST_JUDGE_FAILED",
+        `judge verdict is invalid: ${rule.path}: ${err.message}`,
+        rule,
+        { path: realPath, cause: err },
+      );
+    }
+    throw err;
+  }
+
+  {
     return manifestError(
       "MANIFEST_JUDGE_FAILED",
       `judge verdict did not pass: ${rule.path}`,
@@ -448,8 +462,6 @@ function validateJudgeVerdictRule(
       { path: realPath },
     );
   }
-
-  return undefined;
 }
 
 function isImagePathRule(rule: ManifestRule): boolean {

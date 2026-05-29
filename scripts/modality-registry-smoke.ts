@@ -166,12 +166,21 @@ function registryHasImage(): string[] {
     pipeline.rewindStageForReject("bundle") === IMAGE_STAGE.GENERATE,
     "image reject should rewind to generate",
   );
+  assert(
+    pipeline.stageDef(IMAGE_STAGE.ELABORATE_SPEC).stage === IMAGE_STAGE.ELABORATE_SPEC,
+    "image elaborate_spec should resolve to a text stage",
+  );
   assertThrows(
     () => pipeline.stageDef(IMAGE_STAGE.GENERATE),
-    "not yet implemented",
-    "image stageDef should throw slice-6 sentinel",
+    "image provider is required",
+    "image generate should require injected provider deps",
   );
-  return ["Image registry exposes stage order, transitions, reject rewind, and slice-6 stageDef sentinel."];
+  assertThrows(
+    () => pipeline.stageDef(IMAGE_STAGE.JUDGE),
+    "vision judge is required",
+    "image judge should require injected judge deps",
+  );
+  return ["Image registry exposes stage order, transitions, reject rewind, and provider-gated stage defs."];
 }
 
 function unknownModalityThrows(): string[] {
