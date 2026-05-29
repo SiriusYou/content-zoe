@@ -7,10 +7,17 @@ export enum Stage {
   TRANSLATE_ZH = "translate_zh",
 }
 
+export interface StageRunContext {
+  runDir: string;
+  cwd?: string;
+  timeoutMs: number;
+}
+
 export interface StageDef {
   stage: string;
   prompt: string;
   buildPrompt?: (context: StagePromptContext) => string;
+  run?: (context: StageRunContext) => Promise<void>;
   timeoutMs: number;
   manifest: ManifestSchema;
 }

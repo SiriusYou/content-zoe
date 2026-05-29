@@ -36,7 +36,7 @@ type PathManifestRule = Extract<ManifestRule, { path: string }>;
 // constructor-injection/no-env-reads pattern so subprocess work remains provider-owned.
 export async function runStage(
   stageDef: StageDef,
-  provider: LLMProvider,
+  provider: LLMProvider | undefined,
   jobContext: JobContext,
 ): Promise<StageResult> {
   const startedAt = Date.now();
@@ -52,6 +52,66 @@ export async function runStage(
   }
 
   const { canonicalRunDir } = preflight;
+
+  if (stageDef.run) {
+    try {
+      await stageDef.run({
+        runDir: canonicalRunDir,
+        cwd: jobContext.cwd,
+        timeoutMs: stageDef.timeoutMs,
+      });
+      const manifestError = validateManifest(
+        stageDef.manifest.rules,
+        canonicalRunDir,
+      );
+      if (manifestError) {
+        return {
+          status: "manifest_invalid",
+          stage: stageDef.stage,
+          runDir: canonicalRunDir,
+          elapsedMs: elapsedSince(startedAt),
+          error: manifestError,
+        };
+      }
+
+      return {
+        status: "ok",
+        stage: stageDef.stage,
+        runDir: canonicalRunDir,
+        elapsedMs: elapsedSince(startedAt),
+        output: "",
+      };
+    } catch (err) {
+      const error =
+        err instanceof LLMProviderError
+          ? err
+          : new LLMProviderError({
+              kind: "spawn",
+              message: `runStage internal: ${formatThrown(err)}`,
+              cause: err,
+            });
+      return {
+        status: "error",
+        stage: stageDef.stage,
+        runDir: canonicalRunDir,
+        elapsedMs: elapsedSince(startedAt),
+        error,
+      };
+    }
+  }
+
+  if (!provider) {
+    return {
+      status: "error",
+      stage: stageDef.stage,
+      runDir: canonicalRunDir,
+      elapsedMs: elapsedSince(startedAt),
+      error: new LLMProviderError({
+        kind: "spawn",
+        message: "runStage internal: LLMProvider required for non-run stage",
+      }),
+    };
+  }
 
   let providerPrompt: string;
   try {
