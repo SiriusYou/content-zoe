@@ -16,6 +16,7 @@
     "run-stage-smoke": "bun scripts/run-stage-smoke.ts",
     "image-contracts-smoke": "bun scripts/image-contracts-smoke.ts",
     "image-provider-fake-smoke": "bun scripts/image-provider-fake-smoke.ts",
+    "vision-judge-fake-smoke": "bun scripts/vision-judge-fake-smoke.ts",
     "manifest-image-rules-smoke": "bun scripts/manifest-image-rules-smoke.ts",
     "modality-registry-smoke": "bun scripts/modality-registry-smoke.ts",
     "research-stage-smoke": "bun scripts/research-stage-smoke.ts",
