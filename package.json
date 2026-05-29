@@ -39,6 +39,7 @@
     "content:image-run": "bun src/bin/content-image-run.ts",
     "content:image-show": "bun src/bin/content-image-show.ts",
     "content-image-cli-smoke": "bun scripts/content-image-cli-smoke.ts",
+    "image-publish-smoke": "bun scripts/image-publish-smoke.ts",
     "report:deliver-local": "bun src/bin/report-deliver-local.ts",
     "report-deliver-local-smoke": "bun scripts/report-deliver-local-smoke.ts",
     "report:delivery-status": "bun src/bin/report-delivery-status.ts",

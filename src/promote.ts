@@ -23,7 +23,13 @@ import {
   type Event,
   type Job,
 } from "./db.ts";
+import {
+  buildReadmeImageGalleryEntry,
+  publishReadmeImageGallery,
+} from "./lib/readme-image-gallery-destination.ts";
 import { validateSourcesProvenanceText } from "./lib/sources-provenance.ts";
+import { parseImageSpec, type ImageSpec } from "./pipeline/image/spec.ts";
+import { parseJudgeVerdict, type JudgeVerdict } from "./pipeline/image/verdict.ts";
 
 export type PromoteErrorCode =
   | "UNKNOWN_JOB"
@@ -64,6 +70,7 @@ export interface PromoteJobHooks {
   readonly afterFinalRename?: (context: PromoteHookContext) => Promise<void> | void;
   readonly beforeDbCas?: (context: PromoteHookContext) => Promise<void> | void;
   readonly afterDbCommit?: (context: PromoteHookContext) => Promise<void> | void;
+  readonly beforeImageGalleryWrite?: (context: PromoteHookContext) => Promise<void> | void;
 }
 
 export interface PromoteHookContext {
@@ -82,6 +89,7 @@ export interface PromoteJobResult {
   readonly manifest: PublishManifest;
   readonly gitCommitFailed?: string;
   readonly cleanupFailed?: string;
+  readonly galleryUpdateFailed?: string;
 }
 
 export class PromoteError extends Error {
@@ -103,7 +111,9 @@ const publishedStatus = "published";
 const promotedEventType = "promoted";
 const gitCommitFailedEventType = "git_commit_failed";
 const cleanupFailedEventType = "cleanup_failed";
+const imageGalleryUpdateFailedEventType = "image_gallery_update_failed";
 const requiredSourceMissingMessage = "publish source bundle is missing or invalid";
+const requiredImageFiles = ["image.png", "request.txt", "spec.json", "verdict.json"] as const;
 const sourceMaterialDirName = "source-material";
 const sourceMaterialManifestFile = "source-material/manifest.json";
 const sourceMaterialContextFile = "source-material/context.md";
@@ -174,6 +184,108 @@ export async function promoteJob(
   });
 }
 
+export async function promoteImageJob(
+  options: PromoteJobOptions,
+): Promise<PromoteJobResult> {
+  const cwd = path.resolve(options.cwd);
+  const job = findJobById(options.db, options.jobId);
+  if (job === null) {
+    throw new PromoteError("UNKNOWN_JOB", `unknown job: ${options.jobId}`, options.jobId);
+  }
+  if (job.attempt_number !== options.attemptNumber) {
+    throw new PromoteError("STALE_ATTEMPT", "approve attempt does not match current job attempt", job.id);
+  }
+  if (job.modality !== "image") {
+    throw new PromoteError("PUBLISH_FAILED", "promoteImageJob requires image modality", job.id);
+  }
+
+  const artifactDir = imagePublishArtifactDir(job);
+  const finalArtifactDir = resolveUnderCwd(cwd, artifactDir);
+
+  if (job.status === publishedStatus) {
+    const manifest = requirePublishedManifest(options.db, cwd, job, artifactDir, finalArtifactDir);
+    const galleryUpdateFailed = await reconcileImageGalleryBestEffort({
+      db: options.db,
+      cwd,
+      job,
+      artifactDir,
+      sourceAttemptDir: "",
+      finalArtifactDir,
+      manifest,
+      now: options.now,
+      hooks: options.hooks,
+    });
+    const gitCommitFailed = await runBestEffortGitCommit(
+      {
+        db: options.db,
+        job,
+        artifactDir,
+        now: options.now,
+        committer: options.committer,
+      },
+      manifest,
+      buildImageGitCommitPlan(job, artifactDir),
+    );
+    return {
+      status: "idempotent",
+      jobId: job.id,
+      attemptNumber: job.attempt_number,
+      artifactDir,
+      manifest,
+      galleryUpdateFailed,
+      gitCommitFailed,
+    };
+  }
+
+  if (job.status !== awaitingApprovalStatus) {
+    removeFinalUnlessPublishedAuthority({
+      db: options.db,
+      cwd,
+      job,
+      artifactDir,
+      finalArtifactDir,
+    });
+    throw new PromoteError("STATUS_MISMATCH", "job is not awaiting approval", job.id);
+  }
+
+  assertSupportedImagePurpose(job);
+  const sourceAttemptDir = sourceAttemptDirectory(cwd, job, options.attemptNumber);
+  const sourceManifest = readImageSourceManifest(cwd, job, sourceAttemptDir, artifactDir);
+
+  if (existsSync(finalArtifactDir)) {
+    const finalManifest = manifestFromDirectory(
+      cwd,
+      finalArtifactDir,
+      artifactDir,
+      job.id,
+      job.attempt_number,
+    );
+    assertManifestEquivalent(sourceManifest, finalManifest);
+    return commitImagePublishedState(
+      {
+        ...options,
+        cwd,
+        job,
+        artifactDir,
+        sourceAttemptDir,
+        finalArtifactDir,
+      },
+      finalManifest,
+      true,
+    );
+  }
+
+  return publishFreshImageDestination({
+    ...options,
+    cwd,
+    job,
+    artifactDir,
+    sourceAttemptDir,
+    finalArtifactDir,
+    sourceManifest,
+  });
+}
+
 export function buildGitCommitPlan(artifactDir: string, weekKey: string): GitCommitPlan {
   return {
     artifactDir,
@@ -186,6 +298,36 @@ export function buildGitCommitPlan(artifactDir: string, weekKey: string): GitCom
 
 function publishArtifactDir(job: Job): string {
   return `reports/${job.week_key}-ai-trends`;
+}
+
+function imagePublishArtifactDir(job: Job): string {
+  return `images/${job.id}`;
+}
+
+function buildImageGitCommitPlan(job: Job, artifactDir: string): GitCommitPlan {
+  const commands: (readonly string[])[] = [["git", "add", "--", `${artifactDir}/`]];
+  if (job.purpose === "production") {
+    commands[0] = ["git", "add", "--", `${artifactDir}/`, "README.md"];
+    commands.push([
+      "git",
+      "commit",
+      "-m",
+      `[content-zoe] publish image ${job.id}`,
+      "--",
+      `${artifactDir}/`,
+      "README.md",
+    ]);
+  } else {
+    commands.push([
+      "git",
+      "commit",
+      "-m",
+      `[content-zoe] publish image ${job.id}`,
+      "--",
+      `${artifactDir}/`,
+    ]);
+  }
+  return { artifactDir, commands };
 }
 
 function sourceAttemptDirectory(
@@ -263,6 +405,99 @@ function readSourceManifest(
   }
 }
 
+function readImageSourceManifest(
+  cwd: string,
+  job: Job,
+  sourceAttemptDir: string,
+  artifactDir: string,
+): PublishManifest {
+  try {
+    assertPathInsideCwd(cwd, sourceAttemptDir);
+    const stat = statSync(sourceAttemptDir);
+    if (!stat.isDirectory()) {
+      throw new Error("attempt source is not a directory");
+    }
+
+    const requestPath = assertRegularImageSourceFile(cwd, sourceAttemptDir, "request.txt");
+    const specPath = assertRegularImageSourceFile(cwd, sourceAttemptDir, "spec.json");
+    const imagePath = assertRegularImageSourceFile(cwd, sourceAttemptDir, "image.png");
+    const verdictPath = assertRegularImageSourceFile(cwd, sourceAttemptDir, "verdict.json");
+
+    const requestText = readFileSync(requestPath, "utf8");
+    if (requestText.trim().length === 0) {
+      throw new Error("request.txt must not be empty");
+    }
+
+    const spec = parseImageSpec(JSON.parse(readFileSync(specPath, "utf8")));
+    const verdict = parseJudgeVerdict(JSON.parse(readFileSync(verdictPath, "utf8")));
+    validateImageVerdict(spec, verdict);
+    validateImagePngDimensions(imagePath, spec);
+
+    return manifestFromFiles({
+      cwd,
+      rootDir: sourceAttemptDir,
+      artifactDir,
+      jobId: job.id,
+      attemptNumber: job.attempt_number,
+      files: requiredImageFiles,
+    });
+  } catch (err) {
+    if (err instanceof PromoteError) {
+      throw err;
+    }
+    throw new PromoteError(
+      "PUBLISH_SOURCE_MISSING",
+      requiredSourceMissingMessage,
+      job.id,
+      err,
+    );
+  }
+}
+
+async function publishFreshImageDestination(options: {
+  readonly db: DbClient;
+  readonly cwd: string;
+  readonly job: Job;
+  readonly artifactDir: string;
+  readonly sourceAttemptDir: string;
+  readonly finalArtifactDir: string;
+  readonly sourceManifest: PublishManifest;
+  readonly now: () => number;
+  readonly committer?: GitCommitter;
+  readonly hooks?: PromoteJobHooks;
+}): Promise<PromoteJobResult> {
+  const stagingDir = imageStagingDirectory(options.cwd, options.job, options.now());
+  let renamedFinal = false;
+  try {
+    stageBundle(options.cwd, options.sourceAttemptDir, stagingDir, options.sourceManifest.files);
+    fsyncTreeBestEffort(stagingDir);
+    fsyncDirectoryBestEffort(path.dirname(stagingDir));
+    renameSync(stagingDir, options.finalArtifactDir);
+    renamedFinal = true;
+
+    const finalManifest = manifestFromDirectory(
+      options.cwd,
+      options.finalArtifactDir,
+      options.artifactDir,
+      options.job.id,
+      options.job.attempt_number,
+    );
+    assertManifestEquivalent(options.sourceManifest, finalManifest);
+
+    const context = hookContext(options, finalManifest);
+    await options.hooks?.afterFinalRename?.(context);
+    return commitImagePublishedState(options, finalManifest, true);
+  } catch (err) {
+    if (!renamedFinal) {
+      removePathBestEffort(stagingDir);
+    }
+    if (err instanceof PromoteError) {
+      throw err;
+    }
+    throw new PromoteError("PUBLISH_FAILED", "publish failed", options.job.id, err);
+  }
+}
+
 async function publishFreshDestination(options: {
   readonly db: DbClient;
   readonly cwd: string;
@@ -330,6 +565,148 @@ async function recoverExistingDestination(options: {
   );
   assertManifestEquivalent(options.sourceManifest, finalManifest);
   return commitPublishedState(options, finalManifest, true);
+}
+
+async function commitImagePublishedState(
+  options: {
+    readonly db: DbClient;
+    readonly cwd: string;
+    readonly job: Job;
+    readonly artifactDir: string;
+    readonly sourceAttemptDir: string;
+    readonly finalArtifactDir: string;
+    readonly now: () => number;
+    readonly committer?: GitCommitter;
+    readonly hooks?: PromoteJobHooks;
+  },
+  manifest: PublishManifest,
+  cleanupFinalOnCasLoss: boolean,
+): Promise<PromoteJobResult> {
+  const context = hookContext(options, manifest);
+  await options.hooks?.beforeDbCas?.(context);
+
+  let transactionOpen = false;
+  try {
+    options.db.exec("BEGIN IMMEDIATE");
+    transactionOpen = true;
+    const timestamp = options.now();
+    const updated = casUpdateJob(
+      options.db,
+      options.job.id,
+      {
+        status: awaitingApprovalStatus,
+        attemptNumber: options.job.attempt_number,
+      },
+      {
+        status: publishedStatus,
+        artifact_dir: options.artifactDir,
+        updated_at: timestamp,
+        error: null,
+      },
+    );
+
+    if (updated.rowsAffected !== 1) {
+      options.db.exec("ROLLBACK");
+      transactionOpen = false;
+      if (cleanupFinalOnCasLoss) {
+        removeFinalUnlessPublishedAuthority({
+          db: options.db,
+          cwd: options.cwd,
+          job: options.job,
+          artifactDir: options.artifactDir,
+          finalArtifactDir: options.finalArtifactDir,
+        });
+      }
+      throw classifyApproveRaceLoss(options.db, options.job);
+    }
+
+    const existingPromoted = latestPromotedEvent(
+      options.db,
+      options.job.id,
+      options.job.attempt_number,
+    );
+    if (existingPromoted === null) {
+      insertEvent(options.db, {
+        job_id: options.job.id,
+        attempt_number: options.job.attempt_number,
+        type: promotedEventType,
+        payload: JSON.stringify({
+          artifact_dir: options.artifactDir,
+          publish_manifest: manifest,
+        }),
+        created_at: timestamp,
+      });
+    } else {
+      const existingManifest = parsePromotedManifest(existingPromoted);
+      if (!manifestsEqual(existingManifest, manifest)) {
+        throw new PromoteError(
+          "PUBLISH_ARTIFACT_DIVERGED",
+          "existing promoted event manifest differs from destination",
+          options.job.id,
+        );
+      }
+    }
+
+    options.db.exec("COMMIT");
+    transactionOpen = false;
+  } catch (err) {
+    if (transactionOpen) {
+      try {
+        options.db.exec("ROLLBACK");
+      } catch {
+        // Preserve the original publish failure.
+      }
+    }
+    if (err instanceof PromoteError) {
+      throw err;
+    }
+    throw new PromoteError("PUBLISH_FAILED", "DB publish transaction failed", options.job.id, err);
+  }
+
+  await options.hooks?.afterDbCommit?.(context);
+  const galleryUpdateFailed = await reconcileImageGalleryBestEffort({
+    ...options,
+    manifest,
+  });
+
+  let cleanupFailed: string | undefined;
+  try {
+    rmSync(options.sourceAttemptDir, { recursive: true, force: false });
+  } catch (err) {
+    cleanupFailed = formatError(err);
+    try {
+      insertEvent(options.db, {
+        job_id: options.job.id,
+        attempt_number: options.job.attempt_number,
+        type: cleanupFailedEventType,
+        payload: JSON.stringify({
+          artifact_dir: options.artifactDir,
+          publish_manifest: manifest,
+          error: cleanupFailed,
+        }),
+        created_at: options.now(),
+      });
+    } catch (eventErr) {
+      cleanupFailed = `${cleanupFailed}; cleanup_failed event write failed: ${formatError(eventErr)}`;
+    }
+  }
+
+  const gitCommitFailed = await runBestEffortGitCommit(
+    options,
+    manifest,
+    buildImageGitCommitPlan(options.job, options.artifactDir),
+  );
+
+  return {
+    status: "published",
+    jobId: options.job.id,
+    attemptNumber: options.job.attempt_number,
+    artifactDir: options.artifactDir,
+    manifest,
+    cleanupFailed,
+    galleryUpdateFailed,
+    gitCommitFailed,
+  };
 }
 
 async function commitPublishedState(
@@ -601,6 +978,66 @@ function parsePromotedManifest(event: Event): PublishManifest {
   }
 }
 
+async function reconcileImageGalleryBestEffort(options: {
+  readonly db: DbClient;
+  readonly cwd: string;
+  readonly job: Job;
+  readonly artifactDir: string;
+  readonly sourceAttemptDir: string;
+  readonly finalArtifactDir: string;
+  readonly manifest: PublishManifest;
+  readonly now: () => number;
+  readonly hooks?: PromoteJobHooks;
+}): Promise<string | undefined> {
+  try {
+    assertSupportedImagePurpose(options.job);
+    const current = findJobById(options.db, options.job.id);
+    if (current === null) {
+      throw new Error("published image job disappeared before gallery reconcile");
+    }
+    assertSupportedImagePurpose(current);
+    await options.hooks?.beforeImageGalleryWrite?.(hookContext(options, options.manifest));
+    const entry = buildReadmeImageGalleryEntry({
+      cwd: options.cwd,
+      job: current,
+      manifest: options.manifest,
+    });
+    publishReadmeImageGallery({
+      cwd: options.cwd,
+      entry,
+      purpose: current.purpose,
+      jobPurposes: imageJobPurposeMap(options.db),
+    });
+    return undefined;
+  } catch (err) {
+    const diagnostic = formatError(err);
+    try {
+      insertEvent(options.db, {
+        job_id: options.job.id,
+        attempt_number: options.job.attempt_number,
+        type: imageGalleryUpdateFailedEventType,
+        payload: JSON.stringify({
+          job_id: options.job.id,
+          attempt_number: options.job.attempt_number,
+          artifact_dir: options.artifactDir,
+          error: diagnostic,
+        }),
+        created_at: options.now(),
+      });
+    } catch (eventErr) {
+      return `${diagnostic}; image_gallery_update_failed event write failed: ${formatError(eventErr)}`;
+    }
+    return diagnostic;
+  }
+}
+
+function imageJobPurposeMap(db: DbClient): Map<string, string | null> {
+  const rows = db
+    .query<Pick<Job, "id" | "purpose">, []>("SELECT id, purpose FROM jobs WHERE modality = 'image'")
+    .all();
+  return new Map(rows.map((row) => [row.id, row.purpose]));
+}
+
 async function runBestEffortGitCommit(
   options: {
     readonly db: DbClient;
@@ -610,12 +1047,12 @@ async function runBestEffortGitCommit(
     readonly committer?: GitCommitter;
   },
   manifest: PublishManifest,
+  plan = buildGitCommitPlan(options.artifactDir, options.job.week_key),
 ): Promise<string | undefined> {
   if (options.committer === undefined) {
     return undefined;
   }
 
-  const plan = buildGitCommitPlan(options.artifactDir, options.job.week_key);
   try {
     await options.committer(plan);
     return undefined;
@@ -649,6 +1086,45 @@ function classifyApproveRaceLoss(db: DbClient, job: Job): PromoteError {
     return new PromoteError("STATUS_MISMATCH", "job status changed before approve commit", job.id);
   }
   return new PromoteError("APPROVE_RACE_LOST", "approve race lost", job.id);
+}
+
+function assertSupportedImagePurpose(job: Job): asserts job is Job & { purpose: "production" | "validation" } {
+  if (job.purpose !== "production" && job.purpose !== "validation") {
+    throw new PromoteError("PUBLISH_SOURCE_MISSING", "image job purpose must be production or validation", job.id);
+  }
+}
+
+function assertRegularImageSourceFile(cwd: string, sourceAttemptDir: string, relativePath: string): string {
+  const filePath = resolveUnderDirectory(cwd, sourceAttemptDir, relativePath);
+  const fileStat = lstatSync(filePath);
+  if (fileStat.isSymbolicLink() || !fileStat.isFile()) {
+    throw new Error(`required image source is not a regular file: ${relativePath}`);
+  }
+  return filePath;
+}
+
+function validateImageVerdict(spec: ImageSpec, verdict: JudgeVerdict): void {
+  const expectedIds = spec.acceptanceCriteria.map((criterion) => criterion.id);
+  const actualIds = verdict.criteria.map((criterion) => criterion.id);
+  if (JSON.stringify(expectedIds) !== JSON.stringify(actualIds)) {
+    throw new Error("verdict criterion ids do not match spec acceptance criteria");
+  }
+  if (!verdict.overallPass) {
+    throw new Error("judge verdict did not pass");
+  }
+}
+
+function validateImagePngDimensions(imagePath: string, spec: ImageSpec): void {
+  const header = readFileSync(imagePath).subarray(0, 24);
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (header.length < 24 || !header.subarray(0, 8).equals(signature)) {
+    throw new Error("image.png is not a PNG");
+  }
+  const width = header.readUInt32BE(16);
+  const height = header.readUInt32BE(20);
+  if (width !== spec.dimensions.w || height !== spec.dimensions.h) {
+    throw new Error("image.png dimensions do not match spec.json");
+  }
 }
 
 function stageBundle(
@@ -924,6 +1400,22 @@ function stagingDirectory(cwd: string, job: Job, now: number): string {
     }
   }
   throw new PromoteError("PUBLISH_FAILED", "could not allocate publish staging directory", job.id);
+}
+
+function imageStagingDirectory(cwd: string, job: Job, now: number): string {
+  const imagesDir = resolveUnderCwd(cwd, "images");
+  mkdirSync(imagesDir, { recursive: true });
+  for (let index = 0; index < 100; index += 1) {
+    const candidate = path.resolve(
+      imagesDir,
+      `.publish-${job.id}-attempt-${job.attempt_number}-${now}-${index}`,
+    );
+    assertPathInsideCwd(cwd, candidate);
+    if (!existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  throw new PromoteError("PUBLISH_FAILED", "could not allocate image publish staging directory", job.id);
 }
 
 function fsyncTreeBestEffort(rootDir: string): void {

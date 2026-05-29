@@ -8,6 +8,7 @@ import {
 } from "../db.ts";
 import {
   PromoteError,
+  promoteImageJob,
   promoteJob,
   type GitCommitter,
   type PromoteJobHooks,
@@ -336,18 +337,9 @@ export async function handleApproveCommand(
   if (job === null) {
     return replyWithApproveError(dependencies, "UNKNOWN_JOB", parsed.command.jobId);
   }
-  if (job.modality === Modality.IMAGE) {
-    if (job.attempt_number !== parsed.command.attemptNumber) {
-      return replyWithApproveError(dependencies, "STALE_ATTEMPT", parsed.command.jobId);
-    }
-    if (job.status !== awaitingApprovalStatus) {
-      return replyWithApproveError(dependencies, "STATUS_MISMATCH", parsed.command.jobId);
-    }
-    return replyWithApproveError(dependencies, "IMAGE_PUBLISH_NOT_IMPLEMENTED", parsed.command.jobId);
-  }
-
   try {
-    const publishResult = await promoteJob({
+    const promote = job.modality === Modality.IMAGE ? promoteImageJob : promoteJob;
+    const publishResult = await promote({
       db: dependencies.db,
       cwd: dependencies.cwd,
       jobId: parsed.command.jobId,
@@ -678,6 +670,9 @@ export function approveSuccessReply(result: PromoteJobResult): string {
   }
   if (result.gitCommitFailed !== undefined) {
     notes.push(` Git post-step failed non-blocking: ${result.gitCommitFailed}`);
+  }
+  if (result.galleryUpdateFailed !== undefined) {
+    notes.push(` Gallery update failed non-blocking: ${result.galleryUpdateFailed}`);
   }
   return `Approved attempt ${result.attemptNumber}. Published ${result.jobId} to ${result.artifactDir}/.${notes.join("")}`;
 }

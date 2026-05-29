@@ -34,6 +34,7 @@ import {
   type DbClient,
   type Job,
 } from "../src/db.ts";
+import { FakeImageProvider } from "../src/llm/image-fake.ts";
 import { parseOperatorChatIds } from "../src/telegram/allowlist.ts";
 import {
   DEFAULT_COMMAND_POLL_INTERVAL_MS,
@@ -79,6 +80,8 @@ import {
   promoteJob,
   type GitCommitPlan,
 } from "../src/promote.ts";
+import type { ImageSpec } from "../src/pipeline/image/spec.ts";
+import type { JudgeVerdict } from "../src/pipeline/image/verdict.ts";
 import type {
   ApprovalNotification,
   NotifyPendingApprovalsResult,
@@ -116,7 +119,7 @@ type ScenarioName =
   | "approve-status-mismatch"
   | "approve-source-validation"
   | "approve-success-publishes-bundle"
-  | "image-approve-deferred"
+  | "image-approve-publishes"
   | "approve-without-source-material-optional"
   | "approve-missing-sources-json"
   | "approve-malformed-sources-json"
@@ -200,7 +203,7 @@ const SCENARIOS: readonly ScenarioName[] = [
   "approve-status-mismatch",
   "approve-source-validation",
   "approve-success-publishes-bundle",
-  "image-approve-deferred",
+  "image-approve-publishes",
   "approve-without-source-material-optional",
   "approve-missing-sources-json",
   "approve-malformed-sources-json",
@@ -251,31 +254,29 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
-const slice428ImplementationAnchor = "c4bc54910dfcae9156ac267f933dae148f9d9506";
+const slice428ImplementationAnchor = "2deb95bfcd865b565fd80fca22b41947cc87b207";
 const slice424Scope = new Set([
-  "src/pipeline/modality.ts",
+  "src/promote.ts",
+  "src/lib/readme-image-gallery-destination.ts",
   "src/telegram/commands.ts",
-  "src/lib/runtime-config.ts",
+  "scripts/image-publish-smoke.ts",
+  "docs/preflight/image-publish-smoke.md",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
-  "scripts/report-run-smoke.ts",
-  "docs/preflight/report-run-smoke.md",
-  "scripts/image-pipeline-smoke.ts",
-  "docs/preflight/image-pipeline-smoke.md",
+  "package.json",
 ]);
 const botSmokeActiveTriggers = new Set([
-  "src/pipeline/modality.ts",
+  "src/promote.ts",
+  "src/lib/readme-image-gallery-destination.ts",
   "src/telegram/commands.ts",
-  "src/lib/runtime-config.ts",
+  "scripts/image-publish-smoke.ts",
+  "docs/preflight/image-publish-smoke.md",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
-  "scripts/report-run-smoke.ts",
-  "docs/preflight/report-run-smoke.md",
 ]);
 const botSmokeActiveFrozenFiles = [
   "bun.lock",
   "bun.lockb",
-  "package.json",
   "README.md",
   "AGENTS.md",
   "CLAUDE.md",
@@ -304,6 +305,10 @@ const botSmokeActiveFrozenDirectories = [
   "src/migrations/",
   "src/llm/",
   "src/prompts/",
+  "src/pipeline/",
+  "src/llm/",
+  "src/migrations/",
+  "reports/",
   "docs/process/",
   ".omx/memory-edit/",
 ];
@@ -478,8 +483,8 @@ async function scenarioImpl(
       return runApproveSourceValidation(dir);
     case "approve-success-publishes-bundle":
       return runApproveSuccessPublishesBundle(dir);
-    case "image-approve-deferred":
-      return runImageApproveDeferred(dir);
+    case "image-approve-publishes":
+      return runImageApprovePublishes(dir);
     case "approve-without-source-material-optional":
       return runApproveWithoutSourceMaterialOptional(dir);
     case "approve-missing-sources-json":
@@ -1809,49 +1814,94 @@ async function runApproveSuccessPublishesBundle(dir: string): Promise<string[]> 
   }
 }
 
-async function runImageApproveDeferred(dir: string): Promise<string[]> {
+async function runImageApprovePublishes(dir: string): Promise<string[]> {
   const { db, close } = openScenarioDb(dir);
   try {
-    seedAwaitingJob(db, "img-approve-deferred", {
+    const jobId = "img-approve-publishes";
+    seedAwaitingJob(db, jobId, {
       modality: "image",
       locales: "en",
       current_stage: "judge",
-      run_dir: ".runs/img-approve-deferred",
+      purpose: "production",
       approval_summary: "image ready for approval",
     });
-    const before = stableJobSnapshot(requireJob(db, "img-approve-deferred"));
+    await writeImageApproveAttempt(dir, jobId);
     const replies: string[] = [];
-    let committerCalled = false;
+    const plans: GitCommitPlan[] = [];
 
     const result = await handleApproveCommand({
       db,
-      text: "/approve img-approve-deferred 1",
+      text: "/approve img-approve-publishes 1",
       chatId: 123,
       operatorChatIds: [123],
       cwd: dir,
       now: () => 9_510_000_000,
-      committer: () => {
-        committerCalled = true;
+      committer: (plan) => {
+        plans.push(plan);
       },
       reply: captureReply(replies),
     });
 
-    const after = stableJobSnapshot(requireJob(db, "img-approve-deferred"));
-    assert(result.status === "error", "image approve did not fail closed");
-    assert(result.code === "IMAGE_PUBLISH_NOT_IMPLEMENTED", "image approve returned wrong code");
-    assert(replies[0] === "IMAGE_PUBLISH_NOT_IMPLEMENTED: img-approve-deferred", "image approve reply changed");
-    assert(before === after, "image approve deferral mutated the job");
-    assert(!committerCalled, "image approve deferral called the git committer");
-    assert(findEventsByJob(db, "img-approve-deferred").length === 0, "image approve deferral wrote events");
-    assert(!existsSync(resolve(dir, "reports")), "image approve deferral touched report output");
+    const job = requireJob(db, jobId);
+    const events = findEventsByJob(db, jobId, "promoted");
+    const files = readdirSync(resolve(dir, "images", jobId)).sort();
+    assert(result.status === "published", `image approve did not publish: ${result.code}`);
+    assert(replies[0] === `Approved attempt 1. Published ${jobId} to images/${jobId}/.`, "image approve reply changed");
+    assert(job.status === "published", "image approve did not update job status");
+    assert(job.artifact_dir === `images/${jobId}`, "image approve artifact_dir mismatch");
+    assert(JSON.stringify(files) === JSON.stringify(["image.png", "request.txt", "spec.json", "verdict.json"]), "image approve published wrong files");
+    assert(events.length === 1, "image approve did not write exactly one promoted event");
+    assert(readFileSync(resolve(dir, "README.md"), "utf8").includes(`[image](images/${jobId}/image.png)`), "image approve did not update gallery");
+    assert(plans.length === 1, "image approve did not invoke one git post-step");
+    assert(plans[0].commands.some((command) => command.includes("README.md")), "image approve production git plan omitted README");
+    assert(!existsSync(resolve(dir, "reports")), "image approve touched report output");
 
     return [
-      "Image /approve fails closed as IMAGE_PUBLISH_NOT_IMPLEMENTED with no DB/event/filesystem mutation.",
-      "Image approve deferral does not call promoteJob's committer path.",
+      "Image /approve publishes the four-file image bundle under images/<jobId>/.",
+      "Image approve writes the promoted event, gallery row, success reply, and production git plan.",
     ];
   } finally {
     close();
   }
+}
+
+async function writeImageApproveAttempt(dir: string, jobId: string): Promise<void> {
+  const attemptDir = resolve(dir, ".runs", jobId, "attempt-1");
+  mkdirSync(attemptDir, { recursive: true });
+  const spec = imageApproveSpec();
+  writeFileSync(resolve(attemptDir, "request.txt"), "Draw a precise image approval card.\n");
+  writeFileSync(resolve(attemptDir, "spec.json"), `${JSON.stringify(spec, null, 2)}\n`);
+  await new FakeImageProvider().generate(spec, resolve(attemptDir, "image.png"), 900_000);
+  writeFileSync(resolve(attemptDir, "verdict.json"), `${JSON.stringify(imageApproveVerdict(spec), null, 2)}\n`);
+  writeFileSync(resolve(attemptDir, "run-state.json"), "{}\n");
+}
+
+function imageApproveSpec(): ImageSpec {
+  return {
+    promptOriginal: "Draw a precise image approval card.",
+    subject: "A healthcare AI approval card",
+    style: "clean editorial illustration",
+    composition: "single centered card with checklist",
+    palette: ["blue", "white", "green"],
+    dimensions: { w: 1024, h: 1024 },
+    negativeConstraints: ["no logos", "no patient faces"],
+    safetyProfile: "standard",
+    acceptanceCriteria: [
+      { id: "subject-visible", description: "The approval card is visually dominant.", tier: "judged" },
+      { id: "safe-healthcare", description: "The image avoids unsafe medical advice.", tier: "judged" },
+    ],
+  };
+}
+
+function imageApproveVerdict(spec: ImageSpec): JudgeVerdict {
+  return {
+    overallPass: true,
+    criteria: spec.acceptanceCriteria.map((criterion) => ({
+      id: criterion.id,
+      pass: true,
+      rationale: "ok",
+    })),
+  };
 }
 
 async function runApproveWithoutSourceMaterialOptional(dir: string): Promise<string[]> {
@@ -3541,6 +3591,7 @@ function seedAwaitingJob(
     attempt_number: patch.attempt_number ?? 1,
     status: patch.status ?? "awaiting_approval",
     current_stage: patch.current_stage ?? "approval",
+    purpose: patch.purpose ?? null,
     run_dir: patch.run_dir ?? null,
     artifact_dir: patch.artifact_dir ?? null,
     primary_report_path: patch.primary_report_path ?? null,
