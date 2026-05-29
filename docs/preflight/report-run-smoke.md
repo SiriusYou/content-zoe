@@ -1,9 +1,9 @@
 # report-run smoke evidence
 
 - Command: `bun run report-run-smoke`
-- Started: 2026-05-29T12:39:05.797Z
-- Finished: 2026-05-29T12:39:06.706Z
-- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-29T12-39-05.797Z (removed by finally-cleanup)
+- Started: 2026-05-29T13:28:43.717Z
+- Finished: 2026-05-29T13:28:44.637Z
+- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-29T13-28-43.716Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
@@ -16,7 +16,7 @@
 | en-only-skip | PASS | FakeProvider omitted translate_zh, so an incorrect translation call would have failed.<br>locales=['en'] terminated after edit_en.<br>report.en.md contains the fake edit marker before awaiting approval.<br>report.zh.md remained absent for the en-only run. |
 | stage-failure-mid-run | PASS | Missing edit_en canned prompt produced the same non-ok loop result the CLI maps to failure.<br>The composition-root exit-code branch maps that non-ok stage result to exit 2.<br>run-state.json recorded status=error and lastStage=edit_en. |
 | resume-after-failure | PASS | Resume from failed edit_en started at edit_en; missing research/draft prompts were never called.<br>Atomic attempt-2 includes carry-forward files and recoveryCleanup audit data. |
-| env-purity-static-check | PASS | Only runtime-config.ts reads process.env among the checked runtime files.<br>process.argv appears only in src/bin/report-run.ts.<br>src/bin/report-run.ts and src/lib/report-loop.ts contain no child_process or Bun.spawn references. |
+| env-purity-static-check | PASS | Only runtime-config.ts reads process.env among the checked text report:run runtime files; image CLIs are covered by content-image-cli-smoke.<br>process.argv appears only in src/bin/report-run.ts.<br>src/bin/report-run.ts and src/lib/report-loop.ts contain no child_process or Bun.spawn references. |
 | resume-carry-forward | PASS | Resume from ok research advanced to draft_en; missing research prompt was never called.<br>research/ and sources.json were copied into attempt-2 with fromAttempt/copiedFromAttempt/deletedFiles recorded.<br>A second resume was an already-complete no-op: no attempt-3, no bootstrap residue, no recoveryCleanup drift. |
 | resume-after-success-idempotent | PASS | A completed job resumed as an idempotent no-op.<br>The resume path emitted already complete and did not create attempt-2. |
 | resume-edge-cases | PASS | Missing job directory, empty job directory, missing run-state, corrupted JSON, and schema mismatch all failed with exit-class precondition errors. |

@@ -251,7 +251,7 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
-const slice428ImplementationAnchor = "27e5a552ca4bcc4ee45ed89fb591bfbf625cc3d9";
+const slice428ImplementationAnchor = "c4bc54910dfcae9156ac267f933dae148f9d9506";
 const slice424Scope = new Set([
   "src/pipeline/modality.ts",
   "src/telegram/commands.ts",
@@ -3306,8 +3306,9 @@ function runRejectVocabularySourceOfTruth(): string[] {
 
 function runBoundaryStaticCheck(): string[] {
   const changed = changedFilesAgainstBase();
+  const changedForScopePolicy = botSmokeScopePolicyFiles(changed);
   const scopeMode = assertCycleScopePolicy({
-    changed,
+    changed: changedForScopePolicy,
     activeTriggerFiles: botSmokeActiveTriggers,
     activeScope: slice424Scope,
     activeFrozenFiles: botSmokeActiveFrozenFiles,
@@ -3401,7 +3402,7 @@ function runBoundaryStaticCheck(): string[] {
 
   return [
     `Cycle-scope boundary check ran in ${scopeMode} mode and saw changed files: ${changed.join(", ") || "<none>"}.`,
-    "Active Slice 7a scope admits only modality reject vocabulary, Telegram command control, runtime-config parsing, and bot/report-run smoke evidence files.",
+    "Active Slice 7a scope admits only modality reject vocabulary, Telegram command control, runtime-config parsing, and bot/report-run smoke evidence files; bot/report-run smoke evidence-only refreshes do not reactivate that prior slice after HEAD moves on.",
     "Synthetic Slice 4.12 report:create files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic Slice 4.13 report:remind files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic Slice 4.14 report:status files resolve to inherited-surface mode without a bot-smoke exemption.",
@@ -3412,6 +3413,21 @@ function runBoundaryStaticCheck(): string[] {
     "commands.ts and product support surfaces stayed out of scope; bot.ts contains no abort plumbing.",
     "Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and status handling does not call promoteJob or inspect .runs.",
   ];
+}
+
+function botSmokeScopePolicyFiles(changed: readonly string[]): string[] {
+  const evidenceOnlyTriggers = new Set([
+    "scripts/bot-smoke.ts",
+    "docs/preflight/bot-smoke.md",
+    "scripts/report-run-smoke.ts",
+    "docs/preflight/report-run-smoke.md",
+  ]);
+  const substantiveActiveTriggerTouched = changed.some(
+    (file) => !evidenceOnlyTriggers.has(file) && botSmokeActiveTriggers.has(file),
+  );
+  return substantiveActiveTriggerTouched
+    ? [...changed]
+    : changed.filter((file) => !evidenceOnlyTriggers.has(file));
 }
 
 function runDependencyBoundaryCheck(): string[] {

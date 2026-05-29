@@ -565,7 +565,10 @@ async function runResumeAfterFailure(dir: string): Promise<string[]> {
 
 async function runEnvPurityStaticCheck(): Promise<string[]> {
   const checkedFiles = [
-    ...filesMatching(resolve(repoRoot, "src", "bin"), (file) => file.endsWith(".ts")),
+    ...filesMatching(
+      resolve(repoRoot, "src", "bin"),
+      (file) => file.endsWith(".ts") && !file.includes("/content-image-"),
+    ),
     resolve(repoRoot, "src", "lib", "runtime-config.ts"),
     resolve(repoRoot, "src", "lib", "report-loop.ts"),
     ...filesMatching(resolve(repoRoot, "src", "pipeline"), (file) => file.endsWith(".ts")),
@@ -595,7 +598,7 @@ async function runEnvPurityStaticCheck(): Promise<string[]> {
   assert(argvHits.length === 0, `unexpected process.argv hits: ${JSON.stringify(argvHits)}`);
   assert(spawnHits.length === 0, `unexpected spawn hits: ${JSON.stringify(spawnHits)}`);
   return [
-    "Only runtime-config.ts reads process.env among the checked runtime files.",
+    "Only runtime-config.ts reads process.env among the checked text report:run runtime files; image CLIs are covered by content-image-cli-smoke.",
     "process.argv appears only in src/bin/report-run.ts.",
     "src/bin/report-run.ts and src/lib/report-loop.ts contain no child_process or Bun.spawn references.",
   ];
