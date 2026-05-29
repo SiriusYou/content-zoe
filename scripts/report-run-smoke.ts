@@ -1555,14 +1555,21 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
     "scripts/report-run-smoke.ts",
     "docs/preflight/report-run-smoke.md",
   ]);
+  // Slice 4.29 has a frozen, historical implementation range. The boundary
+  // runs from the approval-label anchor to the Slice 4.29 implementation
+  // commit (`rangeEnd`), NOT to live HEAD: once later slices (5, 6a, 6b, ...)
+  // land, an `anchor..HEAD` diff would sweep in their files and falsely flag
+  // them as out-of-scope. Pinning both ends keeps this a faithful, permanent
+  // assertion over exactly what Slice 4.29 changed. The working-tree diff is
+  // dropped for the same reason: post-merge there is no in-flight 4.29 work,
+  // so it would only catch unrelated session dirt (e.g. regenerated smoke
+  // evidence). The static source-inspection asserts below still read the
+  // current report-run.ts as a live regression guard.
   const anchor = "84ce0cd784ccc1231cc9717cff6885967b55a16e";
-  const committed = gitLines(["diff", "--name-only", `${anchor}..HEAD`]).filter(
-    (name) => name !== "README.md" && !name.startsWith("reports/"),
-  );
-  const working = gitLines(["diff", "--name-only", anchor]).filter(
-    (name) => name !== "README.md" && !name.startsWith("reports/"),
-  );
-  const names = [...new Set([...committed, ...working])].filter((name) => name.length > 0);
+  const rangeEnd = "ac6b0bfceb9f9cfb845e572f227ac16a7e24de61";
+  const names = gitLines(["diff", "--name-only", `${anchor}..${rangeEnd}`])
+    .filter((name) => name !== "README.md" && !name.startsWith("reports/"))
+    .filter((name) => name.length > 0);
   assert(names.length > 0, "boundary check was vacuous: no implementation files detected");
   const unexpected = names.filter((name) => !allowed.has(name));
   assert(unexpected.length === 0, `unexpected implementation files: ${unexpected.join(",")}`);
@@ -1602,7 +1609,7 @@ async function runReportRunBoundaryStaticCheck(): Promise<string[]> {
   }
 
   return [
-    `Approval-label-anchor diff inspected (${anchor}..HEAD plus implementation working files, excluding pre-existing README/reports runtime evidence): ${names.join(", ")}.`,
+    `Frozen Slice 4.29 implementation-range diff inspected (${anchor}..${rangeEnd}, excluding pre-existing README/reports runtime evidence): ${names.join(", ")}.`,
     "Only Slice 4.29 allowed implementation/evidence files were present in the boundary diff.",
     "Static source inspection found the non-resume refusal, --resume guidance, lifecycle-event orphan classifier, and orphan directory cleanup path.",
     "Static hard-out scan found no package/schema/runtime/provider/downstream prompt/publish/Telegram/governance surfaces in the implementation range.",
