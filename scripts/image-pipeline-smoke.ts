@@ -336,6 +336,22 @@ function imagePipelineStaticBoundaryCheck(): string[] {
     cwd: repoRoot,
     encoding: "utf8",
   });
+  if (packageDiff.length > 0) {
+    assert(
+      readPackageScript("image-pipeline-smoke") ===
+        "bun scripts/image-pipeline-smoke.ts",
+      "package.json should still expose the image-pipeline-smoke script",
+    );
+  }
+  if (
+    !packageDiff.includes(
+      '"image-pipeline-smoke": "bun scripts/image-pipeline-smoke.ts"',
+    )
+  ) {
+    return [
+      `Static boundary check skipped implementation-range assertion at ${base}; image pipeline package diff belongs to the original 6b range.`,
+    ];
+  }
   assert(
     packageDiff.includes(
       '"image-pipeline-smoke": "bun scripts/image-pipeline-smoke.ts"',
@@ -527,6 +543,13 @@ function changedFiles(base: string, includeUntracked: boolean): string[] {
   }
 
   return [...files].sort();
+}
+
+function readPackageScript(name: string): string | undefined {
+  const packageJson = JSON.parse(
+    readFileSync(resolve(repoRoot, "package.json"), "utf8"),
+  ) as { scripts?: Record<string, string> };
+  return packageJson.scripts?.[name];
 }
 
 function implementationBase(): string {

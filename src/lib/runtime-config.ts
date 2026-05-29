@@ -1,4 +1,6 @@
 export type LLMProviderName = "fake" | "codex";
+export type ImageProviderName = "fake" | "openai";
+export type VisionJudgeProviderName = "fake" | "openai";
 
 export interface RuntimeConfig {
   llmProvider: LLMProviderName;
@@ -39,6 +41,31 @@ function parseProvider(value: string | undefined): LLMProviderName {
   throw new Error(
     `invalid LLM_PROVIDER: expected "fake" or "codex", got ${JSON.stringify(value)}`,
   );
+}
+
+export function parseImageProviderName(value: string | undefined): ImageProviderName | undefined {
+  if (value === undefined) return undefined;
+  if (value === "fake" || value === "openai") return value;
+  throw new Error(
+    `invalid IMAGE_PROVIDER: expected "fake" or "openai", got ${JSON.stringify(value)}`,
+  );
+}
+
+export function parseVisionJudgeProviderName(value: string | undefined): VisionJudgeProviderName | undefined {
+  if (value === undefined) return undefined;
+  if (value === "fake" || value === "openai") return value;
+  throw new Error(
+    `invalid VISION_JUDGE_PROVIDER: expected "fake" or "openai", got ${JSON.stringify(value)}`,
+  );
+}
+
+export function parseVisionJudgeModel(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new Error(`invalid VISION_JUDGE_MODEL: expected a non-empty string`);
+  }
+  return trimmed;
 }
 
 function parsePositiveInt(

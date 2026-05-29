@@ -1,9 +1,9 @@
 # report-run smoke evidence
 
 - Command: `bun run report-run-smoke`
-- Started: 2026-05-29T06:27:25.055Z
-- Finished: 2026-05-29T06:27:25.981Z
-- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-29T06-27-25.055Z (removed by finally-cleanup)
+- Started: 2026-05-29T12:39:05.797Z
+- Finished: 2026-05-29T12:39:06.706Z
+- Scenario root: /Users/youjia/dev/content-zoe/.runs/report-run-smoke/2026-05-29T12-39-05.797Z (removed by finally-cleanup)
 
 | Scenario | Result | Evidence |
 |---|---:|---|
@@ -12,6 +12,7 @@
 | lifecycle-happy-path-db-audit | PASS | CLI happy path wrote ordered stage_enter/stage_complete pairs for all four stages.<br>Lifecycle payloads used exact key sets and excluded raw fake-provider output/body/prompt fields.<br>Research stage_complete and jobs.as_of shared the same durable completion timestamp. |
 | lifecycle-failure-db-audit | PASS | Loop-level lifecycle callbacks wrote stage_enter for the failed edit_en stage.<br>The failed edit_en stage did not receive a stage_complete event. |
 | default-llm-provider-when-unset | PASS | CLI path ran with LLM_PROVIDER absent from the child environment.<br>runtime-config defaulted to FakeProvider and emitted the fake-provider visibility log. |
+| image-env-ignored-by-text-run | PASS | Text report:run ignored invalid image-only IMAGE_PROVIDER, VISION_JUDGE_PROVIDER, and VISION_JUDGE_MODEL env values.<br>Existing text loadRuntimeConfig path still used LLM_PROVIDER=fake and completed an en-only run. |
 | en-only-skip | PASS | FakeProvider omitted translate_zh, so an incorrect translation call would have failed.<br>locales=['en'] terminated after edit_en.<br>report.en.md contains the fake edit marker before awaiting approval.<br>report.zh.md remained absent for the en-only run. |
 | stage-failure-mid-run | PASS | Missing edit_en canned prompt produced the same non-ok loop result the CLI maps to failure.<br>The composition-root exit-code branch maps that non-ok stage result to exit 2.<br>run-state.json recorded status=error and lastStage=edit_en. |
 | resume-after-failure | PASS | Resume from failed edit_en started at edit_en; missing research/draft prompts were never called.<br>Atomic attempt-2 includes carry-forward files and recoveryCleanup audit data. |

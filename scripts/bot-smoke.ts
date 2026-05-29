@@ -69,6 +69,12 @@ import {
   type RejectType,
 } from "../src/telegram/commands.ts";
 import {
+  isValidRejectScopeTypeForModality,
+  Modality,
+  REJECT_SCOPES,
+  REJECT_TYPES,
+} from "../src/pipeline/modality.ts";
+import {
   buildGitCommitPlan,
   promoteJob,
   type GitCommitPlan,
@@ -87,8 +93,11 @@ type ScenarioName =
   | "open-db-failure-releases-guard"
   | "telegram-sender-adapter"
   | "reject-command-parse"
+  | "image-reject-command-parse"
   | "reject-scope-type-matrix"
   | "reject-success-requeues"
+  | "image-reject-success-requeues"
+  | "image-reject-text-combo-invalid"
   | "reject-zh-rewinds-translate"
   | "reject-invalid-combo"
   | "reject-stale-attempt"
@@ -107,6 +116,7 @@ type ScenarioName =
   | "approve-status-mismatch"
   | "approve-source-validation"
   | "approve-success-publishes-bundle"
+  | "image-approve-deferred"
   | "approve-without-source-material-optional"
   | "approve-missing-sources-json"
   | "approve-malformed-sources-json"
@@ -144,6 +154,7 @@ type ScenarioName =
   | "command-long-poll-overlap-guard"
   | "command-long-poll-stop-clears-future-polls"
   | "bot-command-wiring"
+  | "reject-vocabulary-source-of-truth"
   | "boundary-static-check"
   | "dependency-boundary-check"
   | "bot-db-path-cwd"
@@ -166,8 +177,11 @@ const SCENARIOS: readonly ScenarioName[] = [
   "open-db-failure-releases-guard",
   "telegram-sender-adapter",
   "reject-command-parse",
+  "image-reject-command-parse",
   "reject-scope-type-matrix",
   "reject-success-requeues",
+  "image-reject-success-requeues",
+  "image-reject-text-combo-invalid",
   "reject-zh-rewinds-translate",
   "reject-invalid-combo",
   "reject-stale-attempt",
@@ -186,6 +200,7 @@ const SCENARIOS: readonly ScenarioName[] = [
   "approve-status-mismatch",
   "approve-source-validation",
   "approve-success-publishes-bundle",
+  "image-approve-deferred",
   "approve-without-source-material-optional",
   "approve-missing-sources-json",
   "approve-malformed-sources-json",
@@ -223,6 +238,7 @@ const SCENARIOS: readonly ScenarioName[] = [
   "command-long-poll-overlap-guard",
   "command-long-poll-stop-clears-future-polls",
   "bot-command-wiring",
+  "reject-vocabulary-source-of-truth",
   "boundary-static-check",
   "dependency-boundary-check",
   "bot-db-path-cwd",
@@ -235,32 +251,24 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
-const slice428ImplementationAnchor = "a310f9bae4c161143be1507b1ca7982f99773e29";
+const slice428ImplementationAnchor = "27e5a552ca4bcc4ee45ed89fb591bfbf625cc3d9";
 const slice424Scope = new Set([
-  "src/promote.ts",
+  "src/pipeline/modality.ts",
+  "src/telegram/commands.ts",
+  "src/lib/runtime-config.ts",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
-  "src/lib/sources-provenance.ts",
-  "src/lib/report-run-fake-provider.ts",
-  "src/pipeline/types.ts",
-  "src/pipeline/run-stage.ts",
-  "src/pipeline/research.ts",
-  "scripts/research-stage-smoke.ts",
-  "docs/preflight/research-stage-smoke.md",
   "scripts/report-run-smoke.ts",
   "docs/preflight/report-run-smoke.md",
+  "scripts/image-pipeline-smoke.ts",
+  "docs/preflight/image-pipeline-smoke.md",
 ]);
 const botSmokeActiveTriggers = new Set([
-  "src/promote.ts",
+  "src/pipeline/modality.ts",
+  "src/telegram/commands.ts",
+  "src/lib/runtime-config.ts",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
-  "src/lib/sources-provenance.ts",
-  "src/lib/report-run-fake-provider.ts",
-  "src/pipeline/types.ts",
-  "src/pipeline/run-stage.ts",
-  "src/pipeline/research.ts",
-  "scripts/research-stage-smoke.ts",
-  "docs/preflight/research-stage-smoke.md",
   "scripts/report-run-smoke.ts",
   "docs/preflight/report-run-smoke.md",
 ]);
@@ -276,11 +284,9 @@ const botSmokeActiveFrozenFiles = [
   "PLAN.md",
   "src/db.ts",
   "src/telegram/bot.ts",
-  "src/telegram/commands.ts",
   "src/telegram/notifier.ts",
   "src/telegram/allowlist.ts",
   "src/lib/report-loop.ts",
-  "src/lib/runtime-config.ts",
   "src/lib/publish-destination.ts",
   "src/lib/readme-publish-destination.ts",
   "src/bin/report-create.ts",
@@ -426,10 +432,16 @@ async function scenarioImpl(
       return runTelegramSenderAdapter();
     case "reject-command-parse":
       return runRejectCommandParse();
+    case "image-reject-command-parse":
+      return runImageRejectCommandParse();
     case "reject-scope-type-matrix":
       return runRejectScopeTypeMatrix();
     case "reject-success-requeues":
       return runRejectSuccessRequeues(dir);
+    case "image-reject-success-requeues":
+      return runImageRejectSuccessRequeues(dir);
+    case "image-reject-text-combo-invalid":
+      return runImageRejectTextComboInvalid(dir);
     case "reject-zh-rewinds-translate":
       return runRejectZhRewindsTranslate(dir);
     case "reject-invalid-combo":
@@ -466,6 +478,8 @@ async function scenarioImpl(
       return runApproveSourceValidation(dir);
     case "approve-success-publishes-bundle":
       return runApproveSuccessPublishesBundle(dir);
+    case "image-approve-deferred":
+      return runImageApproveDeferred(dir);
     case "approve-without-source-material-optional":
       return runApproveWithoutSourceMaterialOptional(dir);
     case "approve-missing-sources-json":
@@ -540,6 +554,8 @@ async function scenarioImpl(
       return runCommandLongPollStopClearsFuturePolls();
     case "bot-command-wiring":
       return runBotCommandWiring(dir);
+    case "reject-vocabulary-source-of-truth":
+      return runRejectVocabularySourceOfTruth();
     case "boundary-static-check":
       return runBoundaryStaticCheck();
     case "dependency-boundary-check":
@@ -880,6 +896,22 @@ function runRejectCommandParse(): string[] {
   ];
 }
 
+function runImageRejectCommandParse(): string[] {
+  const parsed = parseRejectCommand(
+    "  /reject img-demo 1 image:style_off   match the requested composition  ",
+  );
+  assert(parsed.ok, "image reject command did not parse");
+  assert(parsed.command.jobId === "img-demo", "image job ID was not parsed");
+  assert(parsed.command.attemptNumber === 1, "image attempt number was not parsed");
+  assert(parsed.command.scope === "image", "image scope was not parsed");
+  assert(parsed.command.rejectType === "style_off", "image reject type was not parsed");
+  assert(parsed.command.reason === "match the requested composition", "image reason was not trimmed");
+
+  return [
+    "Image /reject parses lexically with image:style_off and preserves the operator reason for modality validation after job lookup.",
+  ];
+}
+
 function runRejectScopeTypeMatrix(): string[] {
   const expectedValid = new Set([
     "en:factual_error",
@@ -899,16 +931,31 @@ function runRejectScopeTypeMatrix(): string[] {
     "bundle:other",
   ]);
 
-  for (const scope of rejectScopes) {
-    for (const rejectType of rejectTypes) {
+  for (const scope of REJECT_SCOPES) {
+    for (const rejectType of REJECT_TYPES) {
       const key = `${scope}:${rejectType}`;
       const actual = isValidRejectScopeType(scope, rejectType);
       assert(actual === expectedValid.has(key), `scope/type matrix mismatch for ${key}`);
     }
   }
 
+  const expectedImageValid = new Set([
+    "image:subject_off",
+    "image:style_off",
+    "image:composition_off",
+    "image:safety",
+  ]);
+  for (const scope of REJECT_SCOPES) {
+    for (const rejectType of REJECT_TYPES) {
+      const key = `${scope}:${rejectType}`;
+      const actual = isValidRejectScopeTypeForModality(Modality.IMAGE, scope, rejectType);
+      assert(actual === expectedImageValid.has(key), `image scope/type matrix mismatch for ${key}`);
+    }
+  }
+
   return [
-    "All 18 RejectScope x RejectType combinations matched the PLAN matrix.",
+    "All text RejectScope x RejectType combinations matched the PLAN matrix.",
+    "All image RejectScope x RejectType combinations matched the image-only reject matrix.",
   ];
 }
 
@@ -959,6 +1006,93 @@ async function runRejectSuccessRequeues(dir: string): Promise<string[]> {
     return [
       "Allowed /reject updated the existing job row to queued attempt+1, rewound to draft_en, stored reject fields, and cleared stale notification/summary/error fields.",
       "Exactly one rejected event was written for the old attempt and the reply matched the PLAN literal.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runImageRejectSuccessRequeues(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "img-reject-success", {
+      modality: "image",
+      locales: "en",
+      attempt_number: 2,
+      current_stage: "judge",
+      approval_summary: "image approval summary",
+      notified_at: 10,
+    });
+    const replies: string[] = [];
+
+    const result = await handleRejectCommand({
+      db,
+      text: "/reject img-reject-success 2 image:style_off needs tighter composition",
+      chatId: 123,
+      operatorChatIds: [123],
+      now: () => 1_910_000_000,
+      reply: captureReply(replies),
+    });
+
+    const job = requireJob(db, "img-reject-success");
+    const rejectedEvents = findEventsByJob(db, "img-reject-success", "rejected");
+    assert(result.status === "rejected", "image reject command did not report success");
+    assert(job.modality === "image", "image modality changed");
+    assert(job.attempt_number === 3, "image attempt was not incremented");
+    assert(job.status === "queued", "image job was not requeued");
+    assert(job.current_stage === "generate", "image reject did not rewind to generate");
+    assert(job.reject_scope === "image", "image reject_scope not stored");
+    assert(job.reject_type === "style_off", "image reject_type not stored");
+    assert(job.reject_reason === "needs tighter composition", "image reject_reason not stored");
+    assert(job.notified_at === null, "image notified_at was not cleared");
+    assert(job.approval_summary === null, "image approval_summary was not cleared");
+    assert(rejectedEvents.length === 1, "expected exactly one image rejected event");
+    assert(rejectedEvents[0]?.attempt_number === 2, "image event did not preserve old attempt");
+    assert(
+      replies[0] ===
+        "Rejected attempt 2. Run `bun run content:image-run img-reject-success` to start attempt 3 from generate.",
+      "image success reply was not exact",
+    );
+
+    return [
+      "Allowed image /reject requeued the image job at generate with attempt+1 and cleared stale notification/summary fields.",
+      "Image reject reply points operators to content:image-run and exactly one rejected event preserves the old attempt.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runImageRejectTextComboInvalid(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "img-reject-invalid", {
+      modality: "image",
+      locales: "en",
+      current_stage: "judge",
+    });
+    const replies: string[] = [];
+
+    const result = await handleRejectCommand({
+      db,
+      text: "/reject img-reject-invalid 1 bundle:voice_off internal voice leak",
+      chatId: 123,
+      operatorChatIds: [123],
+      now: () => 1_920_000_000,
+      reply: captureReply(replies),
+    });
+
+    const job = requireJob(db, "img-reject-invalid");
+    assert(result.status === "error", "image text-only combo was not an error");
+    assert(result.code === "INVALID_SCOPE_TYPE_COMBO", "wrong image invalid-combo error code");
+    assert(replies[0] === "INVALID_SCOPE_TYPE_COMBO: img-reject-invalid", "image invalid-combo reply changed");
+    assert(job.status === "awaiting_approval", "image invalid combo mutated status");
+    assert(job.current_stage === "judge", "image invalid combo mutated current_stage");
+    assert(job.attempt_number === 1, "image invalid combo mutated attempt");
+    assert(findEventsByJob(db, "img-reject-invalid").length === 0, "image invalid combo wrote event");
+
+    return [
+      "Image jobs reject text-only scope/type pairs after job lookup and leave DB/events untouched.",
     ];
   } finally {
     close();
@@ -1669,6 +1803,51 @@ async function runApproveSuccessPublishesBundle(dir: string): Promise<string[]> 
       "Allowed approve staged and atomically published reports, research, sources, and source-material into reports/2026-W47-ai-trends.",
       "DB row is published with preserved report metadata and exactly one promoted event carrying the authoritative publish_manifest with source-material/manifest.json.",
       "Only the approved attempt was cleaned up and fake git received a path-bounded plan.",
+    ];
+  } finally {
+    close();
+  }
+}
+
+async function runImageApproveDeferred(dir: string): Promise<string[]> {
+  const { db, close } = openScenarioDb(dir);
+  try {
+    seedAwaitingJob(db, "img-approve-deferred", {
+      modality: "image",
+      locales: "en",
+      current_stage: "judge",
+      run_dir: ".runs/img-approve-deferred",
+      approval_summary: "image ready for approval",
+    });
+    const before = stableJobSnapshot(requireJob(db, "img-approve-deferred"));
+    const replies: string[] = [];
+    let committerCalled = false;
+
+    const result = await handleApproveCommand({
+      db,
+      text: "/approve img-approve-deferred 1",
+      chatId: 123,
+      operatorChatIds: [123],
+      cwd: dir,
+      now: () => 9_510_000_000,
+      committer: () => {
+        committerCalled = true;
+      },
+      reply: captureReply(replies),
+    });
+
+    const after = stableJobSnapshot(requireJob(db, "img-approve-deferred"));
+    assert(result.status === "error", "image approve did not fail closed");
+    assert(result.code === "IMAGE_PUBLISH_NOT_IMPLEMENTED", "image approve returned wrong code");
+    assert(replies[0] === "IMAGE_PUBLISH_NOT_IMPLEMENTED: img-approve-deferred", "image approve reply changed");
+    assert(before === after, "image approve deferral mutated the job");
+    assert(!committerCalled, "image approve deferral called the git committer");
+    assert(findEventsByJob(db, "img-approve-deferred").length === 0, "image approve deferral wrote events");
+    assert(!existsSync(resolve(dir, "reports")), "image approve deferral touched report output");
+
+    return [
+      "Image /approve fails closed as IMAGE_PUBLISH_NOT_IMPLEMENTED with no DB/event/filesystem mutation.",
+      "Image approve deferral does not call promoteJob's committer path.",
     ];
   } finally {
     close();
@@ -3104,6 +3283,27 @@ async function runBotCommandWiring(dir: string): Promise<string[]> {
   }
 }
 
+function runRejectVocabularySourceOfTruth(): string[] {
+  const commandsSource = readSource("src/telegram/commands.ts");
+  const modalitySource = readSource("src/pipeline/modality.ts");
+
+  assert(!/\bconst\s+rejectScopes\b/.test(commandsSource), "commands.ts reintroduced local rejectScopes");
+  assert(!/\bconst\s+rejectTypes\b/.test(commandsSource), "commands.ts reintroduced local rejectTypes");
+  assert(!/\bconst\s+validScopeTypes\b/.test(commandsSource), "commands.ts reintroduced local validScopeTypes");
+  assert(!/\bfunction\s+isRejectScope\b/.test(commandsSource), "commands.ts reintroduced local isRejectScope");
+  assert(!/\bfunction\s+isRejectType\b/.test(commandsSource), "commands.ts reintroduced local isRejectType");
+  assert(/from\s+["']\.\.\/pipeline\/modality\.ts["']/.test(commandsSource), "commands.ts does not import modality vocabulary");
+  assert(/\bexport\s+const\s+REJECT_SCOPES\b/.test(modalitySource), "modality.ts does not export REJECT_SCOPES");
+  assert(/\bexport\s+const\s+REJECT_TYPES\b/.test(modalitySource), "modality.ts does not export REJECT_TYPES");
+  assert(/\bexport\s+const\s+VALID_REJECT_SCOPE_TYPES\b/.test(modalitySource), "modality.ts does not export VALID_REJECT_SCOPE_TYPES");
+  assert(/\bexport\s+function\s+isValidRejectScopeTypeForModality\b/.test(modalitySource), "modality.ts does not export modality validator");
+
+  return [
+    "commands.ts imports reject vocabulary from modality.ts and has no local reject scope/type/matrix truth.",
+    "modality.ts exports runtime reject vocabulary, modality-scoped matrix, and the shared validator.",
+  ];
+}
+
 function runBoundaryStaticCheck(): string[] {
   const changed = changedFilesAgainstBase();
   const scopeMode = assertCycleScopePolicy({
@@ -3201,7 +3401,7 @@ function runBoundaryStaticCheck(): string[] {
 
   return [
     `Cycle-scope boundary check ran in ${scopeMode} mode and saw changed files: ${changed.join(", ") || "<none>"}.`,
-    "Active Slice 4.28 scope admits only sources provenance validation, research prompt/rule, promote boundary, and smoke evidence files.",
+    "Active Slice 7a scope admits only modality reject vocabulary, Telegram command control, runtime-config parsing, and bot/report-run smoke evidence files.",
     "Synthetic Slice 4.12 report:create files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic Slice 4.13 report:remind files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic Slice 4.14 report:status files resolve to inherited-surface mode without a bot-smoke exemption.",
@@ -3321,6 +3521,7 @@ function seedAwaitingJob(
     week_key: patch.week_key ?? "2026-W18",
     topic: patch.topic ?? "Topic",
     locales: patch.locales ?? "en,zh",
+    modality: patch.modality ?? "text_report",
     attempt_number: patch.attempt_number ?? 1,
     status: patch.status ?? "awaiting_approval",
     current_stage: patch.current_stage ?? "approval",
@@ -3600,10 +3801,15 @@ function sourceSlice(source: string, startNeedle: string, endNeedle: string): st
 }
 
 function stripAllowedReportRunGuidance(source: string): string {
-  return source.replace(
-    /Run \\`bun run report:run \$\{command\.jobId\}\\`/g,
-    "Run <operator guidance>",
-  );
+  return source
+    .replace(
+      /Run \\`bun run report:run \$\{command\.jobId\}\\`/g,
+      "Run <operator guidance>",
+    )
+    .replace(
+      /modality === Modality\.IMAGE \? "content:image-run" : "report:run"/g,
+      "modality-run-guidance",
+    );
 }
 
 function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {

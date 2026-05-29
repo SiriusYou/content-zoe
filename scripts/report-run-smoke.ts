@@ -50,6 +50,7 @@ type ScenarioName =
   | "lifecycle-happy-path-db-audit"
   | "lifecycle-failure-db-audit"
   | "default-llm-provider-when-unset"
+  | "image-env-ignored-by-text-run"
   | "en-only-skip"
   | "stage-failure-mid-run"
   | "resume-after-failure"
@@ -94,6 +95,7 @@ const SCENARIOS: ScenarioName[] = [
   "lifecycle-happy-path-db-audit",
   "lifecycle-failure-db-audit",
   "default-llm-provider-when-unset",
+  "image-env-ignored-by-text-run",
   "en-only-skip",
   "stage-failure-mid-run",
   "resume-after-failure",
@@ -195,6 +197,8 @@ async function scenarioImpl(
       return runLifecycleFailureDbAudit(dir);
     case "default-llm-provider-when-unset":
       return runDefaultLlmProviderWhenUnset(dir);
+    case "image-env-ignored-by-text-run":
+      return runImageEnvIgnoredByTextRun(dir);
     case "en-only-skip":
       return runEnOnlySkip(dir);
     case "stage-failure-mid-run":
@@ -296,6 +300,34 @@ async function runDefaultLlmProviderWhenUnset(dir: string): Promise<string[]> {
   return [
     "CLI path ran with LLM_PROVIDER absent from the child environment.",
     "runtime-config defaulted to FakeProvider and emitted the fake-provider visibility log.",
+  ];
+}
+
+async function runImageEnvIgnoredByTextRun(dir: string): Promise<string[]> {
+  seedJobRow(dir, "image-env-ignored");
+  const result = runReportRunCli(
+    dir,
+    ["image-env-ignored", "--locales=en"],
+    {
+      llmProvider: "fake",
+      extraEnv: {
+        IMAGE_PROVIDER: "not-a-provider",
+        VISION_JUDGE_PROVIDER: "not-a-judge",
+        VISION_JUDGE_MODEL: "   ",
+      },
+    },
+  );
+  assert(result.exitCode === 0, `expected exit 0 with ignored image env, got ${result.exitCode}: ${result.stderr}`);
+  assert(
+    result.stderr.includes("[report-run] LLM_PROVIDER=fake"),
+    `expected fake-provider visibility log, got ${result.stderr}`,
+  );
+  const state = readState(dir, "image-env-ignored", 1);
+  assert(state.status === "awaiting_approval", `expected awaiting_approval, got ${state.status}`);
+  assert(state.lastStage === Stage.EDIT_EN, `expected en-only terminal edit_en, got ${state.lastStage}`);
+  return [
+    "Text report:run ignored invalid image-only IMAGE_PROVIDER, VISION_JUDGE_PROVIDER, and VISION_JUDGE_MODEL env values.",
+    "Existing text loadRuntimeConfig path still used LLM_PROVIDER=fake and completed an en-only run.",
   ];
 }
 
@@ -1623,7 +1655,7 @@ function providerOmitting(omitted: readonly Stage[]): FakeProvider {
 function runReportRunCli(
   cwd: string,
   args: string[],
-  options: { llmProvider?: "fake" | "unset" } = {},
+  options: { llmProvider?: "fake" | "unset"; extraEnv?: Record<string, string> } = {},
 ): { exitCode: number | null; stdout: string; stderr: string } {
   const env = { ...process.env };
   if (options.llmProvider === "unset") {
@@ -1631,6 +1663,7 @@ function runReportRunCli(
   } else {
     env.LLM_PROVIDER = "fake";
   }
+  Object.assign(env, options.extraEnv ?? {});
 
   const proc = Bun.spawnSync({
     cmd: ["bun", resolve(repoRoot, "src", "bin", "report-run.ts"), ...args],

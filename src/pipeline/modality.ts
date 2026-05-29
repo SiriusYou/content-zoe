@@ -21,7 +21,42 @@ export const IMAGE_STAGE = {
   JUDGE: "judge",
 } as const;
 
-export type RejectScope = "en" | "zh" | "bundle";
+export const REJECT_SCOPES = ["en", "zh", "bundle", "image"] as const;
+
+export const REJECT_TYPES = [
+  "factual_error",
+  "voice_off",
+  "structure",
+  "length_wrong",
+  "translation_off",
+  "other",
+  "subject_off",
+  "style_off",
+  "composition_off",
+  "safety",
+] as const;
+
+export type RejectScope = typeof REJECT_SCOPES[number];
+export type RejectType = typeof REJECT_TYPES[number];
+
+export const VALID_REJECT_SCOPE_TYPES: Readonly<
+  Record<Modality, Partial<Record<RejectType, readonly RejectScope[]>>>
+> = {
+  [Modality.TEXT_REPORT]: {
+    factual_error: ["en", "bundle"],
+    voice_off: ["en", "zh", "bundle"],
+    structure: ["en", "zh", "bundle"],
+    length_wrong: ["en", "zh", "bundle"],
+    translation_off: ["zh"],
+    other: ["en", "zh", "bundle"],
+  },
+  [Modality.IMAGE]: {
+    subject_off: ["image"],
+    style_off: ["image"],
+    composition_off: ["image"],
+    safety: ["image"],
+  },
+};
 
 export const IMAGE_MAX_REGEN_ROUNDS = 3;
 
@@ -112,6 +147,25 @@ export function getPipeline(modality: Modality | string): PipelineDef {
     throw new Error(`unknown modality: ${modality}`);
   }
   return PIPELINES[modality];
+}
+
+export function isRejectScope(value: string): value is RejectScope {
+  return (REJECT_SCOPES as readonly string[]).includes(value);
+}
+
+export function isRejectType(value: string): value is RejectType {
+  return (REJECT_TYPES as readonly string[]).includes(value);
+}
+
+export function isValidRejectScopeTypeForModality(
+  modality: Modality | string,
+  scope: RejectScope,
+  rejectType: RejectType,
+): boolean {
+  if (!hasOwn(VALID_REJECT_SCOPE_TYPES, modality)) {
+    return false;
+  }
+  return VALID_REJECT_SCOPE_TYPES[modality][rejectType]?.includes(scope) ?? false;
 }
 
 function hasOwn<T extends object>(object: T, key: PropertyKey): key is keyof T {

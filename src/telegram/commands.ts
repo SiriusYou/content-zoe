@@ -13,20 +13,22 @@ import {
   type PromoteJobHooks,
   type PromoteJobResult,
 } from "../promote.ts";
+import {
+  getPipeline,
+  isRejectScope,
+  isRejectType,
+  isValidRejectScopeTypeForModality,
+  Modality,
+  type RejectScope,
+  type RejectType,
+} from "../pipeline/modality.ts";
 
 export const APPROVE_COMMAND = "approve";
 export const REJECT_COMMAND = "reject";
 export const STATUS_COMMAND = "status";
 export const REJECT_REASON_MAX_CHARS = 500;
 
-export type RejectScope = "en" | "zh" | "bundle";
-export type RejectType =
-  | "factual_error"
-  | "voice_off"
-  | "structure"
-  | "length_wrong"
-  | "translation_off"
-  | "other";
+export type { RejectScope, RejectType };
 
 export type RejectCommandErrorCode =
   | "INVALID_COMMAND"
@@ -39,6 +41,7 @@ export type RejectCommandErrorCode =
 
 export type ApproveCommandErrorCode =
   | "INVALID_COMMAND"
+  | "IMAGE_PUBLISH_NOT_IMPLEMENTED"
   | "UNKNOWN_JOB"
   | "STALE_ATTEMPT"
   | "STATUS_MISMATCH"
@@ -185,24 +188,6 @@ const approveCommandPattern = /^\/approve(?:@\w+)?(?:\s+(\S+))?(?:\s+(\S+))?(?:\
 const rejectCommandPattern = /^\/reject(?:@\w+)?(?:\s+(\S+))?(?:\s+(\S+))?(?:\s+(\S+))?(?:\s+([\s\S]*))?$/;
 const statusCommandPattern = /^\/status(?:@\w+)?(?:\s+(\S+))?(?:\s+(\S+))?$/;
 const positiveIntegerPattern = /^\d+$/;
-const rejectScopes = ["en", "zh", "bundle"] as const;
-const rejectTypes = [
-  "factual_error",
-  "voice_off",
-  "structure",
-  "length_wrong",
-  "translation_off",
-  "other",
-] as const;
-
-const validScopeTypes: Readonly<Record<RejectType, readonly RejectScope[]>> = {
-  factual_error: ["en", "bundle"],
-  voice_off: ["en", "zh", "bundle"],
-  structure: ["en", "zh", "bundle"],
-  length_wrong: ["en", "zh", "bundle"],
-  translation_off: ["zh"],
-  other: ["en", "zh", "bundle"],
-};
 
 export function parseApproveCommand(text: string): ParseApproveCommandResult {
   const match = approveCommandPattern.exec(text.trim());
@@ -272,10 +257,6 @@ export function parseRejectCommand(text: string): ParseRejectCommandResult {
     !isRejectType(rawRejectType)
   ) {
     return { ok: false, code: "INVALID_COMMAND", jobId };
-  }
-
-  if (!isValidRejectScopeType(rawScope, rawRejectType)) {
-    return { ok: false, code: "INVALID_SCOPE_TYPE_COMBO", jobId };
   }
 
   const reason = rawReason?.trim() ?? "";
@@ -349,6 +330,20 @@ export async function handleApproveCommand(
       created_at: dependencies.now(),
     });
     return { status: "unauthorized_audited" };
+  }
+
+  const job = findJobById(dependencies.db, parsed.command.jobId);
+  if (job === null) {
+    return replyWithApproveError(dependencies, "UNKNOWN_JOB", parsed.command.jobId);
+  }
+  if (job.modality === Modality.IMAGE) {
+    if (job.attempt_number !== parsed.command.attemptNumber) {
+      return replyWithApproveError(dependencies, "STALE_ATTEMPT", parsed.command.jobId);
+    }
+    if (job.status !== awaitingApprovalStatus) {
+      return replyWithApproveError(dependencies, "STATUS_MISMATCH", parsed.command.jobId);
+    }
+    return replyWithApproveError(dependencies, "IMAGE_PUBLISH_NOT_IMPLEMENTED", parsed.command.jobId);
   }
 
   try {
@@ -425,7 +420,7 @@ export function isValidRejectScopeType(
   scope: RejectScope,
   rejectType: RejectType,
 ): boolean {
-  return validScopeTypes[rejectType].includes(scope);
+  return isValidRejectScopeTypeForModality(Modality.TEXT_REPORT, scope, rejectType);
 }
 
 export async function handleRejectCommand(
@@ -468,6 +463,16 @@ export async function handleRejectCommand(
     return replyWithError(dependencies, "UNKNOWN_JOB", parsed.command.jobId);
   }
 
+  if (
+    !isValidRejectScopeTypeForModality(
+      job.modality,
+      parsed.command.scope,
+      parsed.command.rejectType,
+    )
+  ) {
+    return replyWithError(dependencies, "INVALID_SCOPE_TYPE_COMBO", parsed.command.jobId);
+  }
+
   const preconditionError = rejectPreconditionError(job, parsed.command);
   if (preconditionError !== null) {
     return replyWithError(dependencies, preconditionError, parsed.command.jobId);
@@ -489,6 +494,7 @@ async function rejectWithTransaction(
     transactionOpen = true;
 
     const timestamp = dependencies.now();
+    const rewindStage = getPipeline(job.modality).rewindStageForReject(command.scope);
     insertEvent(dependencies.db, {
       job_id: command.jobId,
       attempt_number: command.attemptNumber,
@@ -511,7 +517,7 @@ async function rejectWithTransaction(
       {
         attempt_number: command.attemptNumber + 1,
         status: queuedStatus,
-        current_stage: rewindStageForScope(command.scope),
+        current_stage: rewindStage,
         reject_scope: command.scope,
         reject_type: command.rejectType,
         reject_reason: command.reason,
@@ -533,7 +539,7 @@ async function rejectWithTransaction(
     dependencies.db.exec("COMMIT");
     transactionOpen = false;
 
-    const replyText = rejectSuccessReply(command);
+    const replyText = rejectSuccessReply(command, job.modality);
     await dependencies.reply(replyText);
     return { status: "rejected", replyText };
   } catch (err) {
@@ -627,8 +633,13 @@ export function formatStatusErrorReply(
   return jobId === undefined ? code : `${code}: ${jobId}`;
 }
 
-export function rejectSuccessReply(command: ParsedRejectCommand): string {
-  return `Rejected attempt ${command.attemptNumber}. Run \`bun run report:run ${command.jobId}\` to start attempt ${command.attemptNumber + 1} from ${rewindStageForScope(command.scope)}.`;
+export function rejectSuccessReply(
+  command: ParsedRejectCommand,
+  modality: Modality | string = Modality.TEXT_REPORT,
+): string {
+  const rewindStage = rewindStageForScope(command.scope, modality);
+  const runCommand = modality === Modality.IMAGE ? "content:image-run" : "report:run";
+  return `Rejected attempt ${command.attemptNumber}. Run \`bun run ${runCommand} ${command.jobId}\` to start attempt ${command.attemptNumber + 1} from ${rewindStage}.`;
 }
 
 export function formatStatusReply(db: DbClient, job: Job): string {
@@ -671,8 +682,11 @@ export function approveSuccessReply(result: PromoteJobResult): string {
   return `Approved attempt ${result.attemptNumber}. Published ${result.jobId} to ${result.artifactDir}/.${notes.join("")}`;
 }
 
-export function rewindStageForScope(scope: RejectScope): "draft_en" | "translate_zh" {
-  return scope === "zh" ? "translate_zh" : "draft_en";
+export function rewindStageForScope(
+  scope: RejectScope,
+  modality: Modality | string = Modality.TEXT_REPORT,
+): string {
+  return getPipeline(modality).rewindStageForReject(scope);
 }
 
 function isAllowedChatId(
@@ -766,12 +780,4 @@ function readObject(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null
     ? value as Record<string, unknown>
     : null;
-}
-
-function isRejectScope(value: string): value is RejectScope {
-  return (rejectScopes as readonly string[]).includes(value);
-}
-
-function isRejectType(value: string): value is RejectType {
-  return (rejectTypes as readonly string[]).includes(value);
 }
