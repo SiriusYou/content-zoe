@@ -1,6 +1,6 @@
 # Vision Judge Fake Smoke
 
-Generated: 2026-05-30T14:18:47.432Z
+Generated: 2026-05-30T14:25:41.200Z
 
 | Scenario | Status | Details |
 | --- | --- | --- |
@@ -28,6 +28,7 @@ Generated: 2026-05-30T14:18:47.432Z
 | google-parses-string-wrapped-verdict | PASS | Google judge parses JSON-string-wrapped verdict text before strict validation. |
 | google-parses-deep-string-wrapped-verdict | PASS | Google judge unwraps repeated JSON-string verdict layers before strict validation. |
 | google-parses-single-array-wrapped-verdict | PASS | Google judge unwraps one-item verdict arrays before strict validation. |
+| google-parses-criteria-array-verdict | PASS | Google judge synthesizes JudgeVerdict from exact-id criterion arrays plus summary rows. |
 | google-safety-error | PASS | Google SAFETY finishReason maps to safety. |
 | google-parse-invalid-verdict | PASS | Google invalid JudgeVerdict maps to parse. |
 | google-rejects-relative-path | PASS | Google judge rejects relative image paths before fetch. |
@@ -38,5 +39,5 @@ Generated: 2026-05-30T14:18:47.432Z
 
 - Fake judge: explicit scripted queue, fail-then-pass sequencing, failure injection, relative-path rejection, deep-clone determinism.
 - OpenAI judge: chat-completions request shape, PNG data URL, fenced JSON parsing, timeout/http/parse/safety mappings, image-read pre-fetch failure, criterion-id exactness.
-- Google judge: Gemini alias request shape, stable-model fallback on unavailable model ids, string/array-wrapped JSON verdicts, safety/parse mappings, relative-path rejection.
+- Google judge: Gemini alias request shape, stable-model fallback on unavailable model ids, string/array-wrapped JSON verdicts, criterion-array verdict normalization, safety/parse mappings, relative-path rejection.
 - Static boundary: no OpenAI SDK dependency, no provider env reads, fake judge hermeticity, package script-only change, declared implementation file scope.

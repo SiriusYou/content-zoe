@@ -274,7 +274,10 @@ function parseJudgeResponse(text: string, spec: ImageSpec): JudgeVerdict {
 
   let contentJson: unknown;
   try {
-    contentJson = parseJsonMaybeWrapped(textPart.text);
+    contentJson = normalizeGoogleJudgeContent(
+      parseJsonMaybeWrapped(textPart.text),
+      spec,
+    );
   } catch (err) {
     throw new VisionJudgeError({
       code: "parse",
@@ -309,6 +312,101 @@ function parseJsonMaybeWrapped(text: string): unknown {
     return parsed[0];
   }
   return parsed;
+}
+
+function normalizeGoogleJudgeContent(value: unknown, spec: ImageSpec): unknown {
+  if (Array.isArray(value)) {
+    return normalizeCriterionArrayVerdict(value, spec) ?? value;
+  }
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const wrapped = value.verdict ?? value.judgeVerdict ?? value.result;
+  if (isRecord(wrapped)) {
+    return wrapped;
+  }
+  return value;
+}
+
+function normalizeCriterionArrayVerdict(
+  value: readonly unknown[],
+  spec: ImageSpec,
+): JudgeVerdict | undefined {
+  const expected = new Set(spec.acceptanceCriteria.map((criterion) => criterion.id));
+  const criteria: JudgeVerdict["criteria"] = [];
+  const seen = new Set<string>();
+  let summaryOverallPass: boolean | undefined;
+  let regenerateFeedback: string | undefined;
+
+  for (const entry of value) {
+    if (!isRecord(entry)) {
+      continue;
+    }
+    if (typeof entry.overallPass === "boolean") {
+      summaryOverallPass = entry.overallPass;
+    }
+    const feedback = parseOptionalString(entry.regenerateFeedback ?? entry.feedback);
+    if (feedback !== undefined) {
+      regenerateFeedback = feedback;
+    }
+
+    const id = parseOptionalString(entry.id ?? entry.criterionId ?? entry.criterion_id);
+    if (id === undefined || !expected.has(id) || seen.has(id)) {
+      continue;
+    }
+
+    const pass = entry.pass ?? entry.passed;
+    const rationale = parseOptionalString(
+      entry.rationale ?? entry.reason ?? entry.explanation,
+    );
+    if (typeof pass !== "boolean" || rationale === undefined) {
+      return undefined;
+    }
+
+    const criterion: JudgeVerdict["criteria"][number] = { id, pass, rationale };
+    if (entry.score !== undefined) {
+      if (typeof entry.score !== "number" || !Number.isFinite(entry.score)) {
+        return undefined;
+      }
+      criterion.score = entry.score;
+    }
+    criteria.push(criterion);
+    seen.add(id);
+  }
+
+  if (criteria.length !== expected.size) {
+    return undefined;
+  }
+
+  const overallPass =
+    summaryOverallPass ?? criteria.every((criterion) => criterion.pass);
+  if (overallPass) {
+    return { overallPass, criteria };
+  }
+
+  return {
+    overallPass,
+    criteria,
+    regenerateFeedback:
+      regenerateFeedback ??
+      `Fix failed criteria: ${criteria
+        .filter((criterion) => !criterion.pass)
+        .map((criterion) => `${criterion.id}: ${criterion.rationale}`)
+        .join("; ")}`,
+  };
+}
+
+function parseOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function describeJsonShape(value: unknown): string {
