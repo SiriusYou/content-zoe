@@ -51,6 +51,7 @@ interface GoogleGeneratePayload {
 
 const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const bodyTailMaxChars = 500;
+const stableVisionJudgeFallbackModels = ["gemini-2.5-pro", "gemini-2.5-flash"] as const;
 
 export class GoogleVisionJudge implements VisionJudge {
   readonly name = "google-vision-judge";
@@ -109,53 +110,63 @@ export class GoogleVisionJudge implements VisionJudge {
     });
 
     const operationPromise = (async () => {
-      let response: GoogleVisionResponse;
-      try {
-        response = await this.fetchImpl(this.endpoint(), {
-          method: "POST",
-          headers: {
-            "x-goog-api-key": this.apiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(this.buildRequestBody(spec, imageBytes)),
-          signal: controller.signal,
-        });
-      } catch (err) {
-        if (timeoutReached || isAbortError(err)) {
-          throw timeoutError;
+      let lastUnavailableError: VisionJudgeError | undefined;
+      for (const model of this.modelCandidates()) {
+        let response: GoogleVisionResponse;
+        try {
+          response = await this.fetchImpl(this.endpoint(model), {
+            method: "POST",
+            headers: {
+              "x-goog-api-key": this.apiKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(this.buildRequestBody(spec, imageBytes)),
+            signal: controller.signal,
+          });
+        } catch (err) {
+          if (timeoutReached || isAbortError(err)) {
+            throw timeoutError;
+          }
+          throw new VisionJudgeError({
+            code: "http",
+            message: `Google vision judge request failed before response: ${formatThrown(err)}`,
+            cause: err,
+          });
         }
-        throw new VisionJudgeError({
-          code: "http",
-          message: `Google vision judge request failed before response: ${formatThrown(err)}`,
-          cause: err,
-        });
-      }
 
-      let text: string;
-      try {
-        text = await response.text();
-      } catch (err) {
-        if (timeoutReached || isAbortError(err)) {
-          throw timeoutError;
+        let text: string;
+        try {
+          text = await response.text();
+        } catch (err) {
+          if (timeoutReached || isAbortError(err)) {
+            throw timeoutError;
+          }
+          if (!response.ok) {
+            throw httpResponseError(
+              response,
+              `unreadable response body: ${formatThrown(err)}`,
+              { classifySafety: false },
+            );
+          }
+          throw new VisionJudgeError({
+            code: "parse",
+            message: `Google vision judge response body was unreadable: ${formatThrown(err)}`,
+            cause: err,
+          });
         }
-        if (!response.ok) {
-          throw httpResponseError(
-            response,
-            `unreadable response body: ${formatThrown(err)}`,
-            { classifySafety: false },
-          );
-        }
-        throw new VisionJudgeError({
-          code: "parse",
-          message: `Google vision judge response body was unreadable: ${formatThrown(err)}`,
-          cause: err,
-        });
-      }
 
-      if (!response.ok) {
-        throw httpResponseError(response, text);
+        if (response.ok) {
+          return text;
+        }
+
+        const error = httpResponseError(response, text);
+        if (isModelUnavailable(response, text)) {
+          lastUnavailableError = error;
+          continue;
+        }
+        throw error;
       }
-      return text;
+      throw lastUnavailableError;
     })();
 
     let timer!: ReturnType<typeof setTimeout>;
@@ -174,8 +185,15 @@ export class GoogleVisionJudge implements VisionJudge {
     }
   }
 
-  private endpoint(): string {
-    return `${this.baseUrl}/${encodeURIComponent(this.model)}:generateContent`;
+  private endpoint(model: string): string {
+    return `${this.baseUrl}/${encodeURIComponent(model)}:generateContent`;
+  }
+
+  private modelCandidates(): string[] {
+    return [
+      this.model,
+      ...stableVisionJudgeFallbackModels.filter((model) => model !== this.model),
+    ];
   }
 
   private buildRequestBody(
@@ -201,6 +219,13 @@ export class GoogleVisionJudge implements VisionJudge {
       },
     };
   }
+}
+
+function isModelUnavailable(response: GoogleVisionResponse, body: string): boolean {
+  return (
+    response.status === 404 &&
+    /(not found|no longer available|not supported for generateContent)/i.test(body)
+  );
 }
 
 export function normalizeGoogleVisionModel(model: string): string {

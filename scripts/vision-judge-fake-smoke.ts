@@ -48,6 +48,7 @@ type ScenarioName =
   | "openai-parse-criteria-id-mismatch"
   | "openai-rejects-relative-path"
   | "google-builds-vision-request"
+  | "google-model-unavailable-fallback"
   | "google-safety-error"
   | "google-parse-invalid-verdict"
   | "google-rejects-relative-path"
@@ -89,6 +90,7 @@ const SCENARIOS: readonly ScenarioName[] = [
   "openai-parse-criteria-id-mismatch",
   "openai-rejects-relative-path",
   "google-builds-vision-request",
+  "google-model-unavailable-fallback",
   "google-safety-error",
   "google-parse-invalid-verdict",
   "google-rejects-relative-path",
@@ -211,6 +213,8 @@ async function scenarioImpl(
       return openaiRejectsRelativePath();
     case "google-builds-vision-request":
       return googleBuildsVisionRequest(runDir);
+    case "google-model-unavailable-fallback":
+      return googleModelUnavailableFallback(runDir);
     case "google-safety-error":
       return googleSafetyError(runDir);
     case "google-parse-invalid-verdict":
@@ -685,6 +689,51 @@ async function googleBuildsVisionRequest(runDir: string): Promise<string[]> {
     assert(prompt.includes(value), `prompt should include ${value}`);
   }
   return ["Google judge mapped Gemini 3.1 Pro alias to gemini-3-pro-preview and built a JSON request with PNG inline data."];
+}
+
+async function googleModelUnavailableFallback(runDir: string): Promise<string[]> {
+  const spec = validSpec();
+  const imagePath = writeImage(runDir, "google-fallback.png");
+  const requests: CapturedRequest[] = [];
+  const fetchImpl: OpenAIVisionFetch = async (url, init) => {
+    requests.push({
+      url,
+      init,
+      body: JSON.parse(String(init.body ?? "{}")) as Record<string, unknown>,
+    });
+    if (requests.length === 1) {
+      return jsonResponse(
+        {
+          error: {
+            code: 404,
+            message: "This model models/gemini-3-pro-preview is no longer available.",
+            status: "NOT_FOUND",
+          },
+        },
+        404,
+      );
+    }
+    return googleGenerateResponse(passingVerdict());
+  };
+  const judge = new GoogleVisionJudge({
+    apiKey: "google-key",
+    model: "gemini3.1-pro",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/models",
+    fetchImpl,
+  });
+
+  const verdict = await judge.judge(imagePath, spec, 1_000);
+  assert(verdict.overallPass, "expected fallback verdict to pass");
+  assert(requests.length === 2, "expected one unavailable request plus one fallback request");
+  assert(
+    requests[0].url.endsWith("/gemini-3-pro-preview:generateContent"),
+    `unexpected primary URL: ${requests[0].url}`,
+  );
+  assert(
+    requests[1].url.endsWith("/gemini-2.5-pro:generateContent"),
+    `unexpected fallback URL: ${requests[1].url}`,
+  );
+  return ["Google judge falls back from unavailable Gemini 3 alias to stable gemini-2.5-pro."];
 }
 
 async function googleSafetyError(runDir: string): Promise<string[]> {
@@ -1174,6 +1223,7 @@ function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {
     "",
     "- Fake judge: explicit scripted queue, fail-then-pass sequencing, failure injection, relative-path rejection, deep-clone determinism.",
     "- OpenAI judge: chat-completions request shape, PNG data URL, fenced JSON parsing, timeout/http/parse/safety mappings, image-read pre-fetch failure, criterion-id exactness.",
+    "- Google judge: Gemini alias request shape, stable-model fallback on unavailable model ids, safety/parse mappings, relative-path rejection.",
     "- Static boundary: no OpenAI SDK dependency, no provider env reads, fake judge hermeticity, package script-only change, declared implementation file scope.",
   );
 
