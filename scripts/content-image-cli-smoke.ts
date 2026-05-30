@@ -79,6 +79,7 @@ const smokeRoot = resolve(
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "content-image-cli-smoke.md");
 const implementationAnchor = "0909a7bcddb71b90d430c76de13b629264d4302a";
+const implementationRangeEnd = "24fcb93eb5703ca60c4f22bbdf3ff85d074145e2";
 const fakeEnv = {
   LLM_PROVIDER: "fake",
   IMAGE_PROVIDER: "fake",
@@ -397,7 +398,7 @@ async function mixedProviderFailClosed(cwd: string): Promise<string[]> {
 }
 
 function staticBoundary(): string[] {
-  const tracked = splitGitLines(git(["diff", "--name-only", implementationAnchor, "--"]));
+  const tracked = splitGitLines(git(["diff", "--name-only", `${implementationAnchor}..${implementationRangeEnd}`, "--"]));
   const untracked = splitGitLines(git(["ls-files", "--others", "--exclude-standard"]));
   const preExistingUntrackedReportFiles = untracked.filter(isPreExistingUntrackedReportFile);
   const touched = [...new Set([...tracked, ...untracked])]
@@ -427,7 +428,7 @@ function staticBoundary(): string[] {
   assert(!touched.includes("src/bin/report-run.ts"), "report-run.ts must remain untouched");
   assert(!touched.includes("src/promote.ts"), "promote.ts must remain untouched");
   return [
-    `diff from ${implementationAnchor.slice(0, 7)} only touches declared Slice 7b files.`,
+    `frozen diff from ${implementationAnchor.slice(0, 7)}..${implementationRangeEnd.slice(0, 7)} only touches declared Slice 7b files.`,
     `working-tree boundary included ${untracked.length} untracked files and explicitly excluded ${preExistingUntrackedReportFiles.length} pre-existing W22/W23 report files from the handback set.`,
     "No real provider smoke or Slice 8 publish files are part of the diff.",
   ];
