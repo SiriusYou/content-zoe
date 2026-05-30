@@ -447,7 +447,36 @@ function googleProviderPlan(): string[] {
 }
 
 async function runningErrorRetryNormalizesSpec(cwd: string): Promise<string[]> {
-  const jobId = "img-running-error-retry";
+  const errorRunDir = await runRecoverableFailureRetry(cwd, {
+    jobId: "img-running-error-retry",
+    status: "error",
+    error: "runStage internal: subject must be a string",
+  });
+  const manifestRunDir = await runRecoverableFailureRetry(cwd, {
+    jobId: "img-running-manifest-retry",
+    status: "manifest_invalid",
+    error: "manifest image is not png: image.png",
+  });
+  assert(existsSync(resolve(errorRunDir, "image.png")), "error retry should generate image.png");
+  assert(
+    existsSync(resolve(manifestRunDir, "image.png")),
+    "manifest_invalid retry should generate image.png",
+  );
+  return [
+    "Errored and manifest-invalid running image attempts retried the same stage explicitly.",
+    "Loose object-shaped spec fields were canonicalized before generation.",
+  ];
+}
+
+async function runRecoverableFailureRetry(
+  cwd: string,
+  opts: {
+    readonly jobId: string;
+    readonly status: "error" | "manifest_invalid";
+    readonly error: string;
+  },
+): Promise<string> {
+  const { jobId } = opts;
   const runDir = seedDirectImageJob(cwd, jobId);
   writeFileSync(
     resolve(runDir, "spec.json"),
@@ -461,9 +490,9 @@ async function runningErrorRetryNormalizesSpec(cwd: string): Promise<string[]> {
         jobId,
         attemptNumber: 1,
         lastStage: IMAGE_STAGE.GENERATE,
-        status: "error",
+        status: opts.status,
         startedAt: "2027-01-01T00:00:00.000Z",
-        error: "runStage internal: subject must be a string",
+        error: opts.error,
         finishedAt: "2027-01-01T00:00:01.000Z",
       },
       null,
@@ -484,7 +513,7 @@ async function runningErrorRetryNormalizesSpec(cwd: string): Promise<string[]> {
   const run = await runImageCli(cwd, jobId);
   assert(run.code === 0, `expected retry exit 0, got ${run.code}: ${run.stderr}`);
   assert(
-    run.stderr.includes("retrying errored running attempt-1 from generate"),
+    run.stderr.includes(`retrying failed running attempt-1 from generate (${opts.status})`),
     "retry should be explicit in stderr",
   );
   const spec = parseImageSpec(JSON.parse(readFileSync(resolve(runDir, "spec.json"), "utf8")));
@@ -504,10 +533,7 @@ async function runningErrorRetryNormalizesSpec(cwd: string): Promise<string[]> {
   assert(existsSync(resolve(runDir, "image.png")), "retry should generate image.png");
   const job = snapshotJob(cwd, jobId);
   assert(job.includes('"status":"awaiting_approval"'), "retry should reach awaiting_approval");
-  return [
-    "Errored running image attempt retried the same stage explicitly.",
-    "Loose object-shaped spec fields were canonicalized before generation.",
-  ];
+  return runDir;
 }
 
 function staticBoundary(): string[] {

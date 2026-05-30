@@ -160,9 +160,10 @@ export async function runContentImageRunCli(
       writeStderr("[content-image-run] already complete: awaiting_approval\n");
       return 0;
     }
-    if (job.status === "running" && isRecoverableErroredImageAttempt(cwd, job)) {
+    const failedAttempt = recoverableFailedImageAttempt(cwd, job);
+    if (job.status === "running" && failedAttempt) {
       writeStderr(
-        `[content-image-run] retrying errored running attempt-${job.attempt_number} from ${job.current_stage}\n`,
+        `[content-image-run] retrying failed running attempt-${job.attempt_number} from ${job.current_stage} (${failedAttempt.status})\n`,
       );
     } else if (job.status !== "queued") {
       throw new ContentImageRunError(
@@ -717,7 +718,10 @@ function validateImageStartStage(stage: string): void {
   throw new ContentImageRunError("INVALID_STAGE", `INVALID_STAGE: ${stage}`);
 }
 
-function isRecoverableErroredImageAttempt(cwd: string, job: Job): boolean {
+function recoverableFailedImageAttempt(
+  cwd: string,
+  job: Job,
+): { status: "error" | "manifest_invalid" } | undefined {
   validateImageStartStage(job.current_stage);
   const statePath = resolve(
     cwd,
@@ -730,18 +734,25 @@ function isRecoverableErroredImageAttempt(cwd: string, job: Job): boolean {
   try {
     state = JSON.parse(readFileSync(statePath, "utf8"));
   } catch {
-    return false;
+    return undefined;
   }
   if (typeof state !== "object" || state === null || Array.isArray(state)) {
-    return false;
+    return undefined;
   }
   const record = state as Record<string, unknown>;
-  return (
-    record.status === "error" &&
+  const status =
+    record.status === "error" || record.status === "manifest_invalid"
+      ? record.status
+      : undefined;
+  if (!status) return undefined;
+  if (
     record.jobId === job.id &&
     record.attemptNumber === job.attempt_number &&
     record.lastStage === job.current_stage
-  );
+  ) {
+    return { status };
+  }
+  return undefined;
 }
 
 function parseLlmProvider(value: string | undefined): LLMProviderName {

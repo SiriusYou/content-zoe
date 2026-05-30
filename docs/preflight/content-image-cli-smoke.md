@@ -1,6 +1,6 @@
 # content-image-cli-smoke
 
-Generated: 2026-05-30T13:20:21.995Z
+Generated: 2026-05-30T13:47:01.868Z
 
 Result: 12/12 PASS
 
@@ -16,5 +16,5 @@ Result: 12/12 PASS
 | resume-no-mutation | PASS | --resume returns IMAGE_RESUME_NOT_IMPLEMENTED with no DB, attempt, or provider side effects. |
 | mixed-provider-fail-closed | PASS | mixed fake/real provider mode fails before provider construction or stage execution. |
 | google-provider-plan | PASS | Google primary plus explicit OpenAI fallback parses, while non-OpenAI fallback fails closed. |
-| running-error-retry-normalizes-spec | PASS | Errored running image attempt retried the same stage explicitly.<br>Loose object-shaped spec fields were canonicalized before generation. |
+| running-error-retry-normalizes-spec | PASS | Errored and manifest-invalid running image attempts retried the same stage explicitly.<br>Loose object-shaped spec fields were canonicalized before generation. |
 | static-boundary | PASS | frozen diff from 0909a7b..24fcb93 only touches declared Slice 7b files.<br>working-tree boundary saw 22 untracked files and explicitly verified only the pre-existing W22/W23 report dirs are untracked reports.<br>No real provider smoke or Slice 8 publish files are part of the diff. |
