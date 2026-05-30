@@ -36,6 +36,7 @@ import {
 import { runReportLoop } from "../src/lib/report-loop.ts";
 import { notifyPendingApprovals } from "../src/telegram/notifier.ts";
 import { IMAGE_MAX_REGEN_ROUNDS, IMAGE_STAGE, Modality } from "../src/pipeline/modality.ts";
+import { parseImageSpec } from "../src/pipeline/image/spec.ts";
 
 type ScenarioName =
   | "create-deterministic"
@@ -48,6 +49,7 @@ type ScenarioName =
   | "resume-no-mutation"
   | "mixed-provider-fail-closed"
   | "google-provider-plan"
+  | "running-error-retry-normalizes-spec"
   | "static-boundary";
 
 interface ScenarioOutcome {
@@ -69,6 +71,7 @@ const SCENARIOS: readonly ScenarioName[] = [
   "resume-no-mutation",
   "mixed-provider-fail-closed",
   "google-provider-plan",
+  "running-error-retry-normalizes-spec",
   "static-boundary",
 ];
 
@@ -161,6 +164,8 @@ async function scenarioImpl(
       return mixedProviderFailClosed(cwd);
     case "google-provider-plan":
       return googleProviderPlan();
+    case "running-error-retry-normalizes-spec":
+      return runningErrorRetryNormalizesSpec(cwd);
     case "static-boundary":
       return staticBoundary();
   }
@@ -441,6 +446,70 @@ function googleProviderPlan(): string[] {
   return ["Google primary plus explicit OpenAI fallback parses, while non-OpenAI fallback fails closed."];
 }
 
+async function runningErrorRetryNormalizesSpec(cwd: string): Promise<string[]> {
+  const jobId = "img-running-error-retry";
+  const runDir = seedDirectImageJob(cwd, jobId);
+  writeFileSync(
+    resolve(runDir, "spec.json"),
+    `${JSON.stringify(looseImageSpecDraft(), null, 2)}\n`,
+  );
+  writeFileSync(
+    resolve(runDir, "run-state.json"),
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        jobId,
+        attemptNumber: 1,
+        lastStage: IMAGE_STAGE.GENERATE,
+        status: "error",
+        startedAt: "2027-01-01T00:00:00.000Z",
+        error: "runStage internal: subject must be a string",
+        finishedAt: "2027-01-01T00:00:01.000Z",
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const db = openDb(resolve(cwd, ".data", "content.db"));
+  try {
+    updateJob(db, jobId, {
+      status: "running",
+      current_stage: IMAGE_STAGE.GENERATE,
+      updated_at: 1_800_000_001,
+    });
+  } finally {
+    db.close();
+  }
+
+  const run = await runImageCli(cwd, jobId);
+  assert(run.code === 0, `expected retry exit 0, got ${run.code}: ${run.stderr}`);
+  assert(
+    run.stderr.includes("retrying errored running attempt-1 from generate"),
+    "retry should be explicit in stderr",
+  );
+  const spec = parseImageSpec(JSON.parse(readFileSync(resolve(runDir, "spec.json"), "utf8")));
+  assert(
+    spec.subject.includes("scene: operations dashboard"),
+    "subject should be normalized from draft object",
+  );
+  assert(spec.palette.includes("#0F2742"), "palette should collect nested draft strings");
+  assert(
+    spec.negativeConstraints.includes("no patient data"),
+    "negativeConstraints should normalize draft object",
+  );
+  assert(
+    spec.safetyProfile.includes("risk: low"),
+    "safetyProfile should be normalized from draft object",
+  );
+  assert(existsSync(resolve(runDir, "image.png")), "retry should generate image.png");
+  const job = snapshotJob(cwd, jobId);
+  assert(job.includes('"status":"awaiting_approval"'), "retry should reach awaiting_approval");
+  return [
+    "Errored running image attempt retried the same stage explicitly.",
+    "Loose object-shaped spec fields were canonicalized before generation.",
+  ];
+}
+
 function staticBoundary(): string[] {
   const tracked = splitGitLines(git(["diff", "--name-only", `${implementationAnchor}..${implementationRangeEnd}`, "--"]));
   const untracked = splitGitLines(git(["ls-files", "--others", "--exclude-standard"]));
@@ -503,6 +572,49 @@ function assertThrowsProviderConfig(fn: () => unknown): void {
     return;
   }
   throw new Error("expected provider config failure");
+}
+
+function looseImageSpecDraft(): unknown {
+  return {
+    promptOriginal: "show a healthcare AI governance dashboard",
+    subject: {
+      scene: "operations dashboard",
+      panels: ["model ownership", "review queue", "approval gate"],
+    },
+    style: {
+      mode: "premium dashboard illustration",
+      mood: "calm",
+    },
+    composition: {
+      layout: "wide dashboard",
+      hierarchy: ["overview", "exceptions", "approval"],
+    },
+    palette: {
+      primaryColors: ["#0F2742", "#1E4E79"],
+      accentColors: ["#3FA7A3"],
+      usage: "amber only for exceptions",
+    },
+    dimensions: { w: 1024, h: 1024 },
+    negativeConstraints: {
+      privacy: ["no patient data", "no brand logos"],
+    },
+    safetyProfile: {
+      category: "benign governance image",
+      risk: "low",
+    },
+    acceptanceCriteria: [
+      {
+        id: "subject-visible",
+        description: "The dashboard is the dominant subject.",
+        tier: "judged",
+      },
+      {
+        id: "no-identifiers",
+        description: "No patient-identifying data is visible.",
+        tier: "mechanical",
+      },
+    ],
+  };
 }
 
 function createJob(cwd: string, key: string, prompt: string): string {

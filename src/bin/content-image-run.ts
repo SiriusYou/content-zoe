@@ -2,6 +2,7 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   realpathSync,
   statSync,
@@ -159,7 +160,11 @@ export async function runContentImageRunCli(
       writeStderr("[content-image-run] already complete: awaiting_approval\n");
       return 0;
     }
-    if (job.status !== "queued") {
+    if (job.status === "running" && isRecoverableErroredImageAttempt(cwd, job)) {
+      writeStderr(
+        `[content-image-run] retrying errored running attempt-${job.attempt_number} from ${job.current_stage}\n`,
+      );
+    } else if (job.status !== "queued") {
       throw new ContentImageRunError(
         "STATUS_MISMATCH",
         `STATUS_MISMATCH: expected queued or awaiting_approval, got ${job.status}`,
@@ -361,7 +366,10 @@ export function prepareImageRunAttempt(opts: {
       `INVALID_STAGE: ${opts.job.current_stage}`,
     );
   }
-  if (opts.job.current_stage !== IMAGE_STAGE.ELABORATE_SPEC) {
+  if (
+    opts.job.current_stage !== IMAGE_STAGE.ELABORATE_SPEC &&
+    !hasRequiredFiles(attemptDir, requiredFiles)
+  ) {
     carryForwardImageArtifacts({
       cwd,
       jobRoot,
@@ -678,6 +686,16 @@ function assertRequiredFiles(attemptDir: string, files: readonly string[]): void
   }
 }
 
+function hasRequiredFiles(attemptDir: string, files: readonly string[]): boolean {
+  return files.every((file) => {
+    try {
+      return statSync(resolve(attemptDir, file)).isFile();
+    } catch {
+      return false;
+    }
+  });
+}
+
 function assertRegularFile(filePath: string, message: string): void {
   try {
     const stat = statSync(filePath);
@@ -697,6 +715,33 @@ function validateImageStartStage(stage: string): void {
     return;
   }
   throw new ContentImageRunError("INVALID_STAGE", `INVALID_STAGE: ${stage}`);
+}
+
+function isRecoverableErroredImageAttempt(cwd: string, job: Job): boolean {
+  validateImageStartStage(job.current_stage);
+  const statePath = resolve(
+    cwd,
+    RUN_DIR,
+    job.id,
+    `attempt-${job.attempt_number}`,
+    "run-state.json",
+  );
+  let state: unknown;
+  try {
+    state = JSON.parse(readFileSync(statePath, "utf8"));
+  } catch {
+    return false;
+  }
+  if (typeof state !== "object" || state === null || Array.isArray(state)) {
+    return false;
+  }
+  const record = state as Record<string, unknown>;
+  return (
+    record.status === "error" &&
+    record.jobId === job.id &&
+    record.attemptNumber === job.attempt_number &&
+    record.lastStage === job.current_stage
+  );
 }
 
 function parseLlmProvider(value: string | undefined): LLMProviderName {

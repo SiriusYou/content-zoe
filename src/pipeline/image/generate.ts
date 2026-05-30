@@ -1,9 +1,9 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import type { ImageProvider } from "../../llm/image-provider.ts";
 import type { ManifestRule, StageDef } from "../types.ts";
-import { parseImageSpec } from "./spec.ts";
+import { normalizeImageSpecDraft } from "./spec.ts";
 import { parseJudgeVerdict } from "./verdict.ts";
 
 export function makeGenerateStage(imageProvider: ImageProvider): StageDef {
@@ -26,9 +26,11 @@ export function makeGenerateStage(imageProvider: ImageProvider): StageDef {
       ],
     },
     run: async (context) => {
-      const spec = parseImageSpec(
-        JSON.parse(readFileSync(path.resolve(context.runDir, "spec.json"), "utf8")),
+      const specPath = path.resolve(context.runDir, "spec.json");
+      const spec = normalizeImageSpecDraft(
+        JSON.parse(readFileSync(specPath, "utf8")),
       );
+      writeFileSync(specPath, `${JSON.stringify(spec, null, 2)}\n`);
       dimensionRule.width = spec.dimensions.w;
       dimensionRule.height = spec.dimensions.h;
 

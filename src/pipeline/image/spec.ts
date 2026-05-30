@@ -48,6 +48,22 @@ export function parseImageSpec(json: unknown): ImageSpec {
   };
 }
 
+export function normalizeImageSpecDraft(json: unknown): ImageSpec {
+  const spec = expectRecord(json, "spec");
+  return parseImageSpec({
+    ...spec,
+    subject: normalizeStringField(spec.subject, "subject"),
+    style: normalizeStringField(spec.style, "style"),
+    composition: normalizeStringField(spec.composition, "composition"),
+    palette: normalizePalette(spec.palette),
+    negativeConstraints: normalizeStringArrayField(
+      spec.negativeConstraints,
+      "negativeConstraints",
+    ),
+    safetyProfile: normalizeStringField(spec.safetyProfile, "safetyProfile"),
+  });
+}
+
 function expectRecord(value: unknown, field: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new ImageSpecParseError(`${field} must be an object`);
@@ -73,6 +89,68 @@ function parseStringArray(value: unknown, field: string): string[] {
   return value.map((entry, index) =>
     parseNonEmptyString(entry, `${field}[${index}]`),
   );
+}
+
+function normalizeStringField(value: unknown, field: string): string {
+  if (typeof value === "string") return value;
+  const normalized = stringifyDraftValue(value);
+  if (normalized.length === 0) {
+    throw new ImageSpecParseError(`${field} could not be normalized to a string`);
+  }
+  return normalized;
+}
+
+function normalizePalette(value: unknown): string[] {
+  return normalizeStringArrayField(value, "palette");
+}
+
+function normalizeStringArrayField(value: unknown, field: string): string[] {
+  if (Array.isArray(value)) return value as string[];
+  const entries = collectDraftStrings(value);
+  if (entries.length === 0) {
+    throw new ImageSpecParseError(`${field} could not be normalized to an array`);
+  }
+  return entries;
+}
+
+function stringifyDraftValue(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    return value
+      .map(stringifyDraftValue)
+      .filter(Boolean)
+      .join("; ");
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, entry]) => {
+        const normalized = stringifyDraftValue(entry);
+        return normalized.length > 0 ? `${key}: ${normalized}` : "";
+      })
+      .filter(Boolean)
+      .join("; ");
+  }
+  return "";
+}
+
+function collectDraftStrings(value: unknown): string[] {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? [trimmed] : [];
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return [String(value)];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap(collectDraftStrings);
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.values(value as Record<string, unknown>).flatMap(
+      collectDraftStrings,
+    );
+  }
+  return [];
 }
 
 function parseDimensions(value: unknown): { w: number; h: number } {
