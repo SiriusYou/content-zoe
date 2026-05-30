@@ -326,6 +326,20 @@ function normalizeGoogleJudgeContent(value: unknown, spec: ImageSpec): unknown {
   if (isRecord(wrapped)) {
     return wrapped;
   }
+  if (Array.isArray(wrapped)) {
+    return normalizeCriterionArrayVerdict(wrapped, spec) ?? value;
+  }
+  if (Array.isArray(value.criteria) && typeof value.overallPass !== "boolean") {
+    const normalized = normalizeCriterionArrayVerdict(value.criteria, spec);
+    if (normalized !== undefined) {
+      return {
+        ...normalized,
+        regenerateFeedback:
+          parseOptionalString(value.regenerateFeedback ?? value.feedback) ??
+          normalized.regenerateFeedback,
+      };
+    }
+  }
   return value;
 }
 
@@ -333,38 +347,62 @@ function normalizeCriterionArrayVerdict(
   value: readonly unknown[],
   spec: ImageSpec,
 ): JudgeVerdict | undefined {
-  const expected = new Set(spec.acceptanceCriteria.map((criterion) => criterion.id));
+  const expectedIds = spec.acceptanceCriteria.map((criterion) => criterion.id);
+  const expected = new Set(expectedIds);
   const criteria: JudgeVerdict["criteria"] = [];
   const seen = new Set<string>();
   let summaryOverallPass: boolean | undefined;
   let regenerateFeedback: string | undefined;
 
-  for (const entry of value) {
+  for (const [index, entry] of value.entries()) {
     if (!isRecord(entry)) {
       continue;
     }
-    if (typeof entry.overallPass === "boolean") {
-      summaryOverallPass = entry.overallPass;
+    const summaryPass = parseOptionalBoolean(entry.overallPass ?? entry.overall_pass);
+    if (summaryPass !== undefined) {
+      summaryOverallPass = summaryPass;
     }
     const feedback = parseOptionalString(entry.regenerateFeedback ?? entry.feedback);
     if (feedback !== undefined) {
       regenerateFeedback = feedback;
     }
 
-    const id = parseOptionalString(entry.id ?? entry.criterionId ?? entry.criterion_id);
+    const id =
+      parseCriterionId(entry, expected) ??
+      (value.length === expectedIds.length ? expectedIds[index] : undefined);
     if (id === undefined || !expected.has(id) || seen.has(id)) {
       continue;
     }
 
-    const pass = entry.pass ?? entry.passed;
-    const rationale = parseOptionalString(
-      entry.rationale ?? entry.reason ?? entry.explanation,
+    const pass = parseOptionalBoolean(
+      entry.pass ??
+        entry.passed ??
+        entry.result ??
+        entry.verdict ??
+        entry.status ??
+        entry.outcome ??
+        entry.meetsCriterion,
     );
-    if (typeof pass !== "boolean" || rationale === undefined) {
+    const rationale = parseOptionalString(
+      entry.rationale ??
+        entry.reason ??
+        entry.explanation ??
+        entry.assessment ??
+        entry.evaluation ??
+        entry.justification ??
+        entry.comment ??
+        entry.comments ??
+        entry.notes,
+    );
+    if (pass === undefined) {
       return undefined;
     }
 
-    const criterion: JudgeVerdict["criteria"][number] = { id, pass, rationale };
+    const criterion: JudgeVerdict["criteria"][number] = {
+      id,
+      pass,
+      rationale: rationale ?? `Google judge returned ${pass ? "pass" : "fail"} for ${id}.`,
+    };
     if (entry.score !== undefined) {
       if (typeof entry.score !== "number" || !Number.isFinite(entry.score)) {
         return undefined;
@@ -395,6 +433,71 @@ function normalizeCriterionArrayVerdict(
         .map((criterion) => `${criterion.id}: ${criterion.rationale}`)
         .join("; ")}`,
   };
+}
+
+function parseCriterionId(
+  entry: Record<string, unknown>,
+  expected: ReadonlySet<string>,
+): string | undefined {
+  for (const value of [
+    entry.id,
+    entry.criterionId,
+    entry.criterionID,
+    entry.criterion_id,
+    entry.acceptanceCriterionId,
+    entry.acceptance_criterion_id,
+  ]) {
+    const id = parseOptionalString(value);
+    if (id !== undefined && expected.has(id)) {
+      return id;
+    }
+  }
+
+  for (const nested of [entry.criterion, entry.acceptanceCriterion]) {
+    if (isRecord(nested)) {
+      const id = parseCriterionId(nested, expected);
+      if (id !== undefined) {
+        return id;
+      }
+    }
+    const id = parseOptionalString(nested);
+    if (id !== undefined && expected.has(id)) {
+      return id;
+    }
+  }
+
+  const stringMatches = Object.values(entry)
+    .map((value) => parseOptionalString(value))
+    .filter((value): value is string => value !== undefined && expected.has(value));
+  return stringMatches.length === 1 ? stringMatches[0] : undefined;
+}
+
+function parseOptionalBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const normalized = parseOptionalString(value)?.toLowerCase().replace(/[_-]+/g, " ");
+  if (normalized === undefined) {
+    return undefined;
+  }
+  if (["true", "pass", "passed", "yes", "met", "satisfied", "compliant"].includes(normalized)) {
+    return true;
+  }
+  if (
+    [
+      "false",
+      "fail",
+      "failed",
+      "no",
+      "not met",
+      "unsatisfied",
+      "non compliant",
+      "noncompliant",
+    ].includes(normalized)
+  ) {
+    return false;
+  }
+  return undefined;
 }
 
 function parseOptionalString(value: unknown): string | undefined {

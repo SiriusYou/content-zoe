@@ -53,6 +53,7 @@ type ScenarioName =
   | "google-parses-deep-string-wrapped-verdict"
   | "google-parses-single-array-wrapped-verdict"
   | "google-parses-criteria-array-verdict"
+  | "google-parses-ordered-criteria-array-verdict"
   | "google-safety-error"
   | "google-parse-invalid-verdict"
   | "google-rejects-relative-path"
@@ -99,6 +100,7 @@ const SCENARIOS: readonly ScenarioName[] = [
   "google-parses-deep-string-wrapped-verdict",
   "google-parses-single-array-wrapped-verdict",
   "google-parses-criteria-array-verdict",
+  "google-parses-ordered-criteria-array-verdict",
   "google-safety-error",
   "google-parse-invalid-verdict",
   "google-rejects-relative-path",
@@ -231,6 +233,8 @@ async function scenarioImpl(
       return googleParsesSingleArrayWrappedVerdict(runDir);
     case "google-parses-criteria-array-verdict":
       return googleParsesCriteriaArrayVerdict(runDir);
+    case "google-parses-ordered-criteria-array-verdict":
+      return googleParsesOrderedCriteriaArrayVerdict(runDir);
     case "google-safety-error":
       return googleSafetyError(runDir);
     case "google-parse-invalid-verdict":
@@ -880,6 +884,49 @@ async function googleParsesCriteriaArrayVerdict(runDir: string): Promise<string[
   return ["Google judge synthesizes JudgeVerdict from exact-id criterion arrays plus summary rows."];
 }
 
+async function googleParsesOrderedCriteriaArrayVerdict(runDir: string): Promise<string[]> {
+  const judge = new GoogleVisionJudge({
+    apiKey: "google-key",
+    model: "gemini-2.5-pro",
+    fetchImpl: captureFetch(
+      jsonResponse({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify([
+                    {
+                      criterion: "The handoff queue is the dominant visual subject.",
+                      verdict: "PASS",
+                      assessment: "handoff queue is visually dominant",
+                    },
+                    {
+                      criterion: "No patient-identifying text appears.",
+                      status: "met",
+                      comments: "no patient-identifying text is visible",
+                    },
+                  ]),
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    ).fetchImpl,
+  });
+
+  const verdict = await judge.judge(
+    writeImage(runDir, "ordered-criteria-array.png"),
+    validSpec(),
+    1_000,
+  );
+  assert(verdict.overallPass, "expected ordered criteria-array verdict to pass");
+  assert(verdict.criteria[0].id === "subject-visible", "expected first spec id");
+  assert(verdict.criteria[1].id === "no-identifiers", "expected second spec id");
+  return ["Google judge synthesizes JudgeVerdict from ordered criterion arrays when row count exactly matches the spec."];
+}
+
 async function googleSafetyError(runDir: string): Promise<string[]> {
   const judge = new GoogleVisionJudge({
     apiKey: "google-key",
@@ -1367,7 +1414,7 @@ function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {
     "",
     "- Fake judge: explicit scripted queue, fail-then-pass sequencing, failure injection, relative-path rejection, deep-clone determinism.",
     "- OpenAI judge: chat-completions request shape, PNG data URL, fenced JSON parsing, timeout/http/parse/safety mappings, image-read pre-fetch failure, criterion-id exactness.",
-    "- Google judge: Gemini alias request shape, stable-model fallback on unavailable model ids, string/array-wrapped JSON verdicts, criterion-array verdict normalization, safety/parse mappings, relative-path rejection.",
+    "- Google judge: Gemini alias request shape, stable-model fallback on unavailable model ids, string/array-wrapped JSON verdicts, id-matched and ordered criterion-array verdict normalization, safety/parse mappings, relative-path rejection.",
     "- Static boundary: no OpenAI SDK dependency, no provider env reads, fake judge hermeticity, package script-only change, declared implementation file scope.",
   );
 
