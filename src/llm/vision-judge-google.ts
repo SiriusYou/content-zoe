@@ -274,7 +274,7 @@ function parseJudgeResponse(text: string, spec: ImageSpec): JudgeVerdict {
 
   let contentJson: unknown;
   try {
-    contentJson = JSON.parse(stripJsonFence(textPart.text));
+    contentJson = parseJsonMaybeStringWrapped(textPart.text);
   } catch (err) {
     throw new VisionJudgeError({
       code: "parse",
@@ -296,6 +296,14 @@ function parseJudgeResponse(text: string, spec: ImageSpec): JudgeVerdict {
 
   assertCriteriaMatchSpec(verdict, spec);
   return verdict;
+}
+
+function parseJsonMaybeStringWrapped(text: string): unknown {
+  let parsed = JSON.parse(stripJsonFence(text));
+  if (typeof parsed === "string") {
+    parsed = JSON.parse(stripJsonFence(parsed));
+  }
+  return parsed;
 }
 
 function assertCriteriaMatchSpec(verdict: JudgeVerdict, spec: ImageSpec): void {
