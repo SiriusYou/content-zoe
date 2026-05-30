@@ -1,0 +1,71 @@
+{
+  "promptOriginal": "Turn a vague healthcare AI governance idea into a precise, impressive visual: a calm operations dashboard showing model ownership, review queues, exception paths, and human approval gates.",
+  "subject": "scene: A healthcare AI governance operations dashboard in active monitoring mode; environment: A clean enterprise control-room style interface with subtle healthcare context, presented as a polished product-visual rather than a literal hospital setting; keyElements: model ownership panel listing named AI systems, owners, status, and accountability indicators; review queue panel showing pending policy reviews, triage priority, and aging items; exception path flow showing flagged cases branching into escalation lanes; human approval gates with clearly marked sign-off checkpoints before deployment or release; audit timeline or compliance rail indicating recent reviews and approvals; subtle healthcare cues such as shield icons, care-related labels, or clinical-quality color semantics without showing patients or charts tied to real individuals; contentBoundaries: No patient faces; No biometric scans; No medical procedures; No personally identifiable information",
+  "style": "visualMode: high-fidelity product illustration blended with premium dashboard UI design; mood: calm, trustworthy, precise, impressive; finish: clean glass-and-matte surfaces, crisp typography, subtle depth, restrained glow accents; realism: semi-realistic interface visualization rather than photorealistic hardware photography; lighting: soft neutral studio lighting with gentle screen illumination; detailLevel: high",
+  "composition": "framing: wide landscape composition; cameraAngle: straight-on with a slight elevated perspective for readability; layout: central governance dashboard as the focal point, with ownership and queue panels balanced on the sides, and exception/approval flow elements clearly connected across the canvas; visualHierarchy: primary focus on governance overview; secondary focus on review queues and ownership accountability; tertiary focus on exception routing and human approval checkpoints; density: information-rich but uncluttered, with deliberate spacing and obvious grouping",
+  "palette": [
+    "cool, muted, professional",
+    "#0F2742",
+    "#1E4E79",
+    "#DCEAF4",
+    "#3FA7A3",
+    "#7BC8A4",
+    "#F0B85A",
+    "#F6F8FA",
+    "#CBD5DF",
+    "#5B6773",
+    "blues and teals for trust and governance, warm amber accents only for exceptions or approvals, high readability with restrained saturation"
+  ],
+  "dimensions": {
+    "w": 1536,
+    "h": 1024
+  },
+  "negativeConstraints": [
+    "Do not depict patients, doctors, or identifiable human faces as the main subject",
+    "Do not include gore, surgery, illness imagery, or emergency scenes",
+    "Do not show real brand logos, hospital names, or vendor trademarks",
+    "Do not include visible personal data, medical records, or realistic patient charts",
+    "Do not make the interface chaotic, neon-heavy, cyberpunk, or alarmist",
+    "Do not use dark horror aesthetics, red-dominant warning palettes, or crisis-room tension",
+    "Do not render the dashboard as a generic finance terminal",
+    "Do not imply autonomous medical decision-making without human review"
+  ],
+  "safetyProfile": "category: benign enterprise healthcare governance visualization; riskLevel: low; allowedContent: abstract healthcare operations context; governance workflows; compliance and approval interfaces; non-identifying UI labels and metrics; disallowedContent: patient-specific data; diagnostic claims; medical treatment depiction; fear-inducing failure scenarios; notes: The image should communicate oversight, accountability, and human control in a healthcare-adjacent setting without showing sensitive clinical content.",
+  "acceptanceCriteria": [
+    {
+      "id": "ac-01",
+      "description": "Image is delivered in a 1536x1024 landscape format.",
+      "tier": "mechanical"
+    },
+    {
+      "id": "ac-02",
+      "description": "The visual contains clearly distinguishable sections for model ownership, review queues, exception paths, and human approval gates.",
+      "tier": "mechanical"
+    },
+    {
+      "id": "ac-03",
+      "description": "No patient identities, faces, personal records, or real-world branded healthcare entities are visible.",
+      "tier": "mechanical"
+    },
+    {
+      "id": "ac-04",
+      "description": "The composition reads immediately as a governance or oversight dashboard rather than a clinical treatment scene or a finance console.",
+      "tier": "judged"
+    },
+    {
+      "id": "ac-05",
+      "description": "The image feels calm, trustworthy, and premium, with strong visual hierarchy and low visual noise.",
+      "tier": "judged"
+    },
+    {
+      "id": "ac-06",
+      "description": "Healthcare context is present but subtle, reinforcing safety and accountability without relying on cliché hospital imagery.",
+      "tier": "judged"
+    },
+    {
+      "id": "ac-07",
+      "description": "Human approval checkpoints are visually legible as meaningful control gates within the workflow rather than decorative icons.",
+      "tier": "judged"
+    }
+  ]
+}

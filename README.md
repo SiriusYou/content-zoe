@@ -42,3 +42,11 @@ content-zoe is eligible to receive automated commits from openclaw-healthcare wo
 | 2026-W26 | AI in healthcare - weekly | 2026-W26-ai-trends | [reports/2026-W26-ai-trends/report.zh.md](reports/2026-W26-ai-trends/report.zh.md) | [reports/2026-W26-ai-trends/sources.json](reports/2026-W26-ai-trends/sources.json) | [reports/2026-W26-ai-trends/source-material/manifest.json](reports/2026-W26-ai-trends/source-material/manifest.json) | 80918ebc814b | 2026-05-22T04:04:38.000Z |
 | 2026-W25 | Healthcare AI governance and medical-device oversight signals | 2026-W25-ai-trends | [reports/2026-W25-ai-trends/report.zh.md](reports/2026-W25-ai-trends/report.zh.md) | [reports/2026-W25-ai-trends/sources.json](reports/2026-W25-ai-trends/sources.json) | [reports/2026-W25-ai-trends/source-material/manifest.json](reports/2026-W25-ai-trends/source-material/manifest.json) | b11b2648024b | 2026-05-21T04:08:31.000Z |
 <!-- content-zoe:published-reports:end -->
+
+## Image Gallery
+
+<!-- content-zoe:image-gallery:start -->
+| Created | Prompt | Image | Spec | Aggregate |
+|---|---|---|---|---|
+| 2026-05-29T14:18:45.000Z | Turn a vague healthcare AI governance idea into a precise, impressive visual: a calm operations dashboard showing mod... | [image](images/img-real-pilot-001/image.png) | [spec](images/img-real-pilot-001/spec.json) | c9e8600f4162 |
+<!-- content-zoe:image-gallery:end -->

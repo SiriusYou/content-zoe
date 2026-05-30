@@ -1,0 +1,40 @@
+{
+  "overallPass": true,
+  "criteria": [
+    {
+      "id": "ac-01",
+      "pass": true,
+      "rationale": "Google judge returned pass for ac-01."
+    },
+    {
+      "id": "ac-02",
+      "pass": true,
+      "rationale": "Google judge returned pass for ac-02."
+    },
+    {
+      "id": "ac-03",
+      "pass": true,
+      "rationale": "Google judge returned pass for ac-03."
+    },
+    {
+      "id": "ac-04",
+      "pass": true,
+      "rationale": "Google judge returned pass for ac-04."
+    },
+    {
+      "id": "ac-05",
+      "pass": true,
+      "rationale": "Google judge returned pass for ac-05."
+    },
+    {
+      "id": "ac-06",
+      "pass": true,
+      "rationale": "Google judge returned pass for ac-06."
+    },
+    {
+      "id": "ac-07",
+      "pass": true,
+      "rationale": "Google judge returned pass for ac-07."
+    }
+  ]
+}
