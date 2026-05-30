@@ -1,6 +1,6 @@
 # Vision Judge Fake Smoke
 
-Generated: 2026-05-29T04:31:58.764Z
+Generated: 2026-05-30T11:29:23.964Z
 
 | Scenario | Status | Details |
 | --- | --- | --- |
@@ -23,6 +23,11 @@ Generated: 2026-05-29T04:31:58.764Z
 | openai-parse-invalid-verdict | PASS | Invalid JudgeVerdict maps to parse and preserves JUDGE_VERDICT_INVALID cause. |
 | openai-parse-criteria-id-mismatch | PASS | Criterion id mismatch smoke covered missing, extra, and wrong id variants as parse. |
 | openai-rejects-relative-path | PASS | OpenAI judge rejects relative image paths before fetch. |
+| google-builds-vision-request | PASS | Google judge built generateContent JSON request with Gemini 3.1 Pro alias, PNG inline data, and prompt criteria. |
+| google-safety-error | PASS | Google SAFETY finishReason maps to safety. |
+| google-parse-invalid-verdict | PASS | Google invalid JudgeVerdict maps to parse. |
+| google-rejects-relative-path | PASS | Google judge rejects relative image paths before fetch. |
+| vision-judge-fallback-logs-and-skips-safety | PASS | Vision fallback logs one explicit event on http failure and does not fall back on safety. |
 | vision-judge-static-boundary-check | PASS | Static boundary checks passed against implementation base HEAD^. |
 
 ## Coverage

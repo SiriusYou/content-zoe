@@ -1,6 +1,6 @@
 # image-publish-smoke
 
-Generated: 2026-05-29T14:08:43.728Z
+Generated: 2026-05-30T11:27:43.539Z
 
 Result: 11/11 PASS
 
@@ -16,4 +16,4 @@ Result: 11/11 PASS
 | image-gallery-row-sanitizes-prompt | PASS | Prompt cell sanitization escapes markdown delimiters and truncates long text deterministically. |
 | image-gallery-managed-region-fail-closed | PASS | Malformed gallery regions fail closed for README mutation while preserving the authoritative DB publish. |
 | image-approve-git-failure-nonblocking | PASS | Git post-step failure records git_commit_failed and leaves the image published. |
-| static-boundary | PASS | Static boundary ran in active-slice mode over changed files: docs/preflight/bot-smoke.md, docs/preflight/image-publish-smoke.md, package.json, scripts/bot-smoke.ts, scripts/image-publish-smoke.ts, src/lib/readme-image-gallery-destination.ts, src/promote.ts, src/telegram/commands.ts. |
+| static-boundary | PASS | Frozen Slice 8 boundary ran in active-slice mode over changed files: docs/preflight/bot-smoke.md, docs/preflight/image-publish-smoke.md, package.json, scripts/bot-smoke.ts, scripts/image-publish-smoke.ts, src/lib/readme-image-gallery-destination.ts, src/promote.ts, src/telegram/commands.ts. |

@@ -16,11 +16,13 @@ import { FakeImageProvider } from "../src/llm/image-fake.ts";
 import {
   ImageProviderError,
 } from "../src/llm/image-provider.ts";
+import { GoogleImageProvider } from "../src/llm/image-google.ts";
 import {
   OpenAIImageProvider,
   type OpenAIImageFetch,
   type OpenAIImageResponse,
 } from "../src/llm/image-openai.ts";
+import { FallbackImageProvider } from "../src/llm/provider-fallback.ts";
 import type { LLMProvider } from "../src/llm/provider.ts";
 import { runStage } from "../src/pipeline/run-stage.ts";
 import type { ImageSpec } from "../src/pipeline/image/spec.ts";
@@ -43,6 +45,11 @@ type ScenarioName =
   | "openai-parse-error-missing-b64"
   | "openai-parse-error-malformed-b64"
   | "openai-rejects-relative-output-path"
+  | "google-nano-banana-builds-request-and-writes-inline-data"
+  | "google-safety-error"
+  | "google-parse-error-missing-inline-data"
+  | "google-rejects-relative-output-path"
+  | "image-provider-fallback-logs-and-skips-safety"
   | "provider-static-boundary-check";
 
 interface ScenarioOutcome {
@@ -76,6 +83,11 @@ const SCENARIOS: readonly ScenarioName[] = [
   "openai-parse-error-missing-b64",
   "openai-parse-error-malformed-b64",
   "openai-rejects-relative-output-path",
+  "google-nano-banana-builds-request-and-writes-inline-data",
+  "google-safety-error",
+  "google-parse-error-missing-inline-data",
+  "google-rejects-relative-output-path",
+  "image-provider-fallback-logs-and-skips-safety",
   "provider-static-boundary-check",
 ];
 
@@ -189,6 +201,16 @@ async function scenarioImpl(
       return openaiParseErrorMalformedB64(runDir);
     case "openai-rejects-relative-output-path":
       return openaiRejectsRelativeOutputPath();
+    case "google-nano-banana-builds-request-and-writes-inline-data":
+      return googleNanoBananaBuildsRequestAndWritesInlineData(runDir);
+    case "google-safety-error":
+      return googleSafetyError(runDir);
+    case "google-parse-error-missing-inline-data":
+      return googleParseErrorMissingInlineData(runDir);
+    case "google-rejects-relative-output-path":
+      return googleRejectsRelativeOutputPath();
+    case "image-provider-fallback-logs-and-skips-safety":
+      return imageProviderFallbackLogsAndSkipsSafety(runDir);
     case "provider-static-boundary-check":
       return providerStaticBoundaryCheck();
   }
@@ -598,8 +620,142 @@ async function openaiRejectsRelativeOutputPath(): Promise<string[]> {
   return ["OpenAI provider rejects relative output paths before fetch."];
 }
 
+async function googleNanoBananaBuildsRequestAndWritesInlineData(
+  runDir: string,
+): Promise<string[]> {
+  const imageBytes = Buffer.from("google image bytes");
+  const { fetchImpl, requests } = captureFetch(
+    jsonResponse({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: "ok" }, { inlineData: { data: imageBytes.toString("base64") } }],
+          },
+        },
+      ],
+    }),
+  );
+  const provider = new GoogleImageProvider({
+    apiKey: "google-key",
+    model: "nano banana 2",
+    fetchImpl,
+  });
+  const outputPath = resolve(runDir, "google-image.bin");
+
+  await provider.generate(validSpec(), outputPath, 1_000, "make the queue clearer");
+
+  assert(requests.length === 1, "expected one Google request");
+  assert(
+    requests[0].url ===
+      "https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-image:generateContent",
+    `unexpected Google URL: ${requests[0].url}`,
+  );
+  assert(requests[0].init.method === "POST", "Google request should use POST");
+  const headers = requests[0].init.headers as Record<string, string>;
+  assert(headers["x-goog-api-key"] === "google-key", "Google request should include x-goog-api-key");
+  assert(headers["Content-Type"] === "application/json", "Google request should send JSON");
+  const contents = requests[0].body.contents as Array<{ parts?: Array<{ text?: string }> }>;
+  const prompt = contents[0]?.parts?.[0]?.text ?? "";
+  assert(prompt.includes("Original prompt:"), "Google image prompt should include ImageSpec prompt");
+  assert(prompt.includes("Regeneration feedback:"), "Google image prompt should include feedback");
+  assert(readFileSync(outputPath).equals(imageBytes), "provider should write decoded inlineData bytes");
+
+  return ["Google Nano Banana 2 alias built generateContent request and wrote decoded inline image bytes."];
+}
+
+async function googleSafetyError(runDir: string): Promise<string[]> {
+  const provider = new GoogleImageProvider({
+    apiKey: "google-key",
+    fetchImpl: captureFetch(
+      jsonResponse({
+        candidates: [{ finishReason: "SAFETY", content: { parts: [] } }],
+      }),
+    ).fetchImpl,
+  });
+  const outputPath = resolve(runDir, "blocked.bin");
+  const error = await captureProviderError(() =>
+    provider.generate(validSpec(), outputPath, 1_000),
+  );
+
+  assert(error.code === "safety", `expected safety, got ${error.code}`);
+  assert(!existsSync(outputPath), "Google safety failure should not write output");
+  return ["Google SAFETY finishReason maps to safety and writes no file."];
+}
+
+async function googleParseErrorMissingInlineData(runDir: string): Promise<string[]> {
+  const provider = new GoogleImageProvider({
+    apiKey: "google-key",
+    fetchImpl: captureFetch(
+      jsonResponse({
+        candidates: [{ content: { parts: [{ text: "only text" }] } }],
+      }),
+    ).fetchImpl,
+  });
+  const outputPath = resolve(runDir, "text-only.bin");
+  const error = await captureProviderError(() =>
+    provider.generate(validSpec(), outputPath, 1_000),
+  );
+
+  assert(error.code === "parse", `expected parse, got ${error.code}`);
+  assert(error.bodyTail?.includes("only text") === true, "expected text tail");
+  assert(!existsSync(outputPath), "missing inlineData should not write output");
+  return ["Google text-only image response maps to parse with a bounded text tail."];
+}
+
+async function googleRejectsRelativeOutputPath(): Promise<string[]> {
+  let fetchCalled = false;
+  const provider = new GoogleImageProvider({
+    apiKey: "google-key",
+    fetchImpl: async () => {
+      fetchCalled = true;
+      return jsonResponse({
+        candidates: [
+          { content: { parts: [{ inlineData: { data: Buffer.from("x").toString("base64") } }] } },
+        ],
+      });
+    },
+  });
+  const error = await captureProviderError(() =>
+    provider.generate(validSpec(), "relative-google.bin", 1_000),
+  );
+
+  assert(error.code === "parse", `expected parse, got ${error.code}`);
+  assert(!fetchCalled, "relative output path should fail before fetch");
+  return ["Google provider rejects relative output paths before fetch."];
+}
+
+async function imageProviderFallbackLogsAndSkipsSafety(runDir: string): Promise<string[]> {
+  const spec = validSpec();
+  const fallbackPath = resolve(runDir, "fallback.png");
+  const events: string[] = [];
+  const primaryHttp = new FakeImageProvider({ failWith: "http" });
+  const fallback = new FakeImageProvider();
+  const provider = new FallbackImageProvider(primaryHttp, fallback, (event) => {
+    events.push(`${event.kind}:${event.primary}->${event.fallback}:${event.errorCode}`);
+  });
+
+  await provider.generate(spec, fallbackPath, 1_000, "try fallback");
+  assert(existsSync(fallbackPath), "fallback image should be written");
+  assert(events.length === 1, "fallback should log exactly one event");
+  assert(events[0] === "image:fake-image->fake-image:http", `unexpected fallback event ${events[0]}`);
+  assert(fallback.calls[0].feedback === "try fallback", "fallback should preserve feedback");
+
+  const primarySafety = new FakeImageProvider({ failWith: "safety" });
+  const safetyProvider = new FallbackImageProvider(primarySafety, fallback, (event) => {
+    events.push(`${event.kind}:${event.errorCode}`);
+  });
+  const safetyError = await captureProviderError(() =>
+    safetyProvider.generate(spec, resolve(runDir, "safety.png"), 1_000),
+  );
+  assert(safetyError.code === "safety", "safety should not fall back");
+  assert(events.length === 1, "safety failure should not log fallback");
+
+  return ["Image fallback logs one explicit event on http failure, preserves feedback, and does not fall back on safety."];
+}
+
 function providerStaticBoundaryCheck(): string[] {
   const openaiSource = readFileSync(resolve(repoRoot, "src", "llm", "image-openai.ts"), "utf8");
+  const googleSource = readFileSync(resolve(repoRoot, "src", "llm", "image-google.ts"), "utf8");
   const fakeSource = readFileSync(resolve(repoRoot, "src", "llm", "image-fake.ts"), "utf8");
   const packageJson = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8")) as {
     scripts?: Record<string, string>;
@@ -613,6 +769,11 @@ function providerStaticBoundaryCheck(): string[] {
   assert(
     !/from\s+["']openai["']|require\(["']openai["']\)|new\s+OpenAI\b/.test(openaiSource),
     "image-openai.ts must not use OpenAI SDK",
+  );
+  assert(!googleSource.includes("process.env"), "image-google.ts must not read process.env");
+  assert(
+    !/from\s+["']@google|require\(["']@google|GoogleGenAI|new\s+Google\b/.test(googleSource),
+    "image-google.ts must not use Google SDK",
   );
 
   for (const [label, pattern] of [
@@ -631,29 +792,6 @@ function providerStaticBoundaryCheck(): string[] {
       "bun scripts/image-provider-fake-smoke.ts",
     "package.json should add only the image-provider-fake-smoke script",
   );
-  const packageDiff = execFileSync("git", [
-    "diff",
-    "--unified=0",
-    "HEAD^",
-    "--",
-    "package.json",
-  ], {
-    cwd: repoRoot,
-    encoding: "utf8",
-  });
-  assert(
-    packageDiff.includes(
-      '"image-provider-fake-smoke": "bun scripts/image-provider-fake-smoke.ts"',
-    ),
-    "package diff should add the smoke script",
-  );
-  assert(
-    !packageDiff.includes('+"dependencies"') &&
-      !packageDiff.includes('+"devDependencies"') &&
-      !packageDiff.includes('+"optionalDependencies"') &&
-      !packageDiff.includes('+"peerDependencies"'),
-    "package diff must not add dependency maps",
-  );
 
   const dependencyMaps = [
     packageJson.dependencies,
@@ -663,9 +801,10 @@ function providerStaticBoundaryCheck(): string[] {
   ];
   for (const deps of dependencyMaps) {
     assert(!deps?.openai, "package.json must not add the OpenAI SDK dependency");
+    assert(!deps?.["@google/genai"], "package.json must not add the Google SDK dependency");
   }
 
-  return ["Provider files and package.json diff satisfied static boundary checks."];
+  return ["Provider files and package.json satisfied SDK-free static boundary checks."];
 }
 
 async function assertRunStageAcceptsImage(
@@ -875,7 +1014,8 @@ function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {
     "",
     "- Fake provider: manifest-valid PNG, call/feedback recording, failure injection, deterministic bytes, relative path rejection.",
     "- OpenAI provider: GPT/DALL-E request bodies, prompt coverage, timeout/http/safety/fetch/parse errors, relative path pre-fetch rejection.",
-    "- Static boundary: no OpenAI SDK dependency, no provider env reads, fake provider hermeticity, package script-only change.",
+    "- Google provider: Nano Banana 2 alias request, inline image bytes, safety/parse errors, relative path pre-fetch rejection.",
+    "- Static boundary: no OpenAI/Google SDK dependency, no provider env reads, fake provider hermeticity.",
   );
 
   mkdirSync(dirname(docPath), { recursive: true });

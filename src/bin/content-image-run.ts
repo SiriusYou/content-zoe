@@ -10,9 +10,16 @@ import path, { resolve } from "node:path";
 
 import { CodexCliProvider } from "../llm/codex-cli.ts";
 import type { ImageProvider } from "../llm/image-provider.ts";
+import { GoogleImageProvider } from "../llm/image-google.ts";
 import { OpenAiImageProvider } from "../llm/image-openai.ts";
 import type { LLMProvider } from "../llm/provider.ts";
+import {
+  FallbackImageProvider,
+  FallbackVisionJudge,
+  type ProviderFallbackLogger,
+} from "../llm/provider-fallback.ts";
 import type { VisionJudge } from "../llm/vision-judge.ts";
+import { GoogleVisionJudge } from "../llm/vision-judge-google.ts";
 import { OpenAiVisionJudge } from "../llm/vision-judge-openai.ts";
 import {
   type DbClient,
@@ -99,11 +106,18 @@ interface ProviderPlan {
   imageProvider: ImageProviderName;
   visionJudgeProvider: VisionJudgeProviderName;
   quiesceWindowMs: number;
+  imageFallbackProvider?: Extract<ImageProviderName, "openai">;
+  visionJudgeFallbackProvider?: Extract<VisionJudgeProviderName, "openai">;
   openAiApiKey?: string;
+  googleApiKey?: string;
   imageModel?: string;
   visionJudgeModel?: string;
+  imageFallbackModel?: string;
+  visionJudgeFallbackModel?: string;
   imageBaseUrl?: string;
   visionBaseUrl?: string;
+  imageFallbackBaseUrl?: string;
+  visionFallbackBaseUrl?: string;
 }
 
 const RUN_DIR = ".runs";
@@ -154,7 +168,13 @@ export async function runContentImageRunCli(
 
     const providerPlan = parseProviderPlan(opts.env ?? process.env);
     const attempt = prepareImageRunAttempt({ cwd, job });
-    const providers = createProviders(providerPlan);
+    const providers = createProviders(providerPlan, {
+      onFallback(event) {
+        writeStderr(
+          `[content-image-run] provider fallback: ${event.kind} ${event.primary} -> ${event.fallback} after ${event.errorCode}: ${event.message}\n`,
+        );
+      },
+    });
 
     const result = await runReportLoop({
       jobId: job.id,
@@ -242,8 +262,8 @@ export function parseProviderPlan(env: Record<string, string | undefined>): Prov
     visionJudgeProvider === "fake";
   const allReal =
     llmProvider === "codex" &&
-    imageProvider === "openai" &&
-    visionJudgeProvider === "openai";
+    imageProvider !== "fake" &&
+    visionJudgeProvider !== "fake";
   if (!allFake && !allReal) {
     throw new ContentImageRunError(
       "PROVIDER_CONFIG_INVALID",
@@ -252,7 +272,22 @@ export function parseProviderPlan(env: Record<string, string | undefined>): Prov
   }
 
   if (allReal) {
-    const openAiApiKey = nonEmpty(env.OPENAI_API_KEY, "OPENAI_API_KEY");
+    const imageFallbackProvider = parseOpenAiFallbackProvider(
+      env.IMAGE_PROVIDER_FALLBACK,
+      "IMAGE_PROVIDER_FALLBACK",
+    );
+    const visionJudgeFallbackProvider = parseOpenAiFallbackProvider(
+      env.VISION_JUDGE_PROVIDER_FALLBACK,
+      "VISION_JUDGE_PROVIDER_FALLBACK",
+    );
+    const needsOpenAi =
+      imageProvider === "openai" ||
+      visionJudgeProvider === "openai" ||
+      imageFallbackProvider === "openai" ||
+      visionJudgeFallbackProvider === "openai";
+    const needsGoogle = imageProvider === "google" || visionJudgeProvider === "google";
+    const openAiApiKey = needsOpenAi ? nonEmpty(env.OPENAI_API_KEY, "OPENAI_API_KEY") : undefined;
+    const googleApiKey = needsGoogle ? nonEmpty(env.GOOGLE_API_KEY, "GOOGLE_API_KEY") : undefined;
     const visionJudgeModel = parseVisionJudgeModel(env.VISION_JUDGE_MODEL);
     if (!visionJudgeModel) {
       throw new ContentImageRunError(
@@ -260,16 +295,42 @@ export function parseProviderPlan(env: Record<string, string | undefined>): Prov
         "PROVIDER_CONFIG_INVALID: VISION_JUDGE_MODEL is required for real mode",
       );
     }
+    if (imageFallbackProvider === "openai" && imageProvider !== "google") {
+      throw new ContentImageRunError(
+        "PROVIDER_CONFIG_INVALID",
+        "PROVIDER_CONFIG_INVALID: IMAGE_PROVIDER_FALLBACK=openai requires IMAGE_PROVIDER=google",
+      );
+    }
+    if (visionJudgeFallbackProvider === "openai" && visionJudgeProvider !== "google") {
+      throw new ContentImageRunError(
+        "PROVIDER_CONFIG_INVALID",
+        "PROVIDER_CONFIG_INVALID: VISION_JUDGE_PROVIDER_FALLBACK=openai requires VISION_JUDGE_PROVIDER=google",
+      );
+    }
     return {
       llmProvider,
       imageProvider,
       visionJudgeProvider,
       quiesceWindowMs,
+      imageFallbackProvider,
+      visionJudgeFallbackProvider,
       openAiApiKey,
+      googleApiKey,
       imageModel: optionalNonEmpty(env.IMAGE_MODEL),
       visionJudgeModel,
-      imageBaseUrl: optionalNonEmpty(env.OPENAI_IMAGE_BASE_URL),
-      visionBaseUrl: optionalNonEmpty(env.OPENAI_VISION_BASE_URL),
+      imageFallbackModel: optionalNonEmpty(env.IMAGE_FALLBACK_MODEL),
+      visionJudgeFallbackModel:
+        optionalNonEmpty(env.VISION_JUDGE_FALLBACK_MODEL) ?? "gpt-4.1",
+      imageBaseUrl:
+        imageProvider === "google"
+          ? optionalNonEmpty(env.GOOGLE_IMAGE_BASE_URL)
+          : optionalNonEmpty(env.OPENAI_IMAGE_BASE_URL),
+      visionBaseUrl:
+        visionJudgeProvider === "google"
+          ? optionalNonEmpty(env.GOOGLE_VISION_BASE_URL)
+          : optionalNonEmpty(env.OPENAI_VISION_BASE_URL),
+      imageFallbackBaseUrl: optionalNonEmpty(env.OPENAI_IMAGE_BASE_URL),
+      visionFallbackBaseUrl: optionalNonEmpty(env.OPENAI_VISION_BASE_URL),
     };
   }
 
@@ -319,7 +380,10 @@ export function prepareImageRunAttempt(opts: {
   };
 }
 
-function createProviders(plan: ProviderPlan): ProviderBundle {
+function createProviders(
+  plan: ProviderPlan,
+  opts: { readonly onFallback?: ProviderFallbackLogger } = {},
+): ProviderBundle {
   if (
     plan.llmProvider === "fake" &&
     plan.imageProvider === "fake" &&
@@ -351,10 +415,112 @@ function createProviders(plan: ProviderPlan): ProviderBundle {
     };
   }
 
+  if (
+    plan.llmProvider === "codex" &&
+    plan.imageProvider !== "fake" &&
+    plan.visionJudgeProvider !== "fake"
+  ) {
+    const fallbackLogger = opts.onFallback ?? (() => undefined);
+    let imageProvider = createRealImageProvider({
+      provider: plan.imageProvider,
+      apiKey: providerApiKey(plan.imageProvider, plan),
+      model: plan.imageModel,
+      baseUrl: plan.imageBaseUrl,
+    });
+    let visionJudge = createRealVisionJudge({
+      provider: plan.visionJudgeProvider,
+      apiKey: providerApiKey(plan.visionJudgeProvider, plan),
+      model: plan.visionJudgeModel,
+      baseUrl: plan.visionBaseUrl,
+    });
+
+    if (plan.imageFallbackProvider === "openai") {
+      imageProvider = new FallbackImageProvider(
+        imageProvider,
+        createRealImageProvider({
+          provider: "openai",
+          apiKey: nonEmptyPlan(plan.openAiApiKey, "OPENAI_API_KEY"),
+          model: plan.imageFallbackModel,
+          baseUrl: plan.imageFallbackBaseUrl,
+        }),
+        fallbackLogger,
+      );
+    }
+    if (plan.visionJudgeFallbackProvider === "openai") {
+      visionJudge = new FallbackVisionJudge(
+        visionJudge,
+        createRealVisionJudge({
+          provider: "openai",
+          apiKey: nonEmptyPlan(plan.openAiApiKey, "OPENAI_API_KEY"),
+          model: plan.visionJudgeFallbackModel,
+          baseUrl: plan.visionFallbackBaseUrl,
+        }),
+        fallbackLogger,
+      );
+    }
+
+    return {
+      provider: new CodexCliProvider({ quiesceWindowMs: plan.quiesceWindowMs }),
+      imageProvider,
+      visionJudge,
+      mode: "real",
+    };
+  }
+
   throw new ContentImageRunError(
     "PROVIDER_CONFIG_INVALID",
     "PROVIDER_CONFIG_INVALID: provider plan could not be constructed",
   );
+}
+
+function createRealImageProvider(input: {
+  readonly provider: Extract<ImageProviderName, "openai" | "google">;
+  readonly apiKey: string;
+  readonly model?: string;
+  readonly baseUrl?: string;
+}): ImageProvider {
+  if (input.provider === "openai") {
+    return new OpenAiImageProvider({
+      apiKey: input.apiKey,
+      model: input.model,
+      baseUrl: input.baseUrl,
+    });
+  }
+  return new GoogleImageProvider({
+    apiKey: input.apiKey,
+    model: input.model,
+    baseUrl: input.baseUrl,
+  });
+}
+
+function createRealVisionJudge(input: {
+  readonly provider: Extract<VisionJudgeProviderName, "openai" | "google">;
+  readonly apiKey: string;
+  readonly model?: string;
+  readonly baseUrl?: string;
+}): VisionJudge {
+  const model = nonEmptyPlan(input.model, "VISION_JUDGE_MODEL");
+  if (input.provider === "openai") {
+    return new OpenAiVisionJudge({
+      apiKey: input.apiKey,
+      model,
+      baseUrl: input.baseUrl,
+    });
+  }
+  return new GoogleVisionJudge({
+    apiKey: input.apiKey,
+    model,
+    baseUrl: input.baseUrl,
+  });
+}
+
+function providerApiKey(
+  provider: Extract<ImageProviderName | VisionJudgeProviderName, "openai" | "google">,
+  plan: ProviderPlan,
+): string {
+  return provider === "openai"
+    ? nonEmptyPlan(plan.openAiApiKey, "OPENAI_API_KEY")
+    : nonEmptyPlan(plan.googleApiKey, "GOOGLE_API_KEY");
 }
 
 export function createImageDbLifecycleHooks(params: {
@@ -563,6 +729,26 @@ function nonEmpty(value: string | undefined, name: string): string {
   throw new ContentImageRunError(
     "PROVIDER_CONFIG_INVALID",
     `PROVIDER_CONFIG_INVALID: ${name} is required`,
+  );
+}
+
+function nonEmptyPlan(value: string | undefined, name: string): string {
+  if (value !== undefined && value.trim().length > 0) return value.trim();
+  throw new ContentImageRunError(
+    "PROVIDER_CONFIG_INVALID",
+    `PROVIDER_CONFIG_INVALID: ${name} is required`,
+  );
+}
+
+function parseOpenAiFallbackProvider(
+  value: string | undefined,
+  name: string,
+): Extract<ImageProviderName, "openai"> | undefined {
+  if (value === undefined || value.trim().length === 0) return undefined;
+  if (value === "openai") return value;
+  throw new ContentImageRunError(
+    "PROVIDER_CONFIG_INVALID",
+    `PROVIDER_CONFIG_INVALID: invalid ${name}: expected "openai", got ${JSON.stringify(value)}`,
   );
 }
 

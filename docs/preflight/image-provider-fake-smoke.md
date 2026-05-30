@@ -1,6 +1,6 @@
 # Image Provider Fake Smoke
 
-Generated: 2026-05-28T21:33:33.421Z
+Generated: 2026-05-30T11:25:55.884Z
 
 | Scenario | Status | Details |
 | --- | --- | --- |
@@ -20,10 +20,16 @@ Generated: 2026-05-28T21:33:33.421Z
 | openai-parse-error-missing-b64 | PASS | OpenAI response missing data[0].b64_json mapped to parse. |
 | openai-parse-error-malformed-b64 | PASS | OpenAI malformed b64 response mapped to parse. |
 | openai-rejects-relative-output-path | PASS | OpenAI provider rejects relative output paths before fetch. |
-| provider-static-boundary-check | PASS | Provider files and package.json diff satisfied static boundary checks. |
+| google-nano-banana-builds-request-and-writes-inline-data | PASS | Google Nano Banana 2 alias built generateContent request and wrote decoded inline image bytes. |
+| google-safety-error | PASS | Google SAFETY finishReason maps to safety and writes no file. |
+| google-parse-error-missing-inline-data | PASS | Google text-only image response maps to parse with a bounded text tail. |
+| google-rejects-relative-output-path | PASS | Google provider rejects relative output paths before fetch. |
+| image-provider-fallback-logs-and-skips-safety | PASS | Image fallback logs one explicit event on http failure, preserves feedback, and does not fall back on safety. |
+| provider-static-boundary-check | PASS | Provider files and package.json satisfied SDK-free static boundary checks. |
 
 ## Coverage
 
 - Fake provider: manifest-valid PNG, call/feedback recording, failure injection, deterministic bytes, relative path rejection.
 - OpenAI provider: GPT/DALL-E request bodies, prompt coverage, timeout/http/safety/fetch/parse errors, relative path pre-fetch rejection.
-- Static boundary: no OpenAI SDK dependency, no provider env reads, fake provider hermeticity, package script-only change.
+- Google provider: Nano Banana 2 alias request, inline image bytes, safety/parse errors, relative path pre-fetch rejection.
+- Static boundary: no OpenAI/Google SDK dependency, no provider env reads, fake provider hermeticity.

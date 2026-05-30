@@ -28,7 +28,6 @@ import type { ImageSpec } from "../src/pipeline/image/spec.ts";
 import type { JudgeVerdict } from "../src/pipeline/image/verdict.ts";
 import {
   assertCycleScopePolicy,
-  changedFilesAgainstBase,
   PROCESS_SPAWN_PATTERNS,
   PROMPT_SURFACE_PATTERNS,
   readRepoSource,
@@ -76,6 +75,7 @@ const smokeRoot = path.join(
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "image-publish-smoke.md");
 const implementationAnchor = "2deb95bfcd865b565fd80fca22b41947cc87b207";
+const implementationRangeEnd = "9361f84ad94d47edaf436989eb51247ffeebe62e";
 const fixedNow = 1_800_100_000;
 const exactImageFiles = ["image.png", "request.txt", "spec.json", "verdict.json"] as const;
 const imageGalleryStart = "<!-- content-zoe:image-gallery:start -->";
@@ -400,7 +400,7 @@ async function imageApproveGitFailureNonblocking(dir: string): Promise<string[]>
 }
 
 function staticBoundary(): string[] {
-  const changed = changedFilesAgainstBase(repoRoot, implementationAnchor).filter(
+  const changed = changedFilesBetween(repoRoot, implementationAnchor, implementationRangeEnd).filter(
     (file) =>
       !file.startsWith("reports/2026-W22-ai-trends/") &&
       !file.startsWith("reports/2026-W23-ai-trends/"),
@@ -432,7 +432,7 @@ function staticBoundary(): string[] {
   });
   const promoteSource = readRepoSource(repoRoot, "src/promote.ts");
   assertNoRealProviderOrReportRunSurface(promoteSource, "src/promote.ts");
-  return [`Static boundary ran in ${mode} mode over changed files: ${changed.join(", ") || "<none>"}.`];
+  return [`Frozen Slice 8 boundary ran in ${mode} mode over changed files: ${changed.join(", ") || "<none>"}.`];
 }
 
 async function seedImageFixture(
@@ -594,6 +594,17 @@ function assertNoRealProviderOrReportRunSurface(source: string, subject: string)
     assert(!pattern.test(stripped), `${subject} contains forbidden ${label}`);
   }
   assert(!/report:run|src\/bin\/report-run|content:image-run/.test(stripped), `${subject} touched operator run surface`);
+}
+
+function changedFilesBetween(repoRoot: string, base: string, end: string): string[] {
+  return execFileSync("git", ["diff", "--name-only", `${base}..${end}`], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  })
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .sort();
 }
 
 function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {

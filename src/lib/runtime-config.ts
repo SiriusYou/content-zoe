@@ -1,6 +1,6 @@
 export type LLMProviderName = "fake" | "codex";
-export type ImageProviderName = "fake" | "openai";
-export type VisionJudgeProviderName = "fake" | "openai";
+export type ImageProviderName = "fake" | "openai" | "google";
+export type VisionJudgeProviderName = "fake" | "openai" | "google";
 
 export interface RuntimeConfig {
   llmProvider: LLMProviderName;
@@ -45,17 +45,17 @@ function parseProvider(value: string | undefined): LLMProviderName {
 
 export function parseImageProviderName(value: string | undefined): ImageProviderName | undefined {
   if (value === undefined) return undefined;
-  if (value === "fake" || value === "openai") return value;
+  if (value === "fake" || value === "openai" || value === "google") return value;
   throw new Error(
-    `invalid IMAGE_PROVIDER: expected "fake" or "openai", got ${JSON.stringify(value)}`,
+    `invalid IMAGE_PROVIDER: expected "fake", "openai", or "google", got ${JSON.stringify(value)}`,
   );
 }
 
 export function parseVisionJudgeProviderName(value: string | undefined): VisionJudgeProviderName | undefined {
   if (value === undefined) return undefined;
-  if (value === "fake" || value === "openai") return value;
+  if (value === "fake" || value === "openai" || value === "google") return value;
   throw new Error(
-    `invalid VISION_JUDGE_PROVIDER: expected "fake" or "openai", got ${JSON.stringify(value)}`,
+    `invalid VISION_JUDGE_PROVIDER: expected "fake", "openai", or "google", got ${JSON.stringify(value)}`,
   );
 }
 

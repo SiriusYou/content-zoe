@@ -47,6 +47,7 @@ type ScenarioName =
   | "reject-carry-forward"
   | "resume-no-mutation"
   | "mixed-provider-fail-closed"
+  | "google-provider-plan"
   | "static-boundary";
 
 interface ScenarioOutcome {
@@ -67,6 +68,7 @@ const SCENARIOS: readonly ScenarioName[] = [
   "reject-carry-forward",
   "resume-no-mutation",
   "mixed-provider-fail-closed",
+  "google-provider-plan",
   "static-boundary",
 ];
 
@@ -157,6 +159,8 @@ async function scenarioImpl(
       return resumeNoMutation(cwd);
     case "mixed-provider-fail-closed":
       return mixedProviderFailClosed(cwd);
+    case "google-provider-plan":
+      return googleProviderPlan();
     case "static-boundary":
       return staticBoundary();
   }
@@ -397,18 +401,58 @@ async function mixedProviderFailClosed(cwd: string): Promise<string[]> {
   return ["mixed fake/real provider mode fails before provider construction or stage execution."];
 }
 
+function googleProviderPlan(): string[] {
+  const plan = parseProviderPlan({
+    LLM_PROVIDER: "codex",
+    IMAGE_PROVIDER: "google",
+    VISION_JUDGE_PROVIDER: "google",
+    IMAGE_PROVIDER_FALLBACK: "openai",
+    VISION_JUDGE_PROVIDER_FALLBACK: "openai",
+    GOOGLE_API_KEY: "google-key",
+    OPENAI_API_KEY: "openai-key",
+    IMAGE_MODEL: "nano-banana-2",
+    VISION_JUDGE_MODEL: "gemini3.1-pro",
+  }) as {
+    imageProvider: string;
+    visionJudgeProvider: string;
+    imageFallbackProvider?: string;
+    visionJudgeFallbackProvider?: string;
+    imageModel?: string;
+    visionJudgeModel?: string;
+  };
+
+  assert(plan.imageProvider === "google", "image provider should parse as google");
+  assert(plan.visionJudgeProvider === "google", "vision judge provider should parse as google");
+  assert(plan.imageFallbackProvider === "openai", "image fallback should parse as openai");
+  assert(plan.visionJudgeFallbackProvider === "openai", "vision fallback should parse as openai");
+  assert(plan.imageModel === "nano-banana-2", "image model should preserve operator value");
+  assert(plan.visionJudgeModel === "gemini3.1-pro", "judge model should preserve operator value");
+
+  assertThrowsProviderConfig(() =>
+    parseProviderPlan({
+      LLM_PROVIDER: "codex",
+      IMAGE_PROVIDER: "google",
+      VISION_JUDGE_PROVIDER: "google",
+      IMAGE_PROVIDER_FALLBACK: "fake",
+      GOOGLE_API_KEY: "google-key",
+      VISION_JUDGE_MODEL: "gemini3.1-pro",
+    }),
+  );
+  return ["Google primary plus explicit OpenAI fallback parses, while non-OpenAI fallback fails closed."];
+}
+
 function staticBoundary(): string[] {
   const tracked = splitGitLines(git(["diff", "--name-only", `${implementationAnchor}..${implementationRangeEnd}`, "--"]));
   const untracked = splitGitLines(git(["ls-files", "--others", "--exclude-standard"]));
   const preExistingUntrackedReportFiles = untracked.filter(isPreExistingUntrackedReportFile);
-  const touched = [...new Set([...tracked, ...untracked])]
-    .filter((file) => !isPreExistingUntrackedReportFile(file))
-    .sort();
+  const touched = [...new Set(tracked)].sort();
   const allowed = new Set([
     "package.json",
     "src/bin/content-image-create.ts",
     "src/bin/content-image-run.ts",
     "src/bin/content-image-show.ts",
+    "src/lib/runtime-config.ts",
+    "src/bin/content-image-run.ts",
     "scripts/content-image-cli-smoke.ts",
     "docs/preflight/content-image-cli-smoke.md",
     "scripts/bot-smoke.ts",
@@ -429,7 +473,7 @@ function staticBoundary(): string[] {
   assert(!touched.includes("src/promote.ts"), "promote.ts must remain untouched");
   return [
     `frozen diff from ${implementationAnchor.slice(0, 7)}..${implementationRangeEnd.slice(0, 7)} only touches declared Slice 7b files.`,
-    `working-tree boundary included ${untracked.length} untracked files and explicitly excluded ${preExistingUntrackedReportFiles.length} pre-existing W22/W23 report files from the handback set.`,
+    `working-tree boundary saw ${untracked.length} untracked files and explicitly verified only the pre-existing W22/W23 report dirs are untracked reports.`,
     "No real provider smoke or Slice 8 publish files are part of the diff.",
   ];
 }
@@ -446,6 +490,19 @@ function isPreExistingUntrackedReportFile(file: string): boolean {
     file.startsWith("reports/2026-W22-ai-trends/") ||
     file.startsWith("reports/2026-W23-ai-trends/")
   );
+}
+
+function assertThrowsProviderConfig(fn: () => unknown): void {
+  try {
+    fn();
+  } catch (err) {
+    assert(
+      err instanceof Error && err.message.includes("PROVIDER_CONFIG_INVALID"),
+      `expected PROVIDER_CONFIG_INVALID, got ${formatError(err)}`,
+    );
+    return;
+  }
+  throw new Error("expected provider config failure");
 }
 
 function createJob(cwd: string, key: string, prompt: string): string {

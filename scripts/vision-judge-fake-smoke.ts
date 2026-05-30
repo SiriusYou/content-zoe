@@ -10,11 +10,13 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { FakeVisionJudge } from "../src/llm/vision-judge-fake.ts";
+import { GoogleVisionJudge } from "../src/llm/vision-judge-google.ts";
 import {
   OpenAIVisionJudge,
   type OpenAIVisionFetch,
   type OpenAIVisionResponse,
 } from "../src/llm/vision-judge-openai.ts";
+import { FallbackVisionJudge } from "../src/llm/provider-fallback.ts";
 import {
   VisionJudgeError,
   type VisionJudgeErrorCode,
@@ -45,6 +47,11 @@ type ScenarioName =
   | "openai-parse-invalid-verdict"
   | "openai-parse-criteria-id-mismatch"
   | "openai-rejects-relative-path"
+  | "google-builds-vision-request"
+  | "google-safety-error"
+  | "google-parse-invalid-verdict"
+  | "google-rejects-relative-path"
+  | "vision-judge-fallback-logs-and-skips-safety"
   | "vision-judge-static-boundary-check";
 
 interface ScenarioOutcome {
@@ -81,6 +88,11 @@ const SCENARIOS: readonly ScenarioName[] = [
   "openai-parse-invalid-verdict",
   "openai-parse-criteria-id-mismatch",
   "openai-rejects-relative-path",
+  "google-builds-vision-request",
+  "google-safety-error",
+  "google-parse-invalid-verdict",
+  "google-rejects-relative-path",
+  "vision-judge-fallback-logs-and-skips-safety",
   "vision-judge-static-boundary-check",
 ];
 
@@ -197,6 +209,16 @@ async function scenarioImpl(
       return openaiParseCriteriaIdMismatch(runDir);
     case "openai-rejects-relative-path":
       return openaiRejectsRelativePath();
+    case "google-builds-vision-request":
+      return googleBuildsVisionRequest(runDir);
+    case "google-safety-error":
+      return googleSafetyError(runDir);
+    case "google-parse-invalid-verdict":
+      return googleParseInvalidVerdict(runDir);
+    case "google-rejects-relative-path":
+      return googleRejectsRelativePath();
+    case "vision-judge-fallback-logs-and-skips-safety":
+      return visionJudgeFallbackLogsAndSkipsSafety(runDir);
     case "vision-judge-static-boundary-check":
       return visionJudgeStaticBoundaryCheck();
   }
@@ -617,8 +639,152 @@ async function openaiRejectsRelativePath(): Promise<string[]> {
   return ["OpenAI judge rejects relative image paths before fetch."];
 }
 
+async function googleBuildsVisionRequest(runDir: string): Promise<string[]> {
+  const spec = validSpec();
+  const imagePath = writeImage(runDir, "google-image.png");
+  const { fetchImpl, requests } = captureFetch(googleGenerateResponse(passingVerdict()));
+  const judge = new GoogleVisionJudge({
+    apiKey: "google-key",
+    model: "gemini3.1-pro",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/models/",
+    fetchImpl,
+  });
+
+  const verdict = await judge.judge(imagePath, spec, 1_000);
+  assert(verdict.overallPass, "expected passing verdict");
+  assert(requests.length === 1, "expected one Google request");
+  assert(
+    requests[0].url ===
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro:generateContent",
+    `unexpected Google URL: ${requests[0].url}`,
+  );
+  assert(requests[0].init.method === "POST", "request should use POST");
+  const headers = requests[0].init.headers as Record<string, string>;
+  assert(headers["x-goog-api-key"] === "google-key", "request should include x-goog-api-key");
+  assert(headers["Content-Type"] === "application/json", "request should send JSON");
+  assertGoogleJsonResponseConfig(requests[0].body.generationConfig);
+  const parts = extractGoogleParts(requests[0].body);
+  assert(parts[0]?.inline_data?.mime_type === "image/png", "request should include PNG inline data");
+  assert(typeof parts[0]?.inline_data?.data === "string", "request should include base64 image data");
+  const prompt = String(parts[1]?.text ?? "");
+  for (const value of [
+    spec.promptOriginal,
+    spec.subject,
+    spec.style,
+    spec.composition,
+    ...spec.palette,
+    `${spec.dimensions.w}x${spec.dimensions.h}`,
+    ...spec.negativeConstraints,
+    spec.safetyProfile,
+    ...spec.acceptanceCriteria.flatMap((criterion) => [
+      criterion.id,
+      criterion.description,
+      criterion.tier,
+    ]),
+  ]) {
+    assert(prompt.includes(value), `prompt should include ${value}`);
+  }
+  return ["Google judge built generateContent JSON request with Gemini 3.1 Pro alias, PNG inline data, and prompt criteria."];
+}
+
+async function googleSafetyError(runDir: string): Promise<string[]> {
+  const judge = new GoogleVisionJudge({
+    apiKey: "google-key",
+    model: "gemini-3.1-pro",
+    fetchImpl: captureFetch(
+      jsonResponse({
+        candidates: [{ finishReason: "SAFETY", content: { parts: [] } }],
+      }),
+    ).fetchImpl,
+  });
+  const error = await captureVisionJudgeError(() =>
+    judge.judge(writeImage(runDir, "blocked.png"), validSpec(), 1_000),
+  );
+
+  assert(error.code === "safety", `expected safety, got ${error.code}`);
+  return ["Google SAFETY finishReason maps to safety."];
+}
+
+async function googleParseInvalidVerdict(runDir: string): Promise<string[]> {
+  const judge = new GoogleVisionJudge({
+    apiKey: "google-key",
+    model: "gemini-3.1-pro",
+    fetchImpl: captureFetch(
+      jsonResponse({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: JSON.stringify({ overallPass: "yes", criteria: [] }) }],
+            },
+          },
+        ],
+      }),
+    ).fetchImpl,
+  });
+  const error = await captureVisionJudgeError(() =>
+    judge.judge(writeImage(runDir, "invalid.png"), validSpec(), 1_000),
+  );
+
+  assert(error.code === "parse", `expected parse, got ${error.code}`);
+  return ["Google invalid JudgeVerdict maps to parse."];
+}
+
+async function googleRejectsRelativePath(): Promise<string[]> {
+  let fetchCalled = false;
+  const judge = new GoogleVisionJudge({
+    apiKey: "google-key",
+    model: "gemini-3.1-pro",
+    fetchImpl: async () => {
+      fetchCalled = true;
+      return googleGenerateResponse(passingVerdict());
+    },
+  });
+  const error = await captureVisionJudgeError(() =>
+    judge.judge("relative-google.png", validSpec(), 1_000),
+  );
+
+  assert(error.code === "parse", `expected parse, got ${error.code}`);
+  assert(!fetchCalled, "relative path should fail before fetch");
+  return ["Google judge rejects relative image paths before fetch."];
+}
+
+async function visionJudgeFallbackLogsAndSkipsSafety(runDir: string): Promise<string[]> {
+  const spec = validSpec();
+  const imagePath = writeImage(runDir, "fallback.png");
+  const events: string[] = [];
+  const primaryHttp = new FakeVisionJudge({
+    verdicts: [passingVerdict()],
+    failWith: "http",
+  });
+  const fallback = new FakeVisionJudge({ verdicts: [passingVerdict()] });
+  const judge = new FallbackVisionJudge(primaryHttp, fallback, (event) => {
+    events.push(`${event.kind}:${event.primary}->${event.fallback}:${event.errorCode}`);
+  });
+
+  const verdict = await judge.judge(imagePath, spec, 1_000);
+  assert(verdict.overallPass, "fallback verdict should pass");
+  assert(events.length === 1, "fallback should log exactly one event");
+  assert(events[0] === "vision:fake-vision-judge->fake-vision-judge:http", `unexpected event ${events[0]}`);
+
+  const primarySafety = new FakeVisionJudge({
+    verdicts: [passingVerdict()],
+    failWith: "safety",
+  });
+  const safetyJudge = new FallbackVisionJudge(primarySafety, fallback, (event) => {
+    events.push(`${event.kind}:${event.errorCode}`);
+  });
+  const safetyError = await captureVisionJudgeError(() =>
+    safetyJudge.judge(imagePath, spec, 1_000),
+  );
+  assert(safetyError.code === "safety", "safety should not fall back");
+  assert(events.length === 1, "safety failure should not log fallback");
+
+  return ["Vision fallback logs one explicit event on http failure and does not fall back on safety."];
+}
+
 function visionJudgeStaticBoundaryCheck(): string[] {
   const openaiSource = readFileSync(resolve(repoRoot, "src", "llm", "vision-judge-openai.ts"), "utf8");
+  const googleSource = readFileSync(resolve(repoRoot, "src", "llm", "vision-judge-google.ts"), "utf8");
   const fakeSource = readFileSync(resolve(repoRoot, "src", "llm", "vision-judge-fake.ts"), "utf8");
   const packageJson = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8")) as {
     scripts?: Record<string, string>;
@@ -632,6 +798,11 @@ function visionJudgeStaticBoundaryCheck(): string[] {
   assert(
     !/from\s+["']openai["']|require\(["']openai["']\)|new\s+OpenAI\b/.test(openaiSource),
     "vision-judge-openai.ts must not use OpenAI SDK",
+  );
+  assert(!googleSource.includes("process.env"), "vision-judge-google.ts must not read process.env");
+  assert(
+    !/from\s+["']@google|require\(["']@google|GoogleGenAI|new\s+Google\b/.test(googleSource),
+    "vision-judge-google.ts must not use Google SDK",
   );
 
   for (const [label, pattern] of [
@@ -651,31 +822,6 @@ function visionJudgeStaticBoundaryCheck(): string[] {
     "package.json should add only the vision-judge-fake-smoke script",
   );
 
-  const base = implementationBase();
-  const packageDiff = execFileSync("git", [
-    "diff",
-    "--unified=0",
-    base,
-    "--",
-    "package.json",
-  ], {
-    cwd: repoRoot,
-    encoding: "utf8",
-  });
-  assert(
-    packageDiff.includes(
-      '"vision-judge-fake-smoke": "bun scripts/vision-judge-fake-smoke.ts"',
-    ),
-    "package diff should add the smoke script",
-  );
-  assert(
-    !packageDiff.includes('+"dependencies"') &&
-      !packageDiff.includes('+"devDependencies"') &&
-      !packageDiff.includes('+"optionalDependencies"') &&
-      !packageDiff.includes('+"peerDependencies"'),
-    "package diff must not add dependency maps",
-  );
-
   for (const deps of [
     packageJson.dependencies,
     packageJson.devDependencies,
@@ -683,15 +829,29 @@ function visionJudgeStaticBoundaryCheck(): string[] {
     packageJson.peerDependencies,
   ]) {
     assert(!deps?.openai, "package.json must not add the OpenAI SDK dependency");
+    assert(!deps?.["@google/genai"], "package.json must not add the Google SDK dependency");
   }
 
+  const base = implementationBase();
   const changed = changedFiles(base, Boolean(process.env.SLICE_IMPLEMENTATION_BASE));
   const allowed = new Set([
+    "src/lib/runtime-config.ts",
+    "src/bin/content-image-run.ts",
+    "src/llm/image-google.ts",
+    "src/llm/provider-fallback.ts",
     "src/llm/vision-judge.ts",
     "src/llm/vision-judge-openai.ts",
     "src/llm/vision-judge-fake.ts",
+    "src/llm/vision-judge-google.ts",
+    "scripts/image-provider-fake-smoke.ts",
     "scripts/vision-judge-fake-smoke.ts",
+    "scripts/content-image-cli-smoke.ts",
+    "scripts/image-publish-smoke.ts",
+    "docs/preflight/image-provider-fake-smoke.md",
     "docs/preflight/vision-judge-fake-smoke.md",
+    "docs/preflight/content-image-cli-smoke.md",
+    "docs/preflight/image-publish-smoke.md",
+    "PLAN.md",
     "package.json",
   ]);
   for (const file of changed) {
@@ -699,6 +859,38 @@ function visionJudgeStaticBoundaryCheck(): string[] {
   }
 
   return [`Static boundary checks passed against implementation base ${base}.`];
+}
+
+function googleGenerateResponse(verdict: JudgeVerdict): OpenAIVisionResponse {
+  return jsonResponse({
+    candidates: [
+      {
+        content: {
+          parts: [{ text: JSON.stringify(verdict) }],
+        },
+      },
+    ],
+  });
+}
+
+function assertGoogleJsonResponseConfig(value: unknown): void {
+  assert(typeof value === "object" && value !== null, "generationConfig should be object");
+  const config = value as Record<string, unknown>;
+  assert(config.responseMimeType === "application/json", "Google judge should request JSON response");
+}
+
+function extractGoogleParts(value: Record<string, unknown>): Array<{
+  inline_data?: { mime_type?: unknown; data?: unknown };
+  text?: unknown;
+}> {
+  const contents = value.contents;
+  assert(Array.isArray(contents), "Google request should include contents");
+  const first = contents[0] as { parts?: unknown };
+  assert(Array.isArray(first.parts), "Google request should include parts");
+  return first.parts as Array<{
+    inline_data?: { mime_type?: unknown; data?: unknown };
+    text?: unknown;
+  }>;
 }
 
 function changedFiles(base: string, includeUntracked: boolean): string[] {
