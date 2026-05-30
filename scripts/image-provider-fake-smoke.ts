@@ -104,6 +104,10 @@ const docPath = resolve(
   "preflight",
   "image-provider-fake-smoke.md",
 );
+const tinyPng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+  "base64",
+);
 
 const noopProvider: LLMProvider = {
   name: "noop",
@@ -623,13 +627,20 @@ async function openaiRejectsRelativeOutputPath(): Promise<string[]> {
 async function googleNanoBananaBuildsRequestAndWritesInlineData(
   runDir: string,
 ): Promise<string[]> {
-  const imageBytes = Buffer.from("google image bytes");
   const { fetchImpl, requests } = captureFetch(
     jsonResponse({
       candidates: [
         {
           content: {
-            parts: [{ text: "ok" }, { inlineData: { data: imageBytes.toString("base64") } }],
+            parts: [
+              { text: "ok" },
+              {
+                inlineData: {
+                  mimeType: "image/png",
+                  data: tinyPng.toString("base64"),
+                },
+              },
+            ],
           },
         },
       ],
@@ -640,9 +651,10 @@ async function googleNanoBananaBuildsRequestAndWritesInlineData(
     model: "nano banana 2",
     fetchImpl,
   });
-  const outputPath = resolve(runDir, "google-image.bin");
+  const outputPath = resolve(runDir, "google-image.png");
+  const spec = validSpec();
 
-  await provider.generate(validSpec(), outputPath, 1_000, "make the queue clearer");
+  await provider.generate(spec, outputPath, 1_000, "make the queue clearer");
 
   assert(requests.length === 1, "expected one Google request");
   assert(
@@ -662,9 +674,11 @@ async function googleNanoBananaBuildsRequestAndWritesInlineData(
     !("generationConfig" in requests[0].body),
     "Google image request should omit optional generationConfig for live REST compatibility",
   );
-  assert(readFileSync(outputPath).equals(imageBytes), "provider should write decoded inlineData bytes");
+  const png = parsePng(readFileSync(outputPath));
+  assert(png.width === spec.dimensions.w, "Google output should be normalized to spec width");
+  assert(png.height === spec.dimensions.h, "Google output should be normalized to spec height");
 
-  return ["Google Nano Banana 2 alias built a generationConfig-free request and wrote decoded inline image bytes."];
+  return ["Google Nano Banana 2 alias built a generationConfig-free request and normalized inline image bytes to PNG."];
 }
 
 async function googleSafetyError(runDir: string): Promise<string[]> {
@@ -885,8 +899,11 @@ function parsePng(bytes: Buffer): {
       height = data.readUInt32BE(4);
       bitDepth = data[8];
       colorType = data[9];
-      assert(bitDepth === 8, "fake PNG must use 8-bit samples");
-      assert(colorType === 6, "fake PNG must use RGBA color type 6");
+      assert(bitDepth === 8, "PNG must use 8-bit samples");
+      assert(
+        colorType === 0 || colorType === 2 || colorType === 4 || colorType === 6,
+        "PNG must use grayscale, grayscale-alpha, RGB, or RGBA color",
+      );
     } else if (type === "IDAT") {
       assert(length > 0, "IDAT must be non-empty");
       idats.push(data);
@@ -906,7 +923,9 @@ function parsePng(bytes: Buffer): {
   assert(idats.length > 0, "PNG missing IDAT");
 
   const decompressed = inflateSync(Buffer.concat(idats));
-  const expectedBytes = (width * 4 + 1) * height;
+  const channelsByColorType: Record<number, number> = { 0: 1, 2: 3, 4: 2, 6: 4 };
+  const channels = channelsByColorType[colorType];
+  const expectedBytes = (width * channels + 1) * height;
   assert(
     decompressed.length === expectedBytes,
     `decompressed scanline length mismatch: expected ${expectedBytes}, got ${decompressed.length}`,
@@ -1018,7 +1037,7 @@ function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {
     "",
     "- Fake provider: manifest-valid PNG, call/feedback recording, failure injection, deterministic bytes, relative path rejection.",
     "- OpenAI provider: GPT/DALL-E request bodies, prompt coverage, timeout/http/safety/fetch/parse errors, relative path pre-fetch rejection.",
-    "- Google provider: Nano Banana 2 alias request, inline image bytes, safety/parse errors, relative path pre-fetch rejection.",
+    "- Google provider: Nano Banana 2 alias request, inline image normalization, safety/parse errors, relative path pre-fetch rejection.",
     "- Static boundary: no OpenAI/Google SDK dependency, no provider env reads, fake provider hermeticity.",
   );
 

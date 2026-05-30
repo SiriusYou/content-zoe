@@ -1,6 +1,6 @@
 # Image Provider Fake Smoke
 
-Generated: 2026-05-30T13:26:04.195Z
+Generated: 2026-05-30T13:39:03.520Z
 
 | Scenario | Status | Details |
 | --- | --- | --- |
@@ -20,7 +20,7 @@ Generated: 2026-05-30T13:26:04.195Z
 | openai-parse-error-missing-b64 | PASS | OpenAI response missing data[0].b64_json mapped to parse. |
 | openai-parse-error-malformed-b64 | PASS | OpenAI malformed b64 response mapped to parse. |
 | openai-rejects-relative-output-path | PASS | OpenAI provider rejects relative output paths before fetch. |
-| google-nano-banana-builds-request-and-writes-inline-data | PASS | Google Nano Banana 2 alias built a generationConfig-free request and wrote decoded inline image bytes. |
+| google-nano-banana-builds-request-and-writes-inline-data | PASS | Google Nano Banana 2 alias built a generationConfig-free request and normalized inline image bytes to PNG. |
 | google-safety-error | PASS | Google SAFETY finishReason maps to safety and writes no file. |
 | google-parse-error-missing-inline-data | PASS | Google text-only image response maps to parse with a bounded text tail. |
 | google-rejects-relative-output-path | PASS | Google provider rejects relative output paths before fetch. |
@@ -31,5 +31,5 @@ Generated: 2026-05-30T13:26:04.195Z
 
 - Fake provider: manifest-valid PNG, call/feedback recording, failure injection, deterministic bytes, relative path rejection.
 - OpenAI provider: GPT/DALL-E request bodies, prompt coverage, timeout/http/safety/fetch/parse errors, relative path pre-fetch rejection.
-- Google provider: Nano Banana 2 alias request, inline image bytes, safety/parse errors, relative path pre-fetch rejection.
+- Google provider: Nano Banana 2 alias request, inline image normalization, safety/parse errors, relative path pre-fetch rejection.
 - Static boundary: no OpenAI/Google SDK dependency, no provider env reads, fake provider hermeticity.

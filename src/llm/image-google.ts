@@ -1,4 +1,11 @@
-import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 
 import type { ImageSpec } from "../pipeline/image/spec.ts";
@@ -35,9 +42,11 @@ interface GoogleGeneratePayload {
       parts?: Array<{
         inlineData?: {
           data?: unknown;
+          mimeType?: unknown;
         };
         inline_data?: {
           data?: unknown;
+          mime_type?: unknown;
         };
         text?: unknown;
       }>;
@@ -54,6 +63,12 @@ interface GoogleGeneratePayload {
 const DEFAULT_MODEL = "gemini-3.1-flash-image";
 const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1/models";
 const bodyTailMaxChars = 500;
+const sipsPath = "/usr/bin/sips";
+
+interface InlineImageData {
+  data: string;
+  mimeType?: string;
+}
 
 export class GoogleImageProvider implements ImageProvider {
   readonly name = "google-image";
@@ -86,16 +101,18 @@ export class GoogleImageProvider implements ImageProvider {
     }
 
     const response = await this.requestImage(spec, timeoutMs, feedback);
-    const b64 = parseImageB64(response);
-    const bytes = decodeBase64(b64);
+    const image = parseImageData(response);
+    const bytes = decodeBase64(image.data);
 
     try {
-      mkdirSync(path.dirname(absolutePath), { recursive: true });
-      const tempPath = `${absolutePath}.tmp`;
-      writeFileSync(tempPath, bytes);
-      renameSync(tempPath, absolutePath);
+      writeNormalizedPng(bytes, absolutePath, spec.dimensions, image.mimeType);
     } catch (err) {
       rmSync(`${absolutePath}.tmp`, { force: true });
+      rmSync(`${absolutePath}.source`, { force: true });
+      rmSync(`${absolutePath}.source.png`, { force: true });
+      rmSync(`${absolutePath}.source.jpg`, { force: true });
+      rmSync(`${absolutePath}.source.jpeg`, { force: true });
+      rmSync(`${absolutePath}.source.webp`, { force: true });
       throw new ImageProviderError({
         code: "parse",
         message: `failed to write image output: ${formatThrown(err)}`,
@@ -221,7 +238,7 @@ export function normalizeGoogleImageModel(model: string | undefined): string {
   return model!.trim();
 }
 
-function parseImageB64(text: string): string {
+function parseImageData(text: string): InlineImageData {
   let parsed: GoogleGeneratePayload;
   try {
     parsed = JSON.parse(text) as GoogleGeneratePayload;
@@ -246,7 +263,12 @@ function parseImageB64(text: string): string {
   for (const part of parts) {
     const inlineData = part.inlineData ?? part.inline_data;
     if (typeof inlineData?.data === "string" && inlineData.data.length > 0) {
-      return inlineData.data;
+      const inlineDataRecord = inlineData as Record<string, unknown>;
+      const mimeType = inlineDataRecord.mimeType ?? inlineDataRecord.mime_type;
+      return {
+        data: inlineData.data,
+        mimeType: typeof mimeType === "string" ? mimeType : undefined,
+      };
     }
   }
 
@@ -262,6 +284,97 @@ function parseImageB64(text: string): string {
     bodyTail: textTail.length > 0 ? textTail : undefined,
     message: "Google image response missing inline image data",
   });
+}
+
+function writeNormalizedPng(
+  bytes: Buffer,
+  absolutePath: string,
+  dimensions: { w: number; h: number },
+  mimeType?: string,
+): void {
+  mkdirSync(path.dirname(absolutePath), { recursive: true });
+  const tempPath = `${absolutePath}.tmp`;
+  const existingPng = parsePngDimensions(bytes);
+  if (existingPng?.w === dimensions.w && existingPng.h === dimensions.h) {
+    writeFileSync(tempPath, bytes);
+    renameSync(tempPath, absolutePath);
+    return;
+  }
+
+  if (!existsSync(sipsPath)) {
+    throw new Error("macOS sips is required to normalize Google image output to PNG");
+  }
+
+  const sourcePath = `${absolutePath}.source${extensionForRaster(bytes, mimeType)}`;
+  try {
+    writeFileSync(sourcePath, bytes);
+    const result = Bun.spawnSync({
+      cmd: [
+        sipsPath,
+        "-s",
+        "format",
+        "png",
+        "-z",
+        String(dimensions.h),
+        String(dimensions.w),
+        sourcePath,
+        "--out",
+        tempPath,
+      ],
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (!result.success || result.exitCode !== 0) {
+      throw new Error(
+        `sips failed with code ${result.exitCode}: ${decodePipe(result.stderr) || decodePipe(result.stdout)}`,
+      );
+    }
+
+    const normalized = readFileSync(tempPath);
+    const normalizedDimensions = parsePngDimensions(normalized);
+    if (
+      normalizedDimensions?.w !== dimensions.w ||
+      normalizedDimensions.h !== dimensions.h
+    ) {
+      throw new Error(
+        `sips output dimensions mismatch: expected ${dimensions.w}x${dimensions.h}, got ${
+          normalizedDimensions
+            ? `${normalizedDimensions.w}x${normalizedDimensions.h}`
+            : "non-png"
+        }`,
+      );
+    }
+    renameSync(tempPath, absolutePath);
+  } finally {
+    rmSync(sourcePath, { force: true });
+  }
+}
+
+function parsePngDimensions(bytes: Buffer): { w: number; h: number } | undefined {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (bytes.length < 24 || !bytes.subarray(0, 8).equals(signature)) {
+    return undefined;
+  }
+  if (bytes.toString("ascii", 12, 16) !== "IHDR") {
+    return undefined;
+  }
+  return {
+    w: bytes.readUInt32BE(16),
+    h: bytes.readUInt32BE(20),
+  };
+}
+
+function extensionForRaster(bytes: Buffer, mimeType: string | undefined): string {
+  const normalizedMime = mimeType?.toLowerCase();
+  if (normalizedMime === "image/png") return ".png";
+  if (normalizedMime === "image/jpeg" || normalizedMime === "image/jpg") return ".jpg";
+  if (normalizedMime === "image/webp") return ".webp";
+  if (parsePngDimensions(bytes)) return ".png";
+  if (bytes.subarray(0, 2).equals(Buffer.from([0xff, 0xd8]))) return ".jpg";
+  if (bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") {
+    return ".webp";
+  }
+  return "";
 }
 
 function assertNotSafetyBlocked(parsed: GoogleGeneratePayload): void {
@@ -344,6 +457,11 @@ function isAbortError(err: unknown): boolean {
 
 function tail(text: string, maxChars: number): string {
   return text.length <= maxChars ? text : text.slice(text.length - maxChars);
+}
+
+function decodePipe(value: Buffer | Uint8Array | ArrayBuffer | undefined): string {
+  if (!value) return "";
+  return new TextDecoder().decode(value).trim();
 }
 
 function formatThrown(err: unknown): string {
