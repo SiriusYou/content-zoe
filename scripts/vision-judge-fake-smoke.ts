@@ -50,6 +50,8 @@ type ScenarioName =
   | "google-builds-vision-request"
   | "google-model-unavailable-fallback"
   | "google-parses-string-wrapped-verdict"
+  | "google-parses-deep-string-wrapped-verdict"
+  | "google-parses-single-array-wrapped-verdict"
   | "google-safety-error"
   | "google-parse-invalid-verdict"
   | "google-rejects-relative-path"
@@ -93,6 +95,8 @@ const SCENARIOS: readonly ScenarioName[] = [
   "google-builds-vision-request",
   "google-model-unavailable-fallback",
   "google-parses-string-wrapped-verdict",
+  "google-parses-deep-string-wrapped-verdict",
+  "google-parses-single-array-wrapped-verdict",
   "google-safety-error",
   "google-parse-invalid-verdict",
   "google-rejects-relative-path",
@@ -219,6 +223,10 @@ async function scenarioImpl(
       return googleModelUnavailableFallback(runDir);
     case "google-parses-string-wrapped-verdict":
       return googleParsesStringWrappedVerdict(runDir);
+    case "google-parses-deep-string-wrapped-verdict":
+      return googleParsesDeepStringWrappedVerdict(runDir);
+    case "google-parses-single-array-wrapped-verdict":
+      return googleParsesSingleArrayWrappedVerdict(runDir);
     case "google-safety-error":
       return googleSafetyError(runDir);
     case "google-parse-invalid-verdict":
@@ -766,6 +774,64 @@ async function googleParsesStringWrappedVerdict(runDir: string): Promise<string[
   return ["Google judge parses JSON-string-wrapped verdict text before strict validation."];
 }
 
+async function googleParsesDeepStringWrappedVerdict(runDir: string): Promise<string[]> {
+  const judge = new GoogleVisionJudge({
+    apiKey: "google-key",
+    model: "gemini-2.5-pro",
+    fetchImpl: captureFetch(
+      jsonResponse({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify(
+                    JSON.stringify(JSON.stringify(passingVerdict())),
+                  ),
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    ).fetchImpl,
+  });
+
+  const verdict = await judge.judge(
+    writeImage(runDir, "deep-string-wrapped.png"),
+    validSpec(),
+    1_000,
+  );
+  assert(verdict.overallPass, "expected deep string-wrapped verdict to pass");
+  return ["Google judge unwraps repeated JSON-string verdict layers before strict validation."];
+}
+
+async function googleParsesSingleArrayWrappedVerdict(runDir: string): Promise<string[]> {
+  const judge = new GoogleVisionJudge({
+    apiKey: "google-key",
+    model: "gemini-2.5-pro",
+    fetchImpl: captureFetch(
+      jsonResponse({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: JSON.stringify([passingVerdict()]) }],
+            },
+          },
+        ],
+      }),
+    ).fetchImpl,
+  });
+
+  const verdict = await judge.judge(
+    writeImage(runDir, "single-array-wrapped.png"),
+    validSpec(),
+    1_000,
+  );
+  assert(verdict.overallPass, "expected single-array-wrapped verdict to pass");
+  return ["Google judge unwraps one-item verdict arrays before strict validation."];
+}
+
 async function googleSafetyError(runDir: string): Promise<string[]> {
   const judge = new GoogleVisionJudge({
     apiKey: "google-key",
@@ -1253,7 +1319,7 @@ function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {
     "",
     "- Fake judge: explicit scripted queue, fail-then-pass sequencing, failure injection, relative-path rejection, deep-clone determinism.",
     "- OpenAI judge: chat-completions request shape, PNG data URL, fenced JSON parsing, timeout/http/parse/safety mappings, image-read pre-fetch failure, criterion-id exactness.",
-    "- Google judge: Gemini alias request shape, stable-model fallback on unavailable model ids, string-wrapped JSON verdicts, safety/parse mappings, relative-path rejection.",
+    "- Google judge: Gemini alias request shape, stable-model fallback on unavailable model ids, string/array-wrapped JSON verdicts, safety/parse mappings, relative-path rejection.",
     "- Static boundary: no OpenAI SDK dependency, no provider env reads, fake judge hermeticity, package script-only change, declared implementation file scope.",
   );
 

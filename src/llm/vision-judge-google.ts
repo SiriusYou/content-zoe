@@ -274,7 +274,7 @@ function parseJudgeResponse(text: string, spec: ImageSpec): JudgeVerdict {
 
   let contentJson: unknown;
   try {
-    contentJson = parseJsonMaybeStringWrapped(textPart.text);
+    contentJson = parseJsonMaybeWrapped(textPart.text);
   } catch (err) {
     throw new VisionJudgeError({
       code: "parse",
@@ -289,7 +289,9 @@ function parseJudgeResponse(text: string, spec: ImageSpec): JudgeVerdict {
   } catch (err) {
     throw new VisionJudgeError({
       code: "parse",
-      message: `Google vision judge returned invalid JudgeVerdict: ${formatThrown(err)}`,
+      message:
+        `Google vision judge returned invalid JudgeVerdict ` +
+        `(${describeJsonShape(contentJson)}): ${formatThrown(err)}`,
       cause: err,
     });
   }
@@ -298,12 +300,25 @@ function parseJudgeResponse(text: string, spec: ImageSpec): JudgeVerdict {
   return verdict;
 }
 
-function parseJsonMaybeStringWrapped(text: string): unknown {
+function parseJsonMaybeWrapped(text: string): unknown {
   let parsed = JSON.parse(stripJsonFence(text));
-  if (typeof parsed === "string") {
+  for (let depth = 0; depth < 5 && typeof parsed === "string"; depth += 1) {
     parsed = JSON.parse(stripJsonFence(parsed));
   }
+  if (Array.isArray(parsed) && parsed.length === 1) {
+    return parsed[0];
+  }
   return parsed;
+}
+
+function describeJsonShape(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `parsed ${value.length}-item array`;
+  }
+  if (value === null) {
+    return "parsed null";
+  }
+  return `parsed ${typeof value}`;
 }
 
 function assertCriteriaMatchSpec(verdict: JudgeVerdict, spec: ImageSpec): void {
