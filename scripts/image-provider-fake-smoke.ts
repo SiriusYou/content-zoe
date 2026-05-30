@@ -658,9 +658,13 @@ async function googleNanoBananaBuildsRequestAndWritesInlineData(
   const prompt = contents[0]?.parts?.[0]?.text ?? "";
   assert(prompt.includes("Original prompt:"), "Google image prompt should include ImageSpec prompt");
   assert(prompt.includes("Regeneration feedback:"), "Google image prompt should include feedback");
+  assert(
+    !("generationConfig" in requests[0].body),
+    "Google image request should omit optional generationConfig for live REST compatibility",
+  );
   assert(readFileSync(outputPath).equals(imageBytes), "provider should write decoded inlineData bytes");
 
-  return ["Google Nano Banana 2 alias built generateContent request and wrote decoded inline image bytes."];
+  return ["Google Nano Banana 2 alias built a generationConfig-free request and wrote decoded inline image bytes."];
 }
 
 async function googleSafetyError(runDir: string): Promise<string[]> {

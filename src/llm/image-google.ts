@@ -190,15 +190,14 @@ export class GoogleImageProvider implements ImageProvider {
     spec: ImageSpec,
     feedback?: string,
   ): Record<string, unknown> {
+    // Gemini image models default to text+image responses; some live API
+    // versions reject generationConfig.responseModalities on REST requests.
     return {
       contents: [
         {
           parts: [{ text: buildImagePrompt(spec, feedback) }],
         },
       ],
-      generationConfig: {
-        responseModalities: ["TEXT", "IMAGE"],
-      },
     };
   }
 }
