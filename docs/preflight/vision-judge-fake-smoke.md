@@ -1,6 +1,6 @@
 # Vision Judge Fake Smoke
 
-Generated: 2026-05-30T11:29:23.964Z
+Generated: 2026-05-30T13:54:19.345Z
 
 | Scenario | Status | Details |
 | --- | --- | --- |
@@ -23,7 +23,7 @@ Generated: 2026-05-30T11:29:23.964Z
 | openai-parse-invalid-verdict | PASS | Invalid JudgeVerdict maps to parse and preserves JUDGE_VERDICT_INVALID cause. |
 | openai-parse-criteria-id-mismatch | PASS | Criterion id mismatch smoke covered missing, extra, and wrong id variants as parse. |
 | openai-rejects-relative-path | PASS | OpenAI judge rejects relative image paths before fetch. |
-| google-builds-vision-request | PASS | Google judge built generateContent JSON request with Gemini 3.1 Pro alias, PNG inline data, and prompt criteria. |
+| google-builds-vision-request | PASS | Google judge mapped Gemini 3.1 Pro alias to gemini-3-pro-preview and built a JSON request with PNG inline data. |
 | google-safety-error | PASS | Google SAFETY finishReason maps to safety. |
 | google-parse-invalid-verdict | PASS | Google invalid JudgeVerdict maps to parse. |
 | google-rejects-relative-path | PASS | Google judge rejects relative image paths before fetch. |

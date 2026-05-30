@@ -655,7 +655,7 @@ async function googleBuildsVisionRequest(runDir: string): Promise<string[]> {
   assert(requests.length === 1, "expected one Google request");
   assert(
     requests[0].url ===
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent",
     `unexpected Google URL: ${requests[0].url}`,
   );
   assert(requests[0].init.method === "POST", "request should use POST");
@@ -684,7 +684,7 @@ async function googleBuildsVisionRequest(runDir: string): Promise<string[]> {
   ]) {
     assert(prompt.includes(value), `prompt should include ${value}`);
   }
-  return ["Google judge built generateContent JSON request with Gemini 3.1 Pro alias, PNG inline data, and prompt criteria."];
+  return ["Google judge mapped Gemini 3.1 Pro alias to gemini-3-pro-preview and built a JSON request with PNG inline data."];
 }
 
 async function googleSafetyError(runDir: string): Promise<string[]> {

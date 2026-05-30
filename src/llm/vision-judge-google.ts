@@ -205,9 +205,15 @@ export class GoogleVisionJudge implements VisionJudge {
 
 export function normalizeGoogleVisionModel(model: string): string {
   const trimmed = model.trim();
-  const normalized = trimmed.toLowerCase().replaceAll("_", "-");
-  if (normalized === "gemini3.1-pro") return "gemini-3.1-pro";
-  if (normalized === "gemini3-pro") return "gemini-3-pro";
+  const normalized = trimmed.toLowerCase().replaceAll("_", "-").replace(/\s+/g, "-");
+  if (
+    normalized === "gemini3.1-pro" ||
+    normalized === "gemini-3.1-pro" ||
+    normalized === "gemini3-pro" ||
+    normalized === "gemini-3-pro"
+  ) {
+    return "gemini-3-pro-preview";
+  }
   return trimmed;
 }
 
