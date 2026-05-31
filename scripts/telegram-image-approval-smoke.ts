@@ -648,7 +648,6 @@ function writeEvidence(outcomes: readonly ScenarioOutcome[]): void {
     "- No real Telegram network call was made; HTTP behavior used an injected fake fetch.",
     "- No real bot token, chat id, image provider, vision judge, or `content:image-run` execution was used.",
     "- Temporary DB and `.runs` artifacts were created under the OS temp directory and removed in a `finally` path.",
-    "",
   );
 
   mkdirSync(dirname(docPath), { recursive: true });

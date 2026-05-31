@@ -1,9 +1,9 @@
 # Bot Smoke Evidence
 
 - Command: `bun run bot-smoke`
-- Started: 2026-05-31T05:27:02.307Z
-- Finished: 2026-05-31T05:27:02.542Z
-- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-31T05-27-02.306Z (removed by finally-cleanup)
+- Started: 2026-05-31T05:43:00.219Z
+- Finished: 2026-05-31T05:43:00.526Z
+- Scenario root: /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-31T05-43-00.219Z (removed by finally-cleanup)
 - Result: 74/74 PASS
 
 ## Evidence Ceiling
@@ -86,5 +86,5 @@ This smoke exercises deterministic allowlist parsing, injected bot runtime seams
 | reject-vocabulary-source-of-truth | PASS | commands.ts imports reject vocabulary from modality.ts and has no local reject scope/type/matrix truth.<br>modality.ts exports runtime reject vocabulary, modality-scoped matrix, and the shared validator. |
 | boundary-static-check | PASS | Cycle-scope boundary check ran in active-slice mode and saw changed files: docs/preflight/bot-smoke.md, docs/preflight/telegram-image-approval-smoke.md, docs/runbooks/telegram-bot-operation.md, package.json, scripts/bot-smoke.ts, scripts/telegram-image-approval-smoke.ts, src/telegram/bot.ts, src/telegram/notifier.ts.<br>Active Slice 9 scope admits only Telegram visual-approval notifier/bot wiring, the Slice 9 smoke/runbook/evidence, package scripts, and bot-smoke adaptation evidence.<br>Synthetic Slice 4.12 report:create files resolve to inherited-surface mode without a bot-smoke exemption.<br>Synthetic Slice 4.13 report:remind files resolve to inherited-surface mode without a bot-smoke exemption.<br>Synthetic Slice 4.14 report:status files resolve to inherited-surface mode without a bot-smoke exemption.<br>Synthetic Slice 4.15 report:show files resolve to inherited-surface mode without a bot-smoke exemption.<br>Synthetic Slice 4.16 report:list files resolve to inherited-surface mode without a bot-smoke exemption.<br>Synthetic active-slice scope check rejects out-of-scope prompt product files.<br>Changed runtime sources contain no prompt/LLM/preflight/Codex dependency, report-run execution surface, or broad process spawn surface.<br>commands.ts and product support surfaces stayed out of scope; bot.ts contains no abort plumbing.<br>Smoke source contains no Telegram fetch/API network path, commands.ts does not duplicate notifier orchestration, and status handling does not call promoteJob or inspect .runs. |
 | dependency-boundary-check | PASS | Telegram SDK/network concept-class checks are shared and absent from notifier.ts, commands.ts, and promote.ts.<br>commands.ts does not add Telegram network or new publish/process surfaces for /status, and package.json exposes only the expected bot runtime and bot-smoke command surfaces. |
-| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-31T05-27-02.306Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
+| bot-db-path-cwd | PASS | Default DB path resolved to /var/folders/77/w_yjdztn54lfvlt0drtcpx040000gn/T/cz-bot-smoke-2026-05-31T05-43-00.219Z/bot-db-path-cwd/runtime-cwd/.data/content.db.<br>Default tick interval remains 10000. |
 | no-preflight-codex-survivability | PASS | Changed bot, allowlist, and command surfaces have no preflight, Codex smoke, LLM, prompt, process-spawn, or report-run execution dependency. |

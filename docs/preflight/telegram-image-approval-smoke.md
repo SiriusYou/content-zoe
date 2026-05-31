@@ -1,7 +1,7 @@
 # Telegram Image Approval Smoke Evidence
 
 - Command: `bun run telegram-image-approval-smoke`
-- Generated: 2026-05-31T05:26:53.552Z
+- Generated: 2026-05-31T05:42:53.063Z
 - Result: 9/9 PASS
 - Evidence ceiling: hermetic smoke/static evidence only; no live Telegram client observation.
 
@@ -22,4 +22,3 @@
 - No real Telegram network call was made; HTTP behavior used an injected fake fetch.
 - No real bot token, chat id, image provider, vision judge, or `content:image-run` execution was used.
 - Temporary DB and `.runs` artifacts were created under the OS temp directory and removed in a `finally` path.
-
