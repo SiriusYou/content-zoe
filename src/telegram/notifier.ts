@@ -1,10 +1,23 @@
 import {
+  lstatSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+} from "node:fs";
+import path from "node:path";
+
+import {
   casUpdateJob,
   findJobById,
   insertEvent,
   type DbClient,
   type Job,
 } from "../db.ts";
+import { parseImageSpec, type ImageSpec } from "../pipeline/image/spec.ts";
+import {
+  parseJudgeVerdict,
+  type JudgeVerdict,
+} from "../pipeline/image/verdict.ts";
 
 export const NOTIFIER_RETRY_DELAYS_MS = [1000, 5000, 30000] as const;
 export const NOTIFY_LIMIT_DEFAULT = 10;
@@ -14,6 +27,8 @@ export interface ApprovalNotification {
   attemptNumber: number;
   approvalSummary: string;
   text: string;
+  imageAbsolutePath?: string;
+  caption?: string;
 }
 
 export type ApprovalNotificationSender = (
@@ -29,6 +44,7 @@ export interface NotifyPendingApprovalsOptions {
   sender: ApprovalNotificationSender;
   now: NotifierClock;
   sleep: NotifierSleep;
+  cwd?: string;
   limit?: number;
   retryDelaysMs?: readonly number[];
 }
@@ -52,6 +68,12 @@ const AWAITING_APPROVAL = "awaiting_approval";
 const NOTIFIED_EVENT = "notified";
 const NOTIFY_FAILED_EVENT = "notify_failed";
 const MISSING_SUMMARY_ERROR = "approval_summary is required for approval notification";
+const IMAGE_PREVIEW_UNAVAILABLE =
+  "IMAGE PREVIEW UNAVAILABLE - inspect locally before approving.";
+const PHOTO_CAPTION_LIMIT = 1024;
+const PNG_SIGNATURE = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+]);
 
 export function formatApprovalNotification(
   input: FormatApprovalNotificationInput,
@@ -105,16 +127,23 @@ export async function notifyPendingApprovals(
       continue;
     }
 
-    const notification: ApprovalNotification = {
-      jobId: job.id,
-      attemptNumber: job.attempt_number,
-      approvalSummary: summary,
-      text: formatApprovalNotification({
-        jobId: job.id,
-        attemptNumber: job.attempt_number,
-        approvalSummary: summary,
-      }),
-    };
+    let notification: ApprovalNotification;
+    try {
+      notification = buildApprovalNotification(options, job, summary);
+    } catch (err) {
+      const recorded = recordNotifyFailure(options.db, {
+        job,
+        now: options.now,
+        errorMessage: readableError(err),
+      });
+      if (recorded) {
+        result.failed += 1;
+        result.malformed += 1;
+      } else {
+        result.abandoned += 1;
+      }
+      continue;
+    }
 
     const outcome = await sendWithRetry(options, job, notification, retryDelaysMs);
     result.senderCalls += outcome.senderCalls;
@@ -142,6 +171,272 @@ function selectPendingApprovalJobs(db: DbClient, limit: number): Job[] {
       `,
     )
     .all(AWAITING_APPROVAL, limit);
+}
+
+function buildApprovalNotification(
+  options: NotifyPendingApprovalsOptions,
+  job: Job,
+  summary: string,
+): ApprovalNotification {
+  if (job.modality !== "image") {
+    return {
+      jobId: job.id,
+      attemptNumber: job.attempt_number,
+      approvalSummary: summary,
+      text: formatApprovalNotification({
+        jobId: job.id,
+        attemptNumber: job.attempt_number,
+        approvalSummary: summary,
+      }),
+    };
+  }
+
+  const attempt = loadSafeImageAttempt({
+    cwd: options.cwd ?? process.cwd(),
+    jobId: job.id,
+    attemptNumber: job.attempt_number,
+    runDir: job.run_dir,
+  });
+  const caption = formatImageApprovalCaption({
+    job,
+    spec: attempt.spec,
+    verdict: attempt.verdict,
+  });
+
+  return {
+    jobId: job.id,
+    attemptNumber: job.attempt_number,
+    approvalSummary: summary,
+    text: formatImagePreviewUnavailableText({
+      job,
+      spec: attempt.spec,
+      verdict: attempt.verdict,
+    }),
+    imageAbsolutePath: attempt.imagePath,
+    caption,
+  };
+}
+
+interface SafeImageAttempt {
+  readonly imagePath: string;
+  readonly spec: ImageSpec;
+  readonly verdict: JudgeVerdict;
+}
+
+function loadSafeImageAttempt(args: {
+  cwd: string;
+  jobId: string;
+  attemptNumber: number;
+  runDir: string | null;
+}): SafeImageAttempt {
+  const cwdReal = realpathSync(args.cwd);
+  const safeRunRoot = path.resolve(cwdReal, ".runs", args.jobId);
+  const runDir = normalizeRunDir(args.runDir, args.jobId);
+  const storedRunRoot = path.resolve(cwdReal, runDir);
+  const expectedRunRootReal = realpathContained(
+    safeRunRoot,
+    cwdReal,
+    `run root for ${args.jobId}`,
+  );
+  const storedRunRootReal = realpathContained(
+    storedRunRoot,
+    expectedRunRootReal,
+    `stored run_dir for ${args.jobId}`,
+  );
+
+  if (storedRunRootReal !== expectedRunRootReal) {
+    throw new Error("image notification run_dir does not match job run root");
+  }
+
+  const attemptDir = path.resolve(
+    expectedRunRootReal,
+    `attempt-${args.attemptNumber}`,
+  );
+  const attemptDirReal = realpathContained(
+    attemptDir,
+    expectedRunRootReal,
+    `attempt directory for ${args.jobId}`,
+  );
+  if (attemptDirReal !== attemptDir) {
+    throw new Error("image notification attempt directory resolved unexpectedly");
+  }
+
+  const imagePath = validateAttemptFile({
+    attemptDirReal,
+    filename: "image.png",
+    jobId: args.jobId,
+  });
+  const dimensions = parsePngDimensions(imagePath);
+  if (dimensions.width <= 0 || dimensions.height <= 0) {
+    throw new Error("image.png has invalid IHDR dimensions");
+  }
+
+  const specPath = validateAttemptFile({
+    attemptDirReal,
+    filename: "spec.json",
+    jobId: args.jobId,
+  });
+  const verdictPath = validateAttemptFile({
+    attemptDirReal,
+    filename: "verdict.json",
+    jobId: args.jobId,
+  });
+
+  return {
+    imagePath,
+    spec: parseImageSpec(readJsonFile(specPath, "spec.json")),
+    verdict: parseJudgeVerdict(readJsonFile(verdictPath, "verdict.json")),
+  };
+}
+
+function normalizeRunDir(runDir: string | null, jobId: string): string {
+  if (runDir === null || runDir.trim().length === 0) {
+    throw new Error("image notification run_dir is required");
+  }
+  if (path.isAbsolute(runDir)) {
+    throw new Error("image notification run_dir must be relative");
+  }
+
+  const normalized = path.normalize(runDir);
+  if (
+    normalized !== runDir ||
+    normalized === "." ||
+    normalized.split(path.sep).includes("..")
+  ) {
+    throw new Error("image notification run_dir must be normalized and parent-free");
+  }
+
+  const expected = path.join(".runs", jobId);
+  if (normalized !== expected) {
+    throw new Error("image notification run_dir must be rooted under its job");
+  }
+
+  return normalized;
+}
+
+function validateAttemptFile(args: {
+  attemptDirReal: string;
+  filename: string;
+  jobId: string;
+}): string {
+  const candidate = path.resolve(args.attemptDirReal, args.filename);
+  const lstat = lstatSync(candidate);
+  if (lstat.isSymbolicLink()) {
+    throw new Error(`${args.filename} must not be a symlink`);
+  }
+  const stat = statSync(candidate);
+  if (!stat.isFile()) {
+    throw new Error(`${args.filename} must be a regular file`);
+  }
+  return realpathContained(
+    candidate,
+    args.attemptDirReal,
+    `${args.filename} for ${args.jobId}`,
+  );
+}
+
+function realpathContained(
+  candidate: string,
+  root: string,
+  label: string,
+): string {
+  const candidateReal = realpathSync(candidate);
+  if (!isPathContained(candidateReal, root)) {
+    throw new Error(`${label} escapes expected run boundary`);
+  }
+  return candidateReal;
+}
+
+function isPathContained(candidate: string, root: string): boolean {
+  const relative = path.relative(root, candidate);
+  return (
+    relative === "" ||
+    (!relative.startsWith("..") && !path.isAbsolute(relative))
+  );
+}
+
+function parsePngDimensions(imagePath: string): {
+  readonly width: number;
+  readonly height: number;
+} {
+  const header = readFileSync(imagePath).subarray(0, 33);
+  if (header.length < 33 || !header.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    throw new Error("image.png is not a PNG");
+  }
+  if (header.readUInt32BE(8) !== 13 || header.toString("ascii", 12, 16) !== "IHDR") {
+    throw new Error("image.png lacks parseable IHDR dimensions");
+  }
+  const width = header.readUInt32BE(16);
+  const height = header.readUInt32BE(20);
+  if (width <= 0 || height <= 0) {
+    throw new Error("image.png has invalid IHDR dimensions");
+  }
+  return { width, height };
+}
+
+function readJsonFile(filePath: string, label: string): unknown {
+  try {
+    return JSON.parse(readFileSync(filePath, "utf8"));
+  } catch (err) {
+    throw new Error(`${label} is not parseable JSON: ${readableError(err)}`);
+  }
+}
+
+function formatImageApprovalCaption(input: {
+  job: Job;
+  spec: ImageSpec;
+  verdict: JudgeVerdict;
+}): string {
+  const passed = input.verdict.criteria.filter((criterion) => criterion.pass).length;
+  const total = input.verdict.criteria.length;
+  const tail = [
+    `Verdict: ${input.verdict.overallPass ? "PASS" : "FAIL"}`,
+    `Criteria: ${passed}/${total} pass`,
+    `Approve: /approve ${input.job.id} ${input.job.attempt_number}`,
+    `Reject: /reject ${input.job.id} ${input.job.attempt_number} image:<subject_off|style_off|composition_off|safety> <reason>`,
+  ].join("\n");
+  return truncatePrefixPreservingTail(`Subject: ${input.spec.subject}`, tail);
+}
+
+function formatImagePreviewUnavailableText(input: {
+  job: Job;
+  spec: ImageSpec;
+  verdict: JudgeVerdict;
+}): string {
+  const passed = input.verdict.criteria.filter((criterion) => criterion.pass).length;
+  const total = input.verdict.criteria.length;
+  return [
+    IMAGE_PREVIEW_UNAVAILABLE,
+    `Job: ${input.job.id}`,
+    `Attempt: ${input.job.attempt_number}`,
+    `Subject: ${input.spec.subject}`,
+    `Verdict: ${input.verdict.overallPass ? "PASS" : "FAIL"}`,
+    `Criteria: ${passed}/${total} pass`,
+    "",
+    `Inspect image: bun run content:image-show ${input.job.id} --artifact image`,
+    `Inspect verdict: bun run content:image-show ${input.job.id} --artifact verdict`,
+    `Approve: /approve ${input.job.id} ${input.job.attempt_number}`,
+    `Reject: /reject ${input.job.id} ${input.job.attempt_number} image:<subject_off|style_off|composition_off|safety> <reason>`,
+  ].join("\n");
+}
+
+function truncatePrefixPreservingTail(prefix: string, tail: string): string {
+  if (tail.length + 1 > PHOTO_CAPTION_LIMIT) {
+    throw new Error("image approval command hints exceed Telegram caption limit");
+  }
+
+  const full = `${prefix}\n${tail}`;
+  if (full.length <= PHOTO_CAPTION_LIMIT) {
+    return full;
+  }
+
+  const ellipsis = "...";
+  const maxPrefixLength = PHOTO_CAPTION_LIMIT - tail.length - 1;
+  const truncatedPrefix =
+    maxPrefixLength <= ellipsis.length
+      ? prefix.slice(0, maxPrefixLength)
+      : `${prefix.slice(0, maxPrefixLength - ellipsis.length)}${ellipsis}`;
+  return `${truncatedPrefix}\n${tail}`;
 }
 
 async function sendWithRetry(

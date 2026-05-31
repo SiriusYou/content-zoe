@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readFile, stat } from "node:fs/promises";
 
 import { openDb as defaultOpenDb, type DbClient } from "../db.ts";
 import {
@@ -50,6 +51,16 @@ export interface LoadBotConfigOptions {
 
 export interface TelegramTransport {
   sendMessage(chatId: number, text: string): Promise<void> | void;
+  sendPhoto?(
+    chatId: number,
+    imageAbsolutePath: string,
+    caption: string,
+  ): Promise<void> | void;
+  sendDocument?(
+    chatId: number,
+    imageAbsolutePath: string,
+    caption: string,
+  ): Promise<void> | void;
 }
 
 export interface TelegramHttpTransportOptions {
@@ -90,6 +101,7 @@ export interface CreateTelegramSenderOptions {
 
 export interface TickDependencies {
   readonly dbPath: string;
+  readonly cwd: string;
   readonly openDb: (dbPath: string) => DbClient;
   readonly sender: ApprovalNotificationSender;
   readonly notifyPendingApprovals: typeof defaultNotifyPendingApprovals;
@@ -193,7 +205,20 @@ export function createTelegramSender(
   const chatIds = [...options.chatIds];
   return async (notification: ApprovalNotification): Promise<void> => {
     await Promise.all(
-      chatIds.map((chatId) => options.transport.sendMessage(chatId, notification.text)),
+      chatIds.map((chatId) => {
+        if (
+          notification.imageAbsolutePath !== undefined &&
+          notification.caption !== undefined &&
+          options.transport.sendPhoto !== undefined
+        ) {
+          return options.transport.sendPhoto(
+            chatId,
+            notification.imageAbsolutePath,
+            notification.caption,
+          );
+        }
+        return options.transport.sendMessage(chatId, notification.text);
+      }),
     );
   };
 }
@@ -217,6 +242,52 @@ export function createTelegramHttpTransport(
       if (!response.ok) {
         throw new Error(`Telegram sendMessage failed with HTTP ${response.status}`);
       }
+    },
+    async sendPhoto(
+      chatId: number,
+      imageAbsolutePath: string,
+      caption: string,
+    ): Promise<void> {
+      if (await isTelegramPhotoSuitable(imageAbsolutePath)) {
+        await sendMultipartTelegram({
+          fetchImpl,
+          apiRoot,
+          token: options.token,
+          method: "sendPhoto",
+          fieldName: "photo",
+          chatId,
+          imageAbsolutePath,
+          caption,
+        });
+        return;
+      }
+
+      await sendMultipartTelegram({
+        fetchImpl,
+        apiRoot,
+        token: options.token,
+        method: "sendDocument",
+        fieldName: "document",
+        chatId,
+        imageAbsolutePath,
+        caption,
+      });
+    },
+    async sendDocument(
+      chatId: number,
+      imageAbsolutePath: string,
+      caption: string,
+    ): Promise<void> {
+      await sendMultipartTelegram({
+        fetchImpl,
+        apiRoot,
+        token: options.token,
+        method: "sendDocument",
+        fieldName: "document",
+        chatId,
+        imageAbsolutePath,
+        caption,
+      });
     },
   };
 }
@@ -433,6 +504,7 @@ export function createBotTick(dependencies: TickDependencies): BotTick {
           sender: dependencies.sender,
           now: dependencies.now,
           sleep: dependencies.sleep,
+          cwd: dependencies.cwd,
         });
         return { status: "ran", notifierResult };
       } finally {
@@ -464,6 +536,7 @@ export function startBotRuntime(options: StartBotRuntimeOptions = {}): BotRuntim
     createTelegramSender({ chatIds: config.operatorChatIds, transport });
   const tickController = createBotTick({
     dbPath: config.dbPath,
+    cwd,
     openDb,
     sender,
     notifyPendingApprovals:
@@ -523,6 +596,82 @@ export function startBotRuntime(options: StartBotRuntimeOptions = {}): BotRuntim
       commandTransport.stop();
     },
   };
+}
+
+const TELEGRAM_PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+const TELEGRAM_PHOTO_MAX_DIMENSION_SUM = 10_000;
+const TELEGRAM_PHOTO_MAX_ASPECT_RATIO = 20;
+
+async function sendMultipartTelegram(args: {
+  readonly fetchImpl: typeof fetch;
+  readonly apiRoot: string;
+  readonly token: string;
+  readonly method: "sendPhoto" | "sendDocument";
+  readonly fieldName: "photo" | "document";
+  readonly chatId: number;
+  readonly imageAbsolutePath: string;
+  readonly caption: string;
+}): Promise<void> {
+  const bytes = await readFile(args.imageAbsolutePath);
+  const form = new FormData();
+  form.append("chat_id", String(args.chatId));
+  form.append("caption", args.caption);
+  form.append(
+    args.fieldName,
+    new Blob([bytes], { type: "image/png" }),
+    "image.png",
+  );
+
+  const response = await args.fetchImpl(
+    `${args.apiRoot}/bot${args.token}/${args.method}`,
+    {
+      method: "POST",
+      body: form,
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Telegram ${args.method} failed with HTTP ${response.status}`);
+  }
+}
+
+async function isTelegramPhotoSuitable(imageAbsolutePath: string): Promise<boolean> {
+  const fileStat = await stat(imageAbsolutePath);
+  if (fileStat.size > TELEGRAM_PHOTO_MAX_BYTES) {
+    return false;
+  }
+
+  const bytes = await readFile(imageAbsolutePath);
+  const dimensions = parsePngDimensions(bytes);
+  const larger = Math.max(dimensions.width, dimensions.height);
+  const smaller = Math.min(dimensions.width, dimensions.height);
+  return (
+    dimensions.width + dimensions.height <= TELEGRAM_PHOTO_MAX_DIMENSION_SUM &&
+    larger / smaller <= TELEGRAM_PHOTO_MAX_ASPECT_RATIO
+  );
+}
+
+function parsePngDimensions(bytes: Buffer): {
+  readonly width: number;
+  readonly height: number;
+} {
+  if (
+    bytes.length < 33 ||
+    !bytes.subarray(0, 8).equals(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    ) ||
+    bytes.readUInt32BE(8) !== 13 ||
+    bytes.toString("ascii", 12, 16) !== "IHDR"
+  ) {
+    throw new Error("Telegram image upload requires a PNG with parseable IHDR");
+  }
+
+  const width = bytes.readUInt32BE(16);
+  const height = bytes.readUInt32BE(20);
+  if (width <= 0 || height <= 0) {
+    throw new Error("Telegram image upload PNG dimensions must be positive");
+  }
+  return { width, height };
 }
 
 interface TelegramUpdate {

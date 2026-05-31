@@ -254,23 +254,23 @@ const smokeRoot = path.join(
   `cz-bot-smoke-${new Date().toISOString().replaceAll(":", "-")}`,
 );
 const docPath = resolve(repoRoot, "docs", "preflight", "bot-smoke.md");
-const slice428ImplementationAnchor = "2deb95bfcd865b565fd80fca22b41947cc87b207";
+const slice9ImplementationAnchor = "0a67a0c490862ba3024df14ef3910c0235c4b176";
 const slice424Scope = new Set([
-  "src/promote.ts",
-  "src/lib/readme-image-gallery-destination.ts",
-  "src/telegram/commands.ts",
-  "scripts/image-publish-smoke.ts",
-  "docs/preflight/image-publish-smoke.md",
+  "src/telegram/notifier.ts",
+  "src/telegram/bot.ts",
+  "scripts/telegram-image-approval-smoke.ts",
+  "docs/preflight/telegram-image-approval-smoke.md",
+  "docs/runbooks/telegram-bot-operation.md",
+  "package.json",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
-  "package.json",
 ]);
 const botSmokeActiveTriggers = new Set([
-  "src/promote.ts",
-  "src/lib/readme-image-gallery-destination.ts",
-  "src/telegram/commands.ts",
-  "scripts/image-publish-smoke.ts",
-  "docs/preflight/image-publish-smoke.md",
+  "src/telegram/notifier.ts",
+  "src/telegram/bot.ts",
+  "scripts/telegram-image-approval-smoke.ts",
+  "docs/preflight/telegram-image-approval-smoke.md",
+  "docs/runbooks/telegram-bot-operation.md",
   "scripts/bot-smoke.ts",
   "docs/preflight/bot-smoke.md",
 ]);
@@ -284,11 +284,12 @@ const botSmokeActiveFrozenFiles = [
   "TODOS.md",
   "PLAN.md",
   "src/db.ts",
-  "src/telegram/bot.ts",
-  "src/telegram/notifier.ts",
+  "src/telegram/commands.ts",
   "src/telegram/allowlist.ts",
+  "src/promote.ts",
   "src/lib/report-loop.ts",
   "src/lib/publish-destination.ts",
+  "src/lib/readme-image-gallery-destination.ts",
   "src/lib/readme-publish-destination.ts",
   "src/bin/report-create.ts",
   "src/bin/report-remind.ts",
@@ -684,6 +685,7 @@ async function runTickCallsNotifier(dir: string): Promise<string[]> {
 
   const tick = createBotTick({
     dbPath,
+    cwd: dir,
     openDb(pathArg) {
       openedPath = pathArg;
       return db;
@@ -729,6 +731,7 @@ async function runOverlapGuard(dir: string): Promise<string[]> {
 
   const tick = createBotTick({
     dbPath: resolve(dir, "content.db"),
+    cwd: dir,
     openDb: () => db,
     sender: async () => undefined,
     now: () => 1,
@@ -773,6 +776,7 @@ async function runOpenDbFailureReleasesGuard(dir: string): Promise<string[]> {
 
   const tick = createBotTick({
     dbPath: resolve(dir, "content.db"),
+    cwd: dir,
     openDb: () => {
       openAttempts += 1;
       if (openAttempts === 1) {
@@ -812,12 +816,16 @@ async function runOpenDbFailureReleasesGuard(dir: string): Promise<string[]> {
 
 async function runTelegramSenderAdapter(): Promise<string[]> {
   const sends: { chatId: number; text: string }[] = [];
+  const photos: { chatId: number; imageAbsolutePath: string; caption: string }[] = [];
   const transport: TelegramTransport = {
     async sendMessage(chatId, text) {
       sends.push({ chatId, text });
       if (chatId === 300) {
         throw new Error("send failed");
       }
+    },
+    async sendPhoto(chatId, imageAbsolutePath, caption) {
+      photos.push({ chatId, imageAbsolutePath, caption });
     },
   };
   const sender = createTelegramSender({
@@ -837,6 +845,17 @@ async function runTelegramSenderAdapter(): Promise<string[]> {
     "sender mutated notification text",
   );
 
+  await sender({
+    ...notificationWithText("fallback text"),
+    imageAbsolutePath: "/tmp/image.png",
+    caption: "image caption",
+  });
+  assert(photos.length === 2, `expected two photo sends, got ${photos.length}`);
+  assert(
+    photos.every((send) => send.caption === "image caption"),
+    "sender mutated image caption",
+  );
+
   const failingSender = createTelegramSender({
     chatIds: [100, 300],
     transport,
@@ -851,6 +870,7 @@ async function runTelegramSenderAdapter(): Promise<string[]> {
 
   return [
     "Adapter sent notification.text unchanged to every configured chat ID.",
+    "Image notifications used transport.sendPhoto with the notifier-owned absolute path and caption.",
     "A failed chat send caused the adapter to throw, preserving notifier retry authority.",
   ];
 }
@@ -3452,7 +3472,7 @@ function runBoundaryStaticCheck(): string[] {
 
   return [
     `Cycle-scope boundary check ran in ${scopeMode} mode and saw changed files: ${changed.join(", ") || "<none>"}.`,
-    "Active Slice 7a scope admits only modality reject vocabulary, Telegram command control, runtime-config parsing, and bot/report-run smoke evidence files; bot/report-run smoke evidence-only refreshes do not reactivate that prior slice after HEAD moves on.",
+    "Active Slice 9 scope admits only Telegram visual-approval notifier/bot wiring, the Slice 9 smoke/runbook/evidence, package scripts, and bot-smoke adaptation evidence.",
     "Synthetic Slice 4.12 report:create files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic Slice 4.13 report:remind files resolve to inherited-surface mode without a bot-smoke exemption.",
     "Synthetic Slice 4.14 report:status files resolve to inherited-surface mode without a bot-smoke exemption.",
@@ -3820,7 +3840,7 @@ function eventCount(db: DbClient): number {
 }
 
 function changedFilesAgainstBase(): string[] {
-  return changedFilesAgainstBaseFromAnchor(repoRoot, slice428ImplementationAnchor).filter(
+  return changedFilesAgainstBaseFromAnchor(repoRoot, slice9ImplementationAnchor).filter(
     (file) =>
       !file.startsWith("reports/2026-W22-ai-trends/") &&
       !file.startsWith("reports/2026-W23-ai-trends/"),
