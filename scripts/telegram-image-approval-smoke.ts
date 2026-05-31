@@ -293,10 +293,20 @@ async function runUnsafeRunDirZeroSend(dir: string): Promise<string[]> {
       ["unsafe-parent", `.runs/${"unsafe-parent"}/../unsafe-parent`],
       ["unsafe-sibling", ".runs/other-job"],
       ["unsafe-mismatch", ".runs/unsafe-mismatch-extra"],
+      ["unsafe-run-root-symlink", ".runs/unsafe-run-root-symlink"],
     ];
     for (const [jobId, runDir] of cases) {
       seedImageJob(db, jobId, { run_dir: runDir });
-      writeSafeAttempt(dir, jobId, 1);
+      if (jobId === "unsafe-run-root-symlink") {
+        writeSafeAttempt(dir, "unsafe-run-root-target", 1);
+        symlinkSync(
+          "unsafe-run-root-target",
+          resolve(dir, ".runs", "unsafe-run-root-symlink"),
+          "dir",
+        );
+      } else {
+        writeSafeAttempt(dir, jobId, 1);
+      }
     }
 
     const calls: TransportCall[] = [];
@@ -311,7 +321,7 @@ async function runUnsafeRunDirZeroSend(dir: string): Promise<string[]> {
     }
 
     return [
-      "Absolute, parent-traversal, sibling, and mismatched run_dir cases failed closed.",
+      "Absolute, parent-traversal, sibling, mismatched, and symlinked run_dir cases failed closed.",
       "Each case recorded notify_failed with zero sender calls and no notified event.",
     ];
   } finally {

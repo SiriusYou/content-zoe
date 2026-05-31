@@ -230,36 +230,34 @@ function loadSafeImageAttempt(args: {
   runDir: string | null;
 }): SafeImageAttempt {
   const cwdReal = realpathSync(args.cwd);
-  const safeRunRoot = path.resolve(cwdReal, ".runs", args.jobId);
+  const runsRoot = path.resolve(cwdReal, ".runs");
+  const runsRootReal = validateContainedDirectory({
+    candidate: runsRoot,
+    root: cwdReal,
+    label: ".runs root",
+  });
+  const safeRunRoot = path.resolve(runsRootReal, args.jobId);
   const runDir = normalizeRunDir(args.runDir, args.jobId);
   const storedRunRoot = path.resolve(cwdReal, runDir);
-  const expectedRunRootReal = realpathContained(
-    safeRunRoot,
-    cwdReal,
-    `run root for ${args.jobId}`,
-  );
-  const storedRunRootReal = realpathContained(
-    storedRunRoot,
-    expectedRunRootReal,
-    `stored run_dir for ${args.jobId}`,
-  );
 
-  if (storedRunRootReal !== expectedRunRootReal) {
+  if (storedRunRoot !== safeRunRoot) {
     throw new Error("image notification run_dir does not match job run root");
   }
 
+  const expectedRunRootReal = validateContainedDirectory({
+    candidate: safeRunRoot,
+    root: runsRootReal,
+    label: `run root for ${args.jobId}`,
+  });
   const attemptDir = path.resolve(
     expectedRunRootReal,
     `attempt-${args.attemptNumber}`,
   );
-  const attemptDirReal = realpathContained(
-    attemptDir,
-    expectedRunRootReal,
-    `attempt directory for ${args.jobId}`,
-  );
-  if (attemptDirReal !== attemptDir) {
-    throw new Error("image notification attempt directory resolved unexpectedly");
-  }
+  const attemptDirReal = validateContainedDirectory({
+    candidate: attemptDir,
+    root: expectedRunRootReal,
+    label: `attempt directory for ${args.jobId}`,
+  });
 
   const imagePath = validateAttemptFile({
     attemptDirReal,
@@ -312,6 +310,22 @@ function normalizeRunDir(runDir: string | null, jobId: string): string {
   }
 
   return normalized;
+}
+
+function validateContainedDirectory(args: {
+  candidate: string;
+  root: string;
+  label: string;
+}): string {
+  const lstat = lstatSync(args.candidate);
+  if (lstat.isSymbolicLink()) {
+    throw new Error(`${args.label} must not be a symlink`);
+  }
+  const stat = statSync(args.candidate);
+  if (!stat.isDirectory()) {
+    throw new Error(`${args.label} must be a directory`);
+  }
+  return realpathContained(args.candidate, args.root, args.label);
 }
 
 function validateAttemptFile(args: {
