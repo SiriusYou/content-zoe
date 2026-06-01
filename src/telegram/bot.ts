@@ -56,11 +56,6 @@ export interface TelegramTransport {
     imageAbsolutePath: string,
     caption: string,
   ): Promise<void> | void;
-  sendDocument?(
-    chatId: number,
-    imageAbsolutePath: string,
-    caption: string,
-  ): Promise<void> | void;
 }
 
 export interface TelegramHttpTransportOptions {
@@ -262,22 +257,6 @@ export function createTelegramHttpTransport(
         return;
       }
 
-      await sendMultipartTelegram({
-        fetchImpl,
-        apiRoot,
-        token: options.token,
-        method: "sendDocument",
-        fieldName: "document",
-        chatId,
-        imageAbsolutePath,
-        caption,
-      });
-    },
-    async sendDocument(
-      chatId: number,
-      imageAbsolutePath: string,
-      caption: string,
-    ): Promise<void> {
       await sendMultipartTelegram({
         fetchImpl,
         apiRoot,

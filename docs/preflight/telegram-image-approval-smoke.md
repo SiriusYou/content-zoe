@@ -1,7 +1,7 @@
 # Telegram Image Approval Smoke Evidence
 
 - Command: `bun run telegram-image-approval-smoke`
-- Generated: 2026-05-31T05:42:53.063Z
+- Generated: 2026-06-01T03:02:29.870Z
 - Result: 9/9 PASS
 - Evidence ceiling: hermetic smoke/static evidence only; no live Telegram client observation.
 
@@ -15,7 +15,7 @@
 | unsafe-image-zero-send | PASS | Symlink, directory, missing image, non-PNG, and bad-IHDR image cases failed closed.<br>Unsafe image cases made zero sender calls and recorded only notify_failed. |
 | bad-metadata-zero-send | PASS | Missing and unparseable spec.json/verdict.json cases failed closed.<br>Metadata failures made zero sender calls and recorded no notified events. |
 | caption-truncation-preserves-commands | PASS | Long caption truncated deterministically to 1024 chars.<br>Approve/reject command hints, verdict, and criteria count survived truncation. |
-| bot-transport-send-photo-static | PASS | Static check found additive sendPhoto/sendDocument transport support and cwd notifier wiring.<br>src/telegram/commands.ts contains no image-upload transport changes. |
+| bot-transport-send-photo-static | PASS | Static check found additive sendPhoto transport support, private document fallback, and cwd notifier wiring.<br>src/telegram/commands.ts contains no image-upload transport changes. |
 
 ## External Execution
 

@@ -54,7 +54,7 @@ interface ScenarioOutcome {
 }
 
 interface TransportCall {
-  readonly method: "sendMessage" | "sendPhoto" | "sendDocument";
+  readonly method: "sendMessage" | "sendPhoto";
   readonly chatId: number;
   readonly text?: string;
   readonly imageAbsolutePath?: string;
@@ -435,22 +435,29 @@ async function runCaptionTruncationPreservesCommands(dir: string): Promise<strin
 
 function runBotTransportSendPhotoStatic(): string[] {
   const botSource = readFileSync(resolve(repoRoot, "src/telegram/bot.ts"), "utf8");
+  const transportInterface = extractInterfaceBody(botSource, "TelegramTransport");
   const commandsSource = readFileSync(
     resolve(repoRoot, "src/telegram/commands.ts"),
     "utf8",
   );
 
-  assert(/sendPhoto\?\(/.test(botSource), "TelegramTransport lacks optional sendPhoto");
-  assert(/sendDocument\?\(/.test(botSource), "TelegramTransport lacks optional sendDocument");
+  assert(/sendPhoto\?\(/.test(transportInterface), "TelegramTransport lacks optional sendPhoto");
+  assert(!/sendDocument\?\(/.test(transportInterface), "TelegramTransport exposes public sendDocument");
   assert(/createTelegramSender[\s\S]*\.sendPhoto/.test(botSource), "sender does not branch to sendPhoto");
   assert(/sendDocument/.test(botSource), "HTTP transport lacks document fallback");
   assert(/cwd:\s*dependencies\.cwd/.test(botSource), "bot tick does not pass cwd to notifier");
   assert(!/sendPhoto|sendDocument|caption|imageAbsolutePath/.test(commandsSource), "command handlers changed for image upload transport");
 
   return [
-    "Static check found additive sendPhoto/sendDocument transport support and cwd notifier wiring.",
+    "Static check found additive sendPhoto transport support, private document fallback, and cwd notifier wiring.",
     "src/telegram/commands.ts contains no image-upload transport changes.",
   ];
+}
+
+function extractInterfaceBody(source: string, interfaceName: string): string {
+  const match = new RegExp(`export interface ${interfaceName} \\{([\\s\\S]*?)\\n\\}`).exec(source);
+  assert(match !== null, `${interfaceName} interface missing`);
+  return match[1] ?? "";
 }
 
 async function captureLongCaption(dir: string): Promise<string> {
@@ -499,9 +506,6 @@ function recordingTransport(calls: TransportCall[]): TelegramTransport {
     },
     sendPhoto(chatId, imageAbsolutePath, caption) {
       calls.push({ method: "sendPhoto", chatId, imageAbsolutePath, caption });
-    },
-    sendDocument(chatId, imageAbsolutePath, caption) {
-      calls.push({ method: "sendDocument", chatId, imageAbsolutePath, caption });
     },
   };
 }
